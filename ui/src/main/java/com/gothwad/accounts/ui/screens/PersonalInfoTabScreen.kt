@@ -1,11 +1,17 @@
 package com.gothwad.accounts.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -20,15 +26,22 @@ import androidx.compose.material.icons.rounded.Phone
 import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.Wc
+import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.gothwad.accounts.core.GothwadAccount
+import com.gothwad.accounts.ui.LocalAccountColors
 import com.gothwad.accounts.ui.R
+import com.gothwad.accounts.ui.components.AccountAvatar
 import com.gothwad.accounts.ui.components.AccountSectionCard
 import com.gothwad.accounts.ui.components.AccountSettingRow
 import com.gothwad.accounts.ui.components.SectionDivider
@@ -37,6 +50,7 @@ import com.gothwad.accounts.ui.components.StatusTone
 import com.gothwad.accounts.ui.components.TabIntroHeader
 import com.gothwad.accounts.ui.components.displayEmail
 import com.gothwad.accounts.ui.components.displayName
+import com.gothwad.accounts.ui.components.initials
 
 @Composable
 fun PersonalInfoTabScreen(
@@ -45,18 +59,82 @@ fun PersonalInfoTabScreen(
     onEditBasicProfileClick: () -> Unit = {},
     onManagePersonalOnWeb: () -> Unit,
 ) {
+    val semantic = LocalAccountColors.current
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .testTag("personal_info_tab_screen"),
         contentPadding = PaddingValues(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
             TabIntroHeader(
                 title = stringResource(R.string.gothwad_tab_personal),
                 subtitle = "Basic identity and contact details stored on your Gothwad Account.",
+                modifier = Modifier.widthIn(max = 600.dp),
             )
+        }
+
+        // Identity preview card
+        item {
+            Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                border = BorderStroke(1.dp, semantic.cardBorder),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 600.dp),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    AccountAvatar(
+                        displayName = account.displayName(),
+                        initials = account.initials(),
+                        avatarUrl = account.avatarUrl,
+                        size = 64.dp,
+                        showBrandRing = true,
+                        onClick = onManagePersonalOnWeb,
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(3.dp),
+                    ) {
+                        Text(
+                            text = account.displayName(),
+                            style = MaterialTheme.typography.titleLarge,
+                        )
+                        Text(
+                            text = account.displayEmail(),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        account.username?.takeIf { it.isNotBlank() }?.let {
+                            Text(
+                                text = "@$it",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    }
+                    if (canEditBasicProfileNatively) {
+                        Button(
+                            onClick = onEditBasicProfileClick,
+                            shape = RoundedCornerShape(50),
+                        ) {
+                            Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Edit")
+                        }
+                    }
+                }
+            }
         }
 
         // Basic info
@@ -68,6 +146,7 @@ fun PersonalInfoTabScreen(
                 } else {
                     "Changes saved on accounts.gothwadtech.com sync automatically to this app."
                 },
+                modifier = Modifier.widthIn(max = 600.dp),
             ) {
                 AccountSettingRow(
                     label = "Profile photo",
@@ -119,6 +198,7 @@ fun PersonalInfoTabScreen(
             AccountSectionCard(
                 title = "Contact info",
                 subtitle = "Account identifiers and recovery channels",
+                modifier = Modifier.widthIn(max = 600.dp),
             ) {
                 AccountSettingRow(
                     label = "Account email",
@@ -169,6 +249,7 @@ fun PersonalInfoTabScreen(
             AccountSectionCard(
                 title = "Profile visibility",
                 subtitle = "How Gothwad services receive your profile",
+                modifier = Modifier.widthIn(max = 600.dp),
             ) {
                 AccountSettingRow(
                     label = "Sharing information",
@@ -183,6 +264,8 @@ fun PersonalInfoTabScreen(
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Text(stringResource(R.string.gothwad_manage_web))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
                     }
                 }
             }

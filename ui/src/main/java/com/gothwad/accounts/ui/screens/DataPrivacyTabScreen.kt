@@ -1,25 +1,44 @@
 package com.gothwad.accounts.ui.screens
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.DeleteForever
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.History
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.gothwad.accounts.core.GothwadAccount
+import com.gothwad.accounts.ui.LocalAccountColors
 import com.gothwad.accounts.ui.R
 import com.gothwad.accounts.ui.components.AccountSectionCard
 import com.gothwad.accounts.ui.components.AccountSettingRow
@@ -35,26 +54,133 @@ fun DataPrivacyTabScreen(
     onManageDataOnWeb: () -> Unit,
 ) {
     val context = LocalContext.current
+    val semantic = LocalAccountColors.current
 
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .testTag("data_privacy_tab_screen"),
         contentPadding = PaddingValues(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
             TabIntroHeader(
                 title = stringResource(R.string.gothwad_tab_data),
                 subtitle = "Download a copy of your account data, view shared storage usage, or permanently delete your account on web.",
+                modifier = Modifier.widthIn(max = 600.dp),
             )
         }
 
-        // Export & Delete (exact parity with /me#data)
+        // Privacy Hero Card
+        item {
+            Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                border = BorderStroke(1.dp, semantic.cardBorder),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 600.dp),
+            ) {
+                Column {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(20.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            StatusPill("Your data", StatusTone.VERIFIED)
+                            Text(
+                                text = "Data transparency & control",
+                                style = MaterialTheme.typography.titleLarge,
+                            )
+                            Text(
+                                text = "Export your account snapshot or review account lifecycle actions on accounts.gothwadtech.com.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Image(
+                            painter = painterResource(id = R.drawable.img_privacy_checkup),
+                            contentDescription = "Data and privacy illustration",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(82.dp)
+                                .clip(RoundedCornerShape(18.dp)),
+                        )
+                    }
+                    HorizontalDivider(color = semantic.cardBorder)
+                    TextButton(
+                        onClick = onManageDataOnWeb,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 2.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(stringResource(R.string.gothwad_open_on_web))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
+            }
+        }
+
+        // Shared storage quota with illustration
+        item {
+            AccountSectionCard(
+                title = "Storage across Drive & Mail",
+                subtitle = "Quota breakdown and Drive access details",
+                modifier = Modifier.widthIn(max = 600.dp),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        GothwadQuotaSummary(
+                            context = context,
+                            usedBytes = account.storageUsedBytes,
+                            limitBytes = account.storageLimitBytes,
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(14.dp))
+                    Image(
+                        painter = painterResource(id = R.drawable.img_cloud_storage),
+                        contentDescription = "Cloud storage illustration",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(68.dp)
+                            .clip(RoundedCornerShape(14.dp)),
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                SectionDivider()
+                AccountSettingRow(
+                    label = "Manage storage on Accounts web",
+                    value = "Open storage & data summary",
+                    trailingIcon = Icons.AutoMirrored.Rounded.OpenInNew,
+                    onClick = onManageDataOnWeb,
+                )
+            }
+        }
+
+        // Export & Recent activity
         item {
             AccountSectionCard(
                 title = "Data from Gothwad Accounts",
-                subtitle = "Destructive and export actions require fresh verification on accounts.gothwadtech.com.",
+                subtitle = "Export actions and security event logs on accounts.gothwadtech.com.",
+                modifier = Modifier.widthIn(max = 600.dp),
             ) {
                 AccountSettingRow(
                     label = "Export your account data",
@@ -66,51 +192,36 @@ fun DataPrivacyTabScreen(
                 )
                 SectionDivider()
                 AccountSettingRow(
-                    label = "Delete your Gothwad Account",
-                    value = "Permanently close this account",
-                    supportingText = "Deleting your account on Accounts removes core identity access; sibling products manage product data separately",
-                    icon = Icons.Rounded.DeleteForever,
-                    statusBadge = { StatusPill("Irreversible", StatusTone.CRITICAL) },
-                    trailingIcon = Icons.AutoMirrored.Rounded.OpenInNew,
-                    onClick = onManageDataOnWeb,
-                )
-            }
-        }
-
-        // Shared storage quota
-        item {
-            AccountSectionCard(
-                title = "Storage across Drive & Mail",
-                subtitle = "Quota breakdown and Drive access details",
-            ) {
-                Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)) {
-                    GothwadQuotaSummary(
-                        context = context,
-                        usedBytes = account.storageUsedBytes,
-                        limitBytes = account.storageLimitBytes,
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                }
-                SectionDivider()
-                AccountSettingRow(
-                    label = "Manage storage on Accounts web",
-                    value = "Open storage & data summary",
-                    trailingIcon = Icons.AutoMirrored.Rounded.OpenInNew,
-                    onClick = onManageDataOnWeb,
-                )
-            }
-        }
-
-        // Recent activity
-        item {
-            AccountSectionCard(title = "Recent account activity") {
-                AccountSettingRow(
                     label = "Account activity log",
                     value = "View login & account events on web",
                     icon = Icons.Rounded.History,
                     trailingIcon = Icons.AutoMirrored.Rounded.OpenInNew,
                     onClick = onManageDataOnWeb,
                 )
+            }
+        }
+
+        // Separated Danger Zone Card
+        item {
+            Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.35f)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 600.dp),
+            ) {
+                Column(modifier = Modifier.padding(vertical = 6.dp)) {
+                    AccountSettingRow(
+                        label = "Account deletion",
+                        value = "Delete your Gothwad Account",
+                        supportingText = "Deleting your account on Accounts removes core identity access; sibling products manage product data separately",
+                        icon = Icons.Rounded.DeleteForever,
+                        statusBadge = { StatusPill("Irreversible", StatusTone.CRITICAL) },
+                        trailingIcon = Icons.AutoMirrored.Rounded.OpenInNew,
+                        onClick = onManageDataOnWeb,
+                    )
+                }
             }
         }
     }

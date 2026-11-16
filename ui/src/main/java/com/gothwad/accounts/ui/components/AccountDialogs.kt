@@ -6,19 +6,25 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.LinkOff
@@ -47,12 +53,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.gothwad.accounts.core.DiscoveredAccount
 import com.gothwad.accounts.core.GothwadAccount
 import com.gothwad.accounts.core.ProfileValidation
@@ -61,6 +71,7 @@ import com.gothwad.accounts.ui.R
 import com.gothwad.accounts.ui.model.SignOutDialogTarget
 import java.time.LocalDate
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AccountSwitcherDialog(
     activeAccount: GothwadAccount,
@@ -76,116 +87,214 @@ fun AccountSwitcherDialog(
     onOpenTerms: () -> Unit,
 ) {
     val semantic = LocalAccountColors.current
+    val context = LocalContext.current
+    val hasQuota = activeAccount.storageUsedBytes != null && activeAccount.storageLimitBytes != null
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
         Surface(
-            shape = RoundedCornerShape(28.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
-            tonalElevation = 6.dp,
-            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(32.dp),
+            color = MaterialTheme.colorScheme.surfaceContainer,
+            border = BorderStroke(1.dp, semantic.cardBorder),
+            shadowElevation = 12.dp,
+            modifier = Modifier
+                .padding(horizontal = 14.dp, vertical = 20.dp)
+                .fillMaxWidth()
+                .widthIn(max = 460.dp),
         ) {
             Column(
                 modifier = Modifier
                     .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
+                    .padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                // Branded Control Centre Header
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    IconButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.testTag("switcher_close_button"),
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        modifier = Modifier.size(40.dp),
                     ) {
-                        Icon(
-                            Icons.Rounded.Close,
-                            contentDescription = stringResource(R.string.gothwad_cd_close),
+                        IconButton(
+                            onClick = onDismiss,
+                            modifier = Modifier.testTag("switcher_close_button"),
+                        ) {
+                            Icon(
+                                Icons.Rounded.Close,
+                                contentDescription = stringResource(R.string.gothwad_cd_close),
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        GothwadBrandBadge(size = 24.dp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = stringResource(R.string.gothwad_account_brand),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
-                    Text(
-                        text = stringResource(R.string.gothwad_accounts),
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.weight(1f),
-                    )
+                    Spacer(modifier = Modifier.size(40.dp))
                 }
 
-                // Active account hero box
+                // Active Account Control Hero Card
                 Surface(
-                    shape = RoundedCornerShape(24.dp),
+                    shape = RoundedCornerShape(26.dp),
                     color = MaterialTheme.colorScheme.surface,
                     border = BorderStroke(1.dp, semantic.cardBorder),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Box(contentAlignment = Alignment.BottomEnd) {
                             AccountAvatar(
                                 displayName = activeAccount.displayName(),
                                 initials = activeAccount.initials(),
                                 avatarUrl = activeAccount.avatarUrl,
-                                size = 54.dp,
+                                size = 72.dp,
                                 showBrandRing = true,
                             )
-                            Spacer(modifier = Modifier.width(14.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = activeAccount.displayName(),
-                                    style = MaterialTheme.typography.titleMedium,
-                                )
-                                Text(
-                                    text = activeAccount.displayEmail(),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.surface,
+                                border = BorderStroke(1.5.dp, semantic.cardBorder),
+                                modifier = Modifier.size(24.dp),
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.CheckCircle,
+                                        contentDescription = null,
+                                        tint = semantic.verifiedGreen,
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = activeAccount.displayName(),
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            textAlign = TextAlign.Center,
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = activeAccount.displayEmail(),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            StatusPill(
+                                label = stringResource(R.string.gothwad_active),
+                                tone = StatusTone.VERIFIED,
+                            )
+                            activeAccount.username?.takeIf { it.isNotBlank() }?.let { handle ->
+                                Surface(
+                                    shape = RoundedCornerShape(50),
+                                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                ) {
+                                    Text(
+                                        text = "@$handle",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                    )
+                                }
+                            }
+                            activeAccount.mfaEnabled?.let { mfa ->
                                 StatusPill(
-                                    label = stringResource(R.string.gothwad_active),
-                                    tone = StatusTone.VERIFIED,
+                                    label = if (mfa) "2-Step On" else "2-Step Off",
+                                    tone = if (mfa) StatusTone.VERIFIED else StatusTone.WARNING,
                                 )
                             }
                         }
-                        Spacer(modifier = Modifier.height(12.dp))
-                        OutlinedButton(
+
+                        if (hasQuota) {
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Surface(
+                                shape = RoundedCornerShape(18.dp),
+                                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                border = BorderStroke(1.dp, semantic.cardBorder),
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp)) {
+                                    GothwadQuotaSummary(
+                                        context = context,
+                                        usedBytes = activeAccount.storageUsedBytes,
+                                        limitBytes = activeAccount.storageLimitBytes,
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(
                             onClick = onManageOnWeb,
                             shape = RoundedCornerShape(50),
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .heightIn(min = 48.dp)
                                 .testTag("switcher_manage_web_button"),
                         ) {
-                            Text(stringResource(R.string.gothwad_manage_web))
+                            Text(
+                                text = stringResource(R.string.gothwad_manage_web),
+                                fontWeight = FontWeight.SemiBold,
+                            )
                             Spacer(modifier = Modifier.width(6.dp))
-                            Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
-                        }
-                        Spacer(modifier = Modifier.height(6.dp))
-                        TextButton(
-                            onClick = { onRequestSignOut(activeAccount) },
-                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("switcher_sign_out_active_button"),
-                        ) {
-                            Icon(Icons.Rounded.Logout, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(stringResource(R.string.gothwad_remove_local))
+                            Icon(
+                                Icons.AutoMirrored.Rounded.OpenInNew,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                            )
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
-
+                // Switch / Add Account Card
                 Surface(
                     shape = RoundedCornerShape(24.dp),
                     color = MaterialTheme.colorScheme.surface,
                     border = BorderStroke(1.dp, semantic.cardBorder),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Column(modifier = Modifier.padding(vertical = 6.dp)) {
+                    Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                        if (otherLocalAccounts.isNotEmpty() || peerAccountsToAuthorize.isNotEmpty()) {
+                            Text(
+                                text = stringResource(R.string.gothwad_choose_account),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp),
+                            )
+                        }
+
                         otherLocalAccounts.forEach { acc ->
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .minimumInteractiveComponentSize()
                                     .clickable(role = Role.Button) { onSwitchAccount(acc.userId) }
-                                    .padding(horizontal = 16.dp, vertical = 10.dp)
+                                    .padding(horizontal = 18.dp, vertical = 12.dp)
                                     .testTag("switch_to_${acc.userId}"),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
@@ -193,9 +302,9 @@ fun AccountSwitcherDialog(
                                     displayName = acc.displayName(),
                                     initials = acc.initials(),
                                     avatarUrl = acc.avatarUrl,
-                                    size = 36.dp,
+                                    size = 42.dp,
                                 )
-                                Spacer(modifier = Modifier.width(12.dp))
+                                Spacer(modifier = Modifier.width(14.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(acc.displayName(), style = MaterialTheme.typography.titleSmall)
                                     Text(
@@ -204,10 +313,16 @@ fun AccountSwitcherDialog(
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(18.dp),
+                                )
                             }
                             HorizontalDivider(
                                 color = semantic.cardBorder,
-                                modifier = Modifier.padding(horizontal = 16.dp),
+                                modifier = Modifier.padding(horizontal = 18.dp),
                             )
                         }
 
@@ -217,7 +332,7 @@ fun AccountSwitcherDialog(
                                     .fillMaxWidth()
                                     .minimumInteractiveComponentSize()
                                     .clickable(role = Role.Button) { onContinueWithPeerAccount(peer) }
-                                    .padding(horizontal = 16.dp, vertical = 10.dp)
+                                    .padding(horizontal = 18.dp, vertical = 12.dp)
                                     .testTag("continue_peer_${peer.userId}"),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
@@ -225,9 +340,10 @@ fun AccountSwitcherDialog(
                                     displayName = peer.displayName(),
                                     initials = peer.initials(),
                                     avatarUrl = peer.avatarUrl,
-                                    size = 36.dp,
+                                    size = 42.dp,
+                                    showBrandRing = true,
                                 )
-                                Spacer(modifier = Modifier.width(12.dp))
+                                Spacer(modifier = Modifier.width(14.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = stringResource(R.string.gothwad_continue_as, peer.displayName()),
@@ -248,7 +364,7 @@ fun AccountSwitcherDialog(
                             }
                             HorizontalDivider(
                                 color = semantic.cardBorder,
-                                modifier = Modifier.padding(horizontal = 16.dp),
+                                modifier = Modifier.padding(horizontal = 18.dp),
                             )
                         }
 
@@ -257,13 +373,13 @@ fun AccountSwitcherDialog(
                                 .fillMaxWidth()
                                 .minimumInteractiveComponentSize()
                                 .clickable(role = Role.Button) { onAddAnotherAccount() }
-                                .padding(horizontal = 16.dp, vertical = 12.dp)
+                                .padding(horizontal = 18.dp, vertical = 12.dp)
                                 .testTag("add_another_account_button"),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(36.dp)
+                                    .size(40.dp)
                                     .clip(CircleShape)
                                     .background(MaterialTheme.colorScheme.surfaceContainerHigh),
                                 contentAlignment = Alignment.Center,
@@ -271,26 +387,92 @@ fun AccountSwitcherDialog(
                                 Icon(
                                     Icons.Rounded.PersonAddAlt1,
                                     contentDescription = null,
-                                    modifier = Modifier.size(18.dp),
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp),
                                 )
                             }
-                            Spacer(modifier = Modifier.width(12.dp))
+                            Spacer(modifier = Modifier.width(14.dp))
                             Text(
-                                stringResource(R.string.gothwad_add_account),
+                                text = stringResource(R.string.gothwad_add_account),
                                 style = MaterialTheme.typography.titleSmall,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp),
                             )
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                // Sign-out / Account Removal Card
+                Surface(
+                    shape = RoundedCornerShape(22.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, semantic.cardBorder),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .minimumInteractiveComponentSize()
+                            .clickable(role = Role.Button) { onRequestSignOut(activeAccount) }
+                            .padding(horizontal = 18.dp, vertical = 12.dp)
+                            .testTag("switcher_sign_out_active_button"),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(semantic.criticalContainer),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                Icons.Rounded.Logout,
+                                contentDescription = null,
+                                tint = semantic.onCriticalContainer,
+                                modifier = Modifier.size(19.dp),
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(R.string.gothwad_remove_local),
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                            Text(
+                                text = "Local, device, or server OAuth options",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                }
+
+                // Footer Legal Links
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     TextButton(onClick = onOpenPrivacy) {
                         Text(stringResource(R.string.gothwad_privacy), style = MaterialTheme.typography.bodySmall)
                     }
+                    Text(
+                        text = "•",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                     TextButton(onClick = onOpenTerms) {
                         Text(stringResource(R.string.gothwad_terms), style = MaterialTheme.typography.bodySmall)
                     }
@@ -310,54 +492,101 @@ fun SignOutOrRemoveDialog(
     onDisconnectGrantOnServer: () -> Unit = onSignOutThisApp,
     onManageWebSessions: () -> Unit,
 ) {
+    val semantic = LocalAccountColors.current
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(target.displayName, fontWeight = FontWeight.SemiBold) },
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+        modifier = Modifier
+            .padding(horizontal = 16.dp)
+            .fillMaxWidth()
+            .widthIn(max = 460.dp),
+        title = {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(target.displayName, fontWeight = FontWeight.SemiBold)
+                Text(
+                    text = target.email,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Text(
-                    text = target.email,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Text(
-                    text = stringResource(R.string.gothwad_local_removal_notice),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    text = stringResource(R.string.gothwad_device_removal_notice),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    text = stringResource(R.string.gothwad_server_disconnect_notice),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                OutlinedButton(
-                    onClick = onRemoveFromDevice,
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                    shape = RoundedCornerShape(50),
-                    modifier = Modifier.fillMaxWidth().testTag("dialog_remove_device_button"),
+                Surface(
+                    shape = RoundedCornerShape(18.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, semantic.cardBorder),
                 ) {
-                    Icon(Icons.Rounded.DeleteOutline, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(stringResource(R.string.gothwad_remove_device))
+                    Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = stringResource(R.string.gothwad_local_removal_notice),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Button(
+                            onClick = onSignOutThisApp,
+                            shape = RoundedCornerShape(50),
+                            modifier = Modifier.fillMaxWidth().testTag("dialog_sign_out_app_button"),
+                        ) {
+                            Icon(Icons.Rounded.Logout, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(stringResource(R.string.gothwad_remove_local))
+                        }
+                    }
                 }
-                OutlinedButton(
-                    onClick = onDisconnectGrantOnServer,
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                    shape = RoundedCornerShape(50),
-                    modifier = Modifier.fillMaxWidth().testTag("dialog_disconnect_server_button"),
+
+                Surface(
+                    shape = RoundedCornerShape(18.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, semantic.cardBorder),
                 ) {
-                    Icon(Icons.Rounded.LinkOff, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(stringResource(R.string.gothwad_disconnect_server))
+                    Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = stringResource(R.string.gothwad_device_removal_notice),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        OutlinedButton(
+                            onClick = onRemoveFromDevice,
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                            shape = RoundedCornerShape(50),
+                            modifier = Modifier.fillMaxWidth().testTag("dialog_remove_device_button"),
+                        ) {
+                            Icon(Icons.Rounded.DeleteOutline, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(stringResource(R.string.gothwad_remove_device))
+                        }
+                    }
                 }
+
+                Surface(
+                    shape = RoundedCornerShape(18.dp),
+                    color = semantic.criticalContainer.copy(alpha = 0.55f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.35f)),
+                ) {
+                    Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = stringResource(R.string.gothwad_server_disconnect_notice),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = semantic.onCriticalContainer,
+                        )
+                        OutlinedButton(
+                            onClick = onDisconnectGrantOnServer,
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                            shape = RoundedCornerShape(50),
+                            modifier = Modifier.fillMaxWidth().testTag("dialog_disconnect_server_button"),
+                        ) {
+                            Icon(Icons.Rounded.LinkOff, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(stringResource(R.string.gothwad_disconnect_server))
+                        }
+                    }
+                }
+
                 TextButton(
                     onClick = onManageWebSessions,
                     modifier = Modifier.fillMaxWidth(),
@@ -367,14 +596,6 @@ fun SignOutOrRemoveDialog(
             }
         },
         confirmButton = {
-            Button(
-                onClick = onSignOutThisApp,
-                modifier = Modifier.testTag("dialog_sign_out_app_button"),
-            ) {
-                Text(stringResource(R.string.gothwad_remove_local))
-            }
-        },
-        dismissButton = {
             TextButton(onClick = onDismiss) {
                 Text(stringResource(R.string.gothwad_cancel))
             }
@@ -407,6 +628,12 @@ fun EditBasicProfileDialog(
 
     AlertDialog(
         onDismissRequest = { if (!isSaving) onDismiss() },
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+        modifier = Modifier
+            .padding(horizontal = 16.dp)
+            .fillMaxWidth()
+            .widthIn(max = 460.dp),
         title = { Text("Edit personal info", fontWeight = FontWeight.SemiBold) },
         text = {
             Column(

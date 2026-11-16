@@ -2,6 +2,13 @@ package com.gothwad.accounts.ui.components
 
 import android.content.Context
 import android.text.format.Formatter
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -11,23 +18,40 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.HelpOutline
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material.icons.rounded.Group
+import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.PrivacyTip
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.WarningAmber
@@ -37,17 +61,17 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -107,6 +131,32 @@ fun DiscoveredAccount.initials(): String {
 }
 
 @Composable
+fun GothwadBrandBadge(
+    size: Dp = 28.dp,
+    modifier: Modifier = Modifier,
+) {
+    val semantic = LocalAccountColors.current
+    Box(
+        modifier = modifier.size(size),
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val stroke = Stroke(width = (size.toPx() * 0.11f).coerceAtLeast(2.4.dp.toPx()), cap = StrokeCap.Round)
+            drawArc(semantic.brandHighlight, startAngle = -140f, sweepAngle = 80f, useCenter = false, style = stroke)
+            drawArc(semantic.brandTertiary, startAngle = -52f, sweepAngle = 80f, useCenter = false, style = stroke)
+            drawArc(semantic.brandSecondary, startAngle = 36f, sweepAngle = 86f, useCenter = false, style = stroke)
+            drawArc(semantic.brandPrimary, startAngle = 130f, sweepAngle = 82f, useCenter = false, style = stroke)
+        }
+        Text(
+            text = "G",
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = semantic.brandPrimary,
+        )
+    }
+}
+
+@Composable
 fun AccountsTopAppBar(
     activeAccount: GothwadAccount?,
     canNavigateBack: Boolean,
@@ -118,11 +168,28 @@ fun AccountsTopAppBar(
     onHelpClick: () -> Unit,
     onAvatarClick: () -> Unit,
 ) {
+    val semantic = LocalAccountColors.current
+    val infiniteTransition = rememberInfiniteTransition(label = "refresh_spin")
+    val refreshAngle by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 900, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "refresh_angle",
+    )
+    val topBarInsets = WindowInsets.statusBars.union(
+        WindowInsets.displayCutout.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
+    )
+
+    // Paints the exact #FFFFFF / #212121 canvas color behind the system status bar while keeping
+    // all header controls cleanly below the battery/network/clock bar.
     Surface(
-        color = MaterialTheme.colorScheme.surface,
+        color = semantic.canvasBackground,
         tonalElevation = 0.dp,
     ) {
-        Column {
+        Column(modifier = Modifier.windowInsetsPadding(topBarInsets)) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -150,17 +217,23 @@ fun AccountsTopAppBar(
                             .semantics { heading() },
                     )
                 } else {
-                    Text(
-                        text = stringResource(R.string.gothwad_account_brand),
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                    Row(
                         modifier = Modifier
                             .weight(1f)
-                            .padding(start = 12.dp)
-                            .semantics { heading() },
-                    )
+                            .padding(start = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        GothwadBrandBadge(size = 28.dp)
+                        Text(
+                            text = stringResource(R.string.gothwad_account_brand),
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.semantics { heading() },
+                        )
+                    }
                 }
 
                 if (activeAccount != null && !canNavigateBack) {
@@ -182,7 +255,8 @@ fun AccountsTopAppBar(
                         Icon(
                             imageVector = Icons.Rounded.Refresh,
                             contentDescription = stringResource(R.string.gothwad_refresh_profile),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            tint = if (isRefreshing) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.rotate(if (isRefreshing) refreshAngle else 0f),
                         )
                     }
                 }
@@ -236,49 +310,84 @@ fun AccountsTabBar(
     selectedTab: AccountTab,
     onSelectTab: (AccountTab) -> Unit,
 ) {
+    val semantic = LocalAccountColors.current
     val tabs = AccountTab.entries
-    val selectedIndex = tabs.indexOf(selectedTab).coerceAtLeast(0)
-    Surface(color = MaterialTheme.colorScheme.surface) {
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(selectedTab) {
+        listState.animateScrollToItem(selectedTab.ordinal)
+    }
+
+    Surface(color = semantic.canvasBackground) {
         Column {
-            PrimaryScrollableTabRow(
-                selectedTabIndex = selectedIndex,
-                containerColor = MaterialTheme.colorScheme.surface,
-                contentColor = MaterialTheme.colorScheme.primary,
-                edgePadding = 16.dp,
-                divider = {},
-                indicator = {
-                    TabRowDefaults.PrimaryIndicator(
-                        modifier = Modifier.tabIndicatorOffset(selectedIndex, matchContentSize = true),
-                        width = 36.dp,
-                        height = 3.dp,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                },
+            LazyRow(
+                state = listState,
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                tabs.forEach { tab ->
+                items(tabs, key = { it.name }) { tab ->
                     val isSelected = tab == selectedTab
-                    Tab(
-                        selected = isSelected,
-                        onClick = { onSelectTab(tab) },
-                        modifier = Modifier.testTag("tab_${tab.name.lowercase()}"),
-                        text = {
+                    val containerColor by animateColorAsState(
+                        targetValue = if (isSelected) {
+                            MaterialTheme.colorScheme.primaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.surfaceContainerLow
+                        },
+                        label = "tab_bg_${tab.name}",
+                    )
+                    val contentColor by animateColorAsState(
+                        targetValue = if (isSelected) {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        label = "tab_fg_${tab.name}",
+                    )
+                    val icon = when (tab) {
+                        AccountTab.HOME -> Icons.Rounded.Home
+                        AccountTab.PERSONAL_INFO -> Icons.Rounded.Person
+                        AccountTab.SECURITY -> Icons.Rounded.Lock
+                        AccountTab.DATA_PRIVACY -> Icons.Rounded.PrivacyTip
+                        AccountTab.PEOPLE_SHARING -> Icons.Rounded.Group
+                        AccountTab.CONNECTED_APPS -> Icons.Rounded.Apps
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = containerColor,
+                        border = if (isSelected) null else BorderStroke(1.dp, semantic.cardBorder),
+                        modifier = Modifier
+                            .minimumInteractiveComponentSize()
+                            .clip(RoundedCornerShape(50))
+                            .clickable(role = Role.Tab) { onSelectTab(tab) }
+                            .testTag("tab_${tab.name.lowercase()}"),
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = null,
+                                tint = contentColor,
+                                modifier = Modifier.size(16.dp),
+                            )
                             Text(
                                 text = stringResource(tab.titleRes),
-                                style = MaterialTheme.typography.titleSmall.copy(
+                                style = MaterialTheme.typography.labelLarge.copy(
                                     fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
                                 ),
-                                color = if (isSelected) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                },
+                                color = contentColor,
                                 maxLines = 1,
                             )
-                        },
-                    )
+                        }
+                    }
                 }
             }
-            HorizontalDivider(color = LocalAccountColors.current.cardBorder)
+            HorizontalDivider(color = semantic.cardBorder)
         }
     }
 }
@@ -358,7 +467,7 @@ fun AccountSectionCard(
     val semantic = LocalAccountColors.current
     Surface(
         shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surface,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
         border = BorderStroke(1.dp, semantic.cardBorder),
         modifier = modifier.fillMaxWidth(),
     ) {
@@ -543,6 +652,7 @@ fun GothwadQuotaSummary(
     usedBytes: Long?,
     limitBytes: Long?,
 ) {
+    val semantic = LocalAccountColors.current
     val knownUsed = usedBytes != null && usedBytes >= 0L
     val knownLimit = limitBytes != null && limitBytes > 0L
     val fraction = if (knownUsed && knownLimit) {
@@ -550,14 +660,48 @@ fun GothwadQuotaSummary(
     } else {
         0f
     }
+    val percent = (fraction * 100f).toInt()
+    val barColor = when {
+        fraction >= 0.9f -> semantic.criticalRed
+        fraction >= 0.75f -> semantic.warningAmber
+        else -> MaterialTheme.colorScheme.primary
+    }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (knownUsed && knownLimit) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "${Formatter.formatShortFileSize(context, usedBytes!!)} of ${Formatter.formatShortFileSize(context, limitBytes!!)}",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = barColor.copy(alpha = 0.14f),
+                ) {
+                    Text(
+                        text = "$percent% used",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = barColor,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                    )
+                }
+            }
+        }
         LinearProgressIndicator(
             progress = { fraction },
+            color = barColor,
+            trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            strokeCap = StrokeCap.Round,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(8.dp)
-                .clip(RoundedCornerShape(4.dp)),
+                .height(10.dp)
+                .clip(RoundedCornerShape(5.dp)),
         )
         Row(
             modifier = Modifier.fillMaxWidth(),

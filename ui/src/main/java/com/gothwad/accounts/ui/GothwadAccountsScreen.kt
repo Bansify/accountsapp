@@ -9,10 +9,18 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.browser.customtabs.CustomTabsIntent
-import androidx.compose.animation.Crossfade
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -85,6 +93,9 @@ fun GothwadAccountsScreen(
         }
 
         Scaffold(
+            contentWindowInsets = WindowInsets.safeDrawing.only(
+                WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal,
+            ),
             containerColor = semantic.canvasBackground,
             snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
@@ -193,8 +204,11 @@ fun GothwadAccountsScreen(
 
                             is AccountState.SignedIn -> {
                                 val current = accountState.account
-                                Crossfade(
+                                AnimatedContent(
                                     targetState = uiState.selectedTab,
+                                    transitionSpec = {
+                                        fadeIn(animationSpec = tween(220)) togetherWith fadeOut(animationSpec = tween(160))
+                                    },
                                     label = "account_tab_transition",
                                 ) { tab ->
                                     when (tab) {

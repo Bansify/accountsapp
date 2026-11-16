@@ -1,12 +1,24 @@
 package com.gothwad.accounts.ui.screens
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
@@ -21,18 +33,26 @@ import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PhonelinkLock
 import androidx.compose.material.icons.rounded.Smartphone
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.gothwad.accounts.core.AccountActivityEntry
 import com.gothwad.accounts.core.GothwadAccount
 import com.gothwad.accounts.core.WebSessionInfo
+import com.gothwad.accounts.ui.LocalAccountColors
 import com.gothwad.accounts.ui.R
 import com.gothwad.accounts.ui.components.AccountSectionCard
 import com.gothwad.accounts.ui.components.AccountSettingRow
@@ -44,6 +64,7 @@ import com.gothwad.accounts.ui.components.displayEmail
 import com.gothwad.accounts.ui.components.displayName
 import com.gothwad.accounts.ui.model.AccountTab
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SecurityTabScreen(
     account: GothwadAccount,
@@ -57,18 +78,128 @@ fun SecurityTabScreen(
     onRequestSignOutOrRemove: (GothwadAccount) -> Unit,
     onNavigateTab: (AccountTab) -> Unit,
 ) {
+    val semantic = LocalAccountColors.current
+    val attentionCount = listOfNotNull(
+        account.hasPassword?.let { !it },
+        account.mfaEnabled?.let { !it },
+        account.recoveryEmailVerified?.let { !it },
+    ).count { it }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .testTag("security_tab_screen"),
         contentPadding = PaddingValues(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
             TabIntroHeader(
                 title = stringResource(R.string.gothwad_tab_security),
                 subtitle = "Sign-in credentials, multi-factor verification, passkeys, and active sessions for ${account.displayEmail()}.",
+                modifier = Modifier.widthIn(max = 600.dp),
             )
+        }
+
+        // Dynamic Security Status Hero Card
+        item {
+            Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                border = BorderStroke(1.dp, semantic.cardBorder),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 600.dp),
+            ) {
+                Column {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(20.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            StatusPill(
+                                label = when {
+                                    attentionCount > 0 -> "$attentionCount item${if (attentionCount > 1) "s" else ""} to review"
+                                    account.mfaEnabled == true -> "Strong protection"
+                                    else -> "Security status"
+                                },
+                                tone = when {
+                                    attentionCount > 0 -> StatusTone.WARNING
+                                    account.mfaEnabled == true -> StatusTone.VERIFIED
+                                    else -> StatusTone.NEUTRAL
+                                },
+                            )
+                            Text(
+                                text = if (attentionCount == 0 && account.mfaEnabled == true) {
+                                    "Your Gothwad Account is protected"
+                                } else {
+                                    "Security checkup & sign-in"
+                                },
+                                style = MaterialTheme.typography.titleLarge,
+                            )
+                            Text(
+                                text = "Manage password, TOTP 2-Step Verification, passkeys, and browser sessions.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Image(
+                            painter = painterResource(id = R.drawable.img_security_shield),
+                            contentDescription = "Security checkup illustration",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(82.dp)
+                                .clip(RoundedCornerShape(18.dp)),
+                        )
+                    }
+                    FlowRow(
+                        modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        account.hasPassword?.let { hasPwd ->
+                            StatusPill(
+                                label = if (hasPwd) "Password set" else "Add password",
+                                tone = if (hasPwd) StatusTone.VERIFIED else StatusTone.WARNING,
+                            )
+                        }
+                        account.mfaEnabled?.let { mfa ->
+                            StatusPill(
+                                label = if (mfa) "2-Step On" else "2-Step Off",
+                                tone = if (mfa) StatusTone.VERIFIED else StatusTone.WARNING,
+                            )
+                        }
+                        account.passkeyCount?.let { count ->
+                            StatusPill(
+                                label = if (count > 0) "$count Passkey${if (count > 1) "s" else ""}" else "No passkeys",
+                                tone = if (count > 0) StatusTone.VERIFIED else StatusTone.NEUTRAL,
+                            )
+                        }
+                    }
+                    HorizontalDivider(color = semantic.cardBorder)
+                    TextButton(
+                        onClick = onManageSecurityOnWeb,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 2.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(stringResource(R.string.gothwad_open_on_web))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
+            }
         }
 
         // How you sign in (exact parity with /me#security)
@@ -76,6 +207,7 @@ fun SecurityTabScreen(
             AccountSectionCard(
                 title = "How you sign in to Gothwad",
                 subtitle = "Credentials stay in your browser session on accounts.gothwadtech.com and are never stored in native apps.",
+                modifier = Modifier.widthIn(max = 600.dp),
             ) {
                 AccountSettingRow(
                     label = "Password",
@@ -142,6 +274,7 @@ fun SecurityTabScreen(
             AccountSectionCard(
                 title = "Your devices & sessions",
                 subtitle = "Each Gothwad app holds its own hardware-backed OAuth tokens on this phone.",
+                modifier = Modifier.widthIn(max = 600.dp),
             ) {
                 AccountSettingRow(
                     label = "Web & browser sessions",
@@ -232,16 +365,51 @@ fun SecurityTabScreen(
 
         // Security activity & Connected apps
         item {
-            AccountSectionCard(title = "Activity & app permissions") {
+            AccountSectionCard(
+                title = "Activity & app permissions",
+                modifier = Modifier.widthIn(max = 600.dp),
+            ) {
                 if (canManageNatively && activityFeed.isNotEmpty()) {
                     activityFeed.take(5).forEachIndexed { idx, entry ->
                         if (idx > 0) SectionDivider()
-                        AccountSettingRow(
-                            label = entry.title,
-                            value = entry.detail ?: entry.type,
-                            supportingText = listOfNotNull(entry.ipAddress, entry.createdAt).joinToString(" · "),
-                            icon = Icons.Rounded.History,
-                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(semantic.verifiedContainer),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.History,
+                                    contentDescription = null,
+                                    tint = semantic.onVerifiedContainer,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(14.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(entry.title, style = MaterialTheme.typography.titleSmall)
+                                Text(
+                                    text = entry.detail ?: entry.type,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                val meta = listOfNotNull(entry.ipAddress, entry.createdAt).joinToString(" · ")
+                                if (meta.isNotBlank()) {
+                                    Text(
+                                        text = meta,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
                     }
                     SectionDivider()
                 } else {

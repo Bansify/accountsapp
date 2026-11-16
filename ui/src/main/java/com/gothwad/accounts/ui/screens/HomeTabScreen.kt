@@ -1,11 +1,14 @@
 package com.gothwad.accounts.ui.screens
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,10 +18,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.Badge
@@ -29,25 +34,31 @@ import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PrivacyTip
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material.icons.rounded.Security
+import androidx.compose.material.icons.rounded.VerifiedUser
 import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.gothwad.accounts.core.GothwadAccount
@@ -58,11 +69,14 @@ import com.gothwad.accounts.ui.components.AccountSectionCard
 import com.gothwad.accounts.ui.components.AccountSettingRow
 import com.gothwad.accounts.ui.components.GothwadQuotaSummary
 import com.gothwad.accounts.ui.components.SectionDivider
+import com.gothwad.accounts.ui.components.StatusPill
+import com.gothwad.accounts.ui.components.StatusTone
 import com.gothwad.accounts.ui.components.displayEmail
 import com.gothwad.accounts.ui.components.displayName
 import com.gothwad.accounts.ui.components.initials
 import com.gothwad.accounts.ui.model.AccountTab
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun HomeTabScreen(
     account: GothwadAccount,
@@ -76,136 +90,204 @@ fun HomeTabScreen(
     val context = LocalContext.current
     val semantic = LocalAccountColors.current
     val displayEmail = account.displayEmail()
+    val headerGlow = Brush.verticalGradient(
+        colors = listOf(
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.26f),
+            semantic.canvasBackground,
+        ),
+    )
 
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .testTag("home_tab_screen"),
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(bottom = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        // Welcome hero
+        // Atmospheric Welcome Hero
         item {
-            Column(
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 6.dp, bottom = 4.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
+                    .background(headerGlow)
+                    .padding(horizontal = 16.dp, vertical = 20.dp),
+                contentAlignment = Alignment.Center,
             ) {
-                AccountAvatar(
-                    displayName = account.displayName(),
-                    initials = account.initials(),
-                    avatarUrl = account.avatarUrl,
-                    size = 86.dp,
-                    showBrandRing = true,
-                    onClick = onOpenAvatarMenu,
-                )
-                Spacer(modifier = Modifier.height(14.dp))
-                Text(
-                    text = "Welcome, ${account.displayName()}",
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onBackground,
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                Surface(
-                    shape = RoundedCornerShape(50),
-                    color = MaterialTheme.colorScheme.surface,
-                    border = BorderStroke(1.dp, semantic.cardBorder),
+                Column(
                     modifier = Modifier
-                        .minimumInteractiveComponentSize()
-                        .clickable(role = Role.Button) { onCopyEmail(displayEmail) }
-                        .testTag("home_copy_email_chip"),
+                        .fillMaxWidth()
+                        .widthIn(max = 600.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    AccountAvatar(
+                        displayName = account.displayName(),
+                        initials = account.initials(),
+                        avatarUrl = account.avatarUrl,
+                        size = 90.dp,
+                        showBrandRing = true,
+                        onClick = onOpenAvatarMenu,
+                    )
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Text(
+                        text = "Welcome, ${account.displayName()}",
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        textAlign = TextAlign.Center,
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.dp, semantic.cardBorder),
+                        modifier = Modifier
+                            .minimumInteractiveComponentSize()
+                            .clickable(role = Role.Button) { onCopyEmail(displayEmail) }
+                            .testTag("home_copy_email_chip"),
                     ) {
-                        Text(
-                            text = displayEmail,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Icon(
-                            imageVector = Icons.Rounded.ContentCopy,
-                            contentDescription = stringResource(R.string.gothwad_cd_copy_email),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(14.dp),
-                        )
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Text(
+                                text = displayEmail,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Icon(
+                                imageVector = Icons.Rounded.ContentCopy,
+                                contentDescription = stringResource(R.string.gothwad_cd_copy_email),
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(14.dp),
+                            )
+                        }
+                    }
+
+                    // Live account security status pills when fields are available
+                    val hasAnyStatus = account.mfaEnabled != null || account.hasPassword != null || account.passkeyCount != null
+                    if (hasAnyStatus) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            account.mfaEnabled?.let { mfa ->
+                                StatusPill(
+                                    label = if (mfa) "2-Step On" else "2-Step Off",
+                                    tone = if (mfa) StatusTone.VERIFIED else StatusTone.WARNING,
+                                )
+                            }
+                            account.passkeyCount?.takeIf { it > 0 }?.let { count ->
+                                StatusPill(
+                                    label = "$count Passkey${if (count > 1) "s" else ""}",
+                                    tone = StatusTone.VERIFIED,
+                                )
+                            }
+                            account.hasPassword?.let { hasPwd ->
+                                StatusPill(
+                                    label = if (hasPwd) "Password set" else "No password",
+                                    tone = if (hasPwd) StatusTone.NEUTRAL else StatusTone.WARNING,
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Search pill
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.dp, semantic.cardBorder),
+                        shadowElevation = 1.dp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .minimumInteractiveComponentSize()
+                            .clip(RoundedCornerShape(50))
+                            .clickable(role = Role.Button, onClick = onOpenSearch)
+                            .testTag("home_search_bar_pill"),
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Search,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = stringResource(R.string.gothwad_search_hint),
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
             }
         }
 
-        // Search pill
-        item {
-            Surface(
-                shape = RoundedCornerShape(50),
-                color = MaterialTheme.colorScheme.surface,
-                border = BorderStroke(1.dp, semantic.cardBorder),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .minimumInteractiveComponentSize()
-                    .clickable(role = Role.Button, onClick = onOpenSearch)
-                    .testTag("home_search_bar_pill"),
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Search,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = stringResource(R.string.gothwad_search_hint),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        }
-
-        // Security checkup / recovery summary card
+        // Security checkup hero card with illustration
         item {
             Surface(
                 shape = RoundedCornerShape(24.dp),
-                color = MaterialTheme.colorScheme.surface,
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
                 border = BorderStroke(1.dp, semantic.cardBorder),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .padding(horizontal = 16.dp)
+                    .fillMaxWidth()
+                    .widthIn(max = 600.dp),
             ) {
-                Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(semantic.verifiedContainer),
-                            contentAlignment = Alignment.Center,
+                Column {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(20.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Security,
-                                contentDescription = null,
-                                tint = semantic.verifiedGreen,
+                            StatusPill(
+                                label = if (account.mfaEnabled == true) "Account protected" else "Security overview",
+                                tone = if (account.mfaEnabled == true) StatusTone.VERIFIED else StatusTone.NEUTRAL,
+                            )
+                            Text(
+                                text = "Keep your account protected",
+                                style = MaterialTheme.typography.titleLarge,
+                            )
+                            Text(
+                                text = "Review password, 2-Step Verification, passkeys, recovery email, and active web sessions.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        Text(
-                            text = "Keep your account protected",
-                            style = MaterialTheme.typography.titleMedium,
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Image(
+                            painter = painterResource(id = R.drawable.img_security_shield),
+                            contentDescription = "Account security shield",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(84.dp)
+                                .clip(RoundedCornerShape(18.dp)),
                         )
                     }
-                    Text(
-                        text = "Review password, 2-Step Verification, passkeys, recovery email, and active web sessions on Accounts.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    HorizontalDivider(color = semantic.cardBorder)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
                         Button(
                             onClick = { onNavigateTab(AccountTab.SECURITY) },
                             shape = RoundedCornerShape(50),
                         ) {
+                            Icon(Icons.Rounded.VerifiedUser, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text("Review security")
                         }
                         OutlinedButton(
@@ -221,9 +303,15 @@ fun HomeTabScreen(
             }
         }
 
-        // Quick links (4 real sections matching accounts/web/me)
+        // Quick links grid (4 real sections matching accounts/web/me)
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(
+                modifier = Modifier
+                    .padding(horizontal = 16.dp)
+                    .fillMaxWidth()
+                    .widthIn(max = 600.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -269,26 +357,118 @@ fun HomeTabScreen(
             }
         }
 
-        // Drive & Mail shared storage quota
+        // Privacy & personalization card with illustration
         item {
-            AccountSectionCard(
-                title = "Drive & Mail storage",
-                subtitle = "Shared account quota synced from Gothwad Accounts",
+            Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                border = BorderStroke(1.dp, semantic.cardBorder),
+                modifier = Modifier
+                    .padding(horizontal = 16.dp)
+                    .fillMaxWidth()
+                    .widthIn(max = 600.dp),
             ) {
-                Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)) {
-                    GothwadQuotaSummary(
-                        context = context,
-                        usedBytes = account.storageUsedBytes,
-                        limitBytes = account.storageLimitBytes,
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    OutlinedButton(
-                        onClick = { onManageOnWeb("data") },
-                        shape = RoundedCornerShape(50),
+                Column {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(20.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(stringResource(R.string.gothwad_manage_web))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Text(
+                                text = "Data & privacy controls",
+                                style = MaterialTheme.typography.titleLarge,
+                            )
+                            Text(
+                                text = "Export your Gothwad Account snapshot, review activity, or manage shared Drive & Mail quota.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Image(
+                            painter = painterResource(id = R.drawable.img_privacy_checkup),
+                            contentDescription = "Privacy controls illustration",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(80.dp)
+                                .clip(RoundedCornerShape(18.dp)),
+                        )
+                    }
+                    HorizontalDivider(color = semantic.cardBorder)
+                    TextButton(
+                        onClick = { onNavigateTab(AccountTab.DATA_PRIVACY) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 2.dp),
+                    ) {
+                        Text("Manage data & privacy", modifier = Modifier.fillMaxWidth())
+                    }
+                }
+            }
+        }
+
+        // Drive & Mail shared storage quota with illustration
+        item {
+            Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                border = BorderStroke(1.dp, semantic.cardBorder),
+                modifier = Modifier
+                    .padding(horizontal = 16.dp)
+                    .fillMaxWidth()
+                    .widthIn(max = 600.dp),
+            ) {
+                Column {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(20.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Text(
+                                text = "Drive & Mail storage",
+                                style = MaterialTheme.typography.titleLarge,
+                            )
+                            GothwadQuotaSummary(
+                                context = context,
+                                usedBytes = account.storageUsedBytes,
+                                limitBytes = account.storageLimitBytes,
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Image(
+                            painter = painterResource(id = R.drawable.img_cloud_storage),
+                            contentDescription = "Cloud storage illustration",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(78.dp)
+                                .clip(RoundedCornerShape(18.dp)),
+                        )
+                    }
+                    HorizontalDivider(color = semantic.cardBorder)
+                    TextButton(
+                        onClick = { onManageOnWeb("data") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 2.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(stringResource(R.string.gothwad_manage_web))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
+                        }
                     }
                 }
             }
@@ -296,7 +476,12 @@ fun HomeTabScreen(
 
         // Account details (only verified fields from /oauth/userinfo)
         item {
-            AccountSectionCard(title = "Account details") {
+            AccountSectionCard(
+                title = "Account details",
+                modifier = Modifier
+                    .padding(horizontal = 16.dp)
+                    .widthIn(max = 600.dp),
+            ) {
                 AccountSettingRow(
                     label = "Account email",
                     value = displayEmail,
@@ -347,23 +532,37 @@ private fun HomeQuickLinkTile(
 ) {
     val semantic = LocalAccountColors.current
     Surface(
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(22.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
         border = BorderStroke(1.dp, semantic.cardBorder),
-        modifier = modifier.clickable(role = Role.Button, onClick = onClick),
+        modifier = modifier
+            .clip(RoundedCornerShape(22.dp))
+            .clickable(role = Role.Button, onClick = onClick),
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Box(
-                modifier = Modifier
-                    .size(38.dp)
-                    .clip(CircleShape)
-                    .background(accent.copy(alpha = 0.14f)),
-                contentAlignment = Alignment.Center,
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(imageVector = icon, contentDescription = null, tint = accent, modifier = Modifier.size(20.dp))
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(accent.copy(alpha = 0.14f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(imageVector = icon, contentDescription = null, tint = accent, modifier = Modifier.size(20.dp))
+                }
+                Icon(
+                    imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp),
+                )
             }
             Text(
                 text = title,
