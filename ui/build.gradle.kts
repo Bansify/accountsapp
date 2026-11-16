@@ -12,14 +12,16 @@ android {
     buildFeatures { compose = true }
     publishing { singleVariant("release") { withSourcesJar() } }
 }
-kotlin { jvmToolchain(17) }
+kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
 dependencies {
     api(project(":core"))
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
     implementation(libs.compose.material3)
+    implementation(libs.compose.icons.extended)
     implementation(libs.activity.compose)
     implementation(libs.lifecycle.compose)
+    implementation(libs.lifecycle.viewmodel.compose)
 }
 afterEvaluate {
     publishing { publications { register<MavenPublication>("release") {

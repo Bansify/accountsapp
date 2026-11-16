@@ -12,7 +12,7 @@ android {
 
     publishing { singleVariant("release") { withSourcesJar() } }
 }
-kotlin { jvmToolchain(17) }
+kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
 dependencies {
     api(libs.coroutines)
     api(libs.okhttp)
