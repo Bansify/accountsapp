@@ -18,6 +18,7 @@ import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.Logout
 import androidx.compose.material.icons.rounded.MarkEmailRead
 import androidx.compose.material.icons.rounded.Password
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PhonelinkLock
 import androidx.compose.material.icons.rounded.Smartphone
 import androidx.compose.material3.ButtonDefaults
@@ -39,12 +40,13 @@ import com.gothwad.accounts.ui.components.StatusPill
 import com.gothwad.accounts.ui.components.StatusTone
 import com.gothwad.accounts.ui.components.TabIntroHeader
 import com.gothwad.accounts.ui.components.displayEmail
+import com.gothwad.accounts.ui.components.displayName
 import com.gothwad.accounts.ui.model.AccountTab
 
 @Composable
 fun SecurityTabScreen(
     account: GothwadAccount,
-    localAccountsCount: Int,
+    localAccounts: List<GothwadAccount>,
     installedVerifiedPeers: List<String>,
     onManageSecurityOnWeb: () -> Unit,
     onRequestSignOutOrRemove: (GothwadAccount) -> Unit,
@@ -72,34 +74,55 @@ fun SecurityTabScreen(
             ) {
                 AccountSettingRow(
                     label = "Password",
-                    value = "Add or update password",
+                    value = when (account.hasPassword) {
+                        true -> "Password configured"
+                        false -> "No password set"
+                        null -> "Add or update password"
+                    },
                     supportingText = "Protected with PBKDF2-SHA256 / server session",
                     icon = Icons.Rounded.Password,
+                    statusBadge = account.hasPassword?.let { set ->
+                        { StatusPill(if (set) "Set" else "Not set", if (set) StatusTone.VERIFIED else StatusTone.WARNING) }
+                    },
                     trailingIcon = Icons.AutoMirrored.Rounded.OpenInNew,
                     onClick = onManageSecurityOnWeb,
                 )
                 SectionDivider()
                 AccountSettingRow(
                     label = "2-Step Verification",
-                    value = "Authenticator app (TOTP) & backup codes",
+                    value = when (account.mfaEnabled) {
+                        true -> "Authenticator app (TOTP) active"
+                        false -> "Not enabled yet"
+                        null -> "Authenticator app (TOTP) & backup codes"
+                    },
                     supportingText = "Configure or manage TOTP recovery codes on Accounts web",
                     icon = Icons.Rounded.PhonelinkLock,
+                    statusBadge = account.mfaEnabled?.let { enabled ->
+                        { StatusPill(if (enabled) "On" else "Off", if (enabled) StatusTone.VERIFIED else StatusTone.WARNING) }
+                    },
                     trailingIcon = Icons.AutoMirrored.Rounded.OpenInNew,
                     onClick = onManageSecurityOnWeb,
                 )
                 SectionDivider()
                 AccountSettingRow(
                     label = "Passkeys",
-                    value = "Biometric & hardware security keys (WebAuthn)",
+                    value = account.passkeyCount?.let { count ->
+                        if (count > 0) "$count passkey(s) enrolled" else "No passkeys enrolled"
+                    } ?: "Biometric & hardware security keys (WebAuthn)",
                     supportingText = "Enroll or remove passkeys for passwordless login",
                     icon = Icons.Rounded.Fingerprint,
+                    statusBadge = account.passkeyCount?.let { count ->
+                        { StatusPill("$count", if (count > 0) StatusTone.VERIFIED else StatusTone.NEUTRAL) }
+                    },
                     trailingIcon = Icons.AutoMirrored.Rounded.OpenInNew,
                     onClick = onManageSecurityOnWeb,
                 )
                 SectionDivider()
                 AccountSettingRow(
                     label = "Google accounts",
-                    value = "Linked Google sign-in accounts (up to 3)",
+                    value = account.linkedGoogleCount?.let { count ->
+                        if (count > 0) "$count Google account(s) linked" else "No Google account linked"
+                    } ?: "Linked Google sign-in accounts (up to 3)",
                     supportingText = "Link or unlink Google login methods on Accounts web",
                     icon = Icons.Rounded.Link,
                     trailingIcon = Icons.AutoMirrored.Rounded.OpenInNew,
@@ -108,8 +131,11 @@ fun SecurityTabScreen(
                 SectionDivider()
                 AccountSettingRow(
                     label = "Recovery email",
-                    value = "Manage verified backup email",
+                    value = account.recoveryEmail?.takeIf { it.isNotBlank() } ?: "Manage verified backup email",
                     icon = Icons.Rounded.MarkEmailRead,
+                    statusBadge = account.recoveryEmailVerified?.let { verified ->
+                        { StatusPill(if (verified) "Verified" else "Unverified", if (verified) StatusTone.VERIFIED else StatusTone.WARNING) }
+                    },
                     trailingIcon = Icons.AutoMirrored.Rounded.OpenInNew,
                     onClick = onManageSecurityOnWeb,
                 )
@@ -124,7 +150,9 @@ fun SecurityTabScreen(
             ) {
                 AccountSettingRow(
                     label = "Web & browser sessions",
-                    value = "Review active sessions & sign out other browsers",
+                    value = account.activeSessionsCount?.let { count ->
+                        "$count active web session(s)"
+                    } ?: "Review active sessions & sign out other browsers",
                     supportingText = "Opens Security & devices on accounts.gothwadtech.com",
                     icon = Icons.Rounded.Devices,
                     trailingIcon = Icons.AutoMirrored.Rounded.OpenInNew,
@@ -146,11 +174,22 @@ fun SecurityTabScreen(
                     icon = Icons.Rounded.Smartphone,
                     statusBadge = {
                         StatusPill(
-                            label = "$localAccountsCount local",
+                            label = "${localAccounts.size} local",
                             tone = StatusTone.VERIFIED,
                         )
                     },
                 )
+                if (localAccounts.size > 1) {
+                    localAccounts.forEach { acc ->
+                        SectionDivider()
+                        AccountSettingRow(
+                            label = if (acc.userId == account.userId) "Active local account" else "Signed-in local account",
+                            value = "${acc.displayName()} (${acc.displayEmail()})",
+                            icon = Icons.Rounded.Person,
+                            onClick = { onRequestSignOutOrRemove(acc) },
+                        )
+                    }
+                }
                 Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)) {
                     OutlinedButton(
                         onClick = { onRequestSignOutOrRemove(account) },

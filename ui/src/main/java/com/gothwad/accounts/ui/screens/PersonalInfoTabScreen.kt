@@ -123,7 +123,7 @@ fun PersonalInfoTabScreen(
                 SectionDivider()
                 AccountSettingRow(
                     label = "Phone number",
-                    value = "View or update on Accounts web",
+                    value = account.phoneNumber?.takeIf { it.isNotBlank() } ?: "View or update on Accounts web",
                     supportingText = "Used as a sign-in identifier when set",
                     icon = Icons.Rounded.Phone,
                     trailingIcon = Icons.AutoMirrored.Rounded.OpenInNew,
@@ -132,9 +132,17 @@ fun PersonalInfoTabScreen(
                 SectionDivider()
                 AccountSettingRow(
                     label = "Recovery email",
-                    value = "View or verify on Accounts web",
+                    value = account.recoveryEmail?.takeIf { it.isNotBlank() } ?: "View or verify on Accounts web",
                     supportingText = "Used for password resets and security alerts",
                     icon = Icons.Rounded.MarkEmailRead,
+                    statusBadge = account.recoveryEmailVerified?.let { verified ->
+                        {
+                            StatusPill(
+                                label = if (verified) "Verified" else "Unverified",
+                                tone = if (verified) StatusTone.VERIFIED else StatusTone.WARNING,
+                            )
+                        }
+                    },
                     trailingIcon = Icons.AutoMirrored.Rounded.OpenInNew,
                     onClick = onManagePersonalOnWeb,
                 )

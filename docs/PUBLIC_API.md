@@ -11,6 +11,7 @@ GothwadAccounts.init(
         clientId = "gothwad-tube",
         redirectUri = "https://tube.gothwadtech.com/oauth/callback",
         scopes = setOf(Scope.Profile, Scope.Email, Scope.OfflineAccess),
+        allowCustomSchemeRedirect = true, // Set false in production apps using verified https App Links
         brokerPolicy = BrokerPolicy.PeerDiscovery(
             trustPolicy = BrokerTrustPolicy.SameSigningCertificate(
                 allowDebugBuild = BuildConfig.DEBUG,
@@ -50,8 +51,8 @@ GothwadAccounts.signIn(activity)
 GothwadAccounts.signIn(activity, chooseAccount = true)
 GothwadAccounts.signIn(activity, loginHint = peer.email ?: peer.username)
 GothwadAccounts.switchTo(userId)
-GothwadAccounts.signOut(userId)          // App-local removal ONLY
-GothwadAccounts.removeFromDevice(userId) // Local removal + tombstone + verified peer IPC
+GothwadAccounts.signOut(userId, revokeOnServer = true) // Local removal + best-effort /oauth/revoke
+GothwadAccounts.removeFromDevice(userId)               // Local removal + tombstone + verified peer IPC + best-effort /oauth/revoke
 GothwadAccounts.refreshProfile()         // Force /oauth/userinfo refresh (optional drive quota)
 GothwadAccounts.syncDiscoveredAccounts() // Re-query verified peer AccountDirectoryProviders
 GothwadAccounts.recoverCorruptedStorage()

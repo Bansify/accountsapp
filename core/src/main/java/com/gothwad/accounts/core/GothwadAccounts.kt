@@ -163,11 +163,11 @@ object GothwadAccounts {
         }
     }
 
-    /** Removes local app credentials only; peer apps and browser sessions stay signed in. */
-    fun signOut(userId: String) = scope.launch {
+    /** Removes local app credentials and optionally best-effort revokes this client's token on server. */
+    fun signOut(userId: String, revokeOnServer: Boolean = true) = scope.launch {
         action {
             readyOrThrow()
-            session.signOut(userId)
+            session.signOut(userId, revokeOnServer = revokeOnServer)
             syncDiscoveredAccountsInternal()
         }
     }

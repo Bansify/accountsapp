@@ -11,6 +11,8 @@ enum class Scope(val wireValue: String) {
     DriveRead("drive.read"),
     Notes("notes"),
     Chat("chat"),
+    AccountRead("account.read"),
+    AccountProfileWrite("account.profile.write"),
 }
 
 sealed interface BrokerTrustPolicy {
@@ -67,6 +69,7 @@ data class GothwadConfig(
     val scopes: Set<Scope> = setOf(Scope.Profile, Scope.Email, Scope.OfflineAccess),
     val authBaseUrl: String = "https://accounts.gothwadtech.com/api",
     val brokerPolicy: BrokerPolicy = BrokerPolicy.Disabled,
+    val allowCustomSchemeRedirect: Boolean = true,
 ) {
     init {
         require(clientId.isNotBlank() && scopes.isNotEmpty())
@@ -76,6 +79,9 @@ data class GothwadConfig(
         val redirect = URI(redirectUri)
         require(redirect.isAbsolute && !redirect.isOpaque && redirect.rawPath == "/oauth/callback")
         require(redirect.rawQuery == null && redirect.rawFragment == null && redirect.rawUserInfo == null)
+        require(allowCustomSchemeRedirect || redirect.scheme == "https") {
+            "Production config with allowCustomSchemeRedirect=false requires an https App Link redirectUri"
+        }
         require(redirect.scheme == "https" || (redirect.scheme.contains('.') && redirect.rawAuthority == null))
         require(redirect.scheme != "https" || !redirect.host.isNullOrBlank())
     }

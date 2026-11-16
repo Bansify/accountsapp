@@ -114,35 +114,49 @@ internal class SessionManager(
         save(data.copy(credentials = updated, activeUserId = userId))
     }
 
-    /** App-local removal only; does not emit a device-wide removal tombstone. */
-    suspend fun signOut(userId: String) = mutex.withLock {
-        check(!corrupted) { "Account storage is corrupted" }
-        generation++
-        val remaining = data.credentials.filterNot { it.account.userId == userId }
-        save(
-            data.copy(
-                credentials = remaining,
-                activeUserId = if (data.activeUserId == userId) remaining.firstOrNull()?.account?.userId else data.activeUserId,
-                pending = null,
-            ),
-        )
+    /** App-local removal only; persists locally first, then optionally performs best-effort server revoke. */
+    suspend fun signOut(userId: String, revokeOnServer: Boolean = false) {
+        val removed = mutex.withLock {
+            check(!corrupted) { "Account storage is corrupted" }
+            generation++
+            val target = data.credentials.find { it.account.userId == userId }
+            val remaining = data.credentials.filterNot { it.account.userId == userId }
+            save(
+                data.copy(
+                    credentials = remaining,
+                    activeUserId = if (data.activeUserId == userId) remaining.firstOrNull()?.account?.userId else data.activeUserId,
+                    pending = null,
+                ),
+            )
+            target
+        }
+        if (revokeOnServer && removed != null) {
+            runCatching { oauth.revoke(removed.refreshToken, removed.accessToken) }
+        }
     }
 
-    /** Removes local tokens AND records a device-removal tombstone at [removedAt]. */
-    suspend fun removeFromDevice(userId: String, removedAt: Long = clock()): Long = mutex.withLock {
-        check(!corrupted) { "Account storage is corrupted" }
-        generation++
-        val remaining = data.credentials.filterNot { it.account.userId == userId }
-        val nextTombstones = data.deviceRemovalTombstones + (userId to removedAt)
-        save(
-            data.copy(
-                credentials = remaining,
-                activeUserId = if (data.activeUserId == userId) remaining.firstOrNull()?.account?.userId else data.activeUserId,
-                pending = null,
-                deviceRemovalTombstones = nextTombstones,
-            ),
-        )
-        removedAt
+    /** Removes local tokens, records a device-removal tombstone at [removedAt], and revokes this app's grant best-effort. */
+    suspend fun removeFromDevice(userId: String, removedAt: Long = clock()): Long {
+        val removed = mutex.withLock {
+            check(!corrupted) { "Account storage is corrupted" }
+            generation++
+            val target = data.credentials.find { it.account.userId == userId }
+            val remaining = data.credentials.filterNot { it.account.userId == userId }
+            val nextTombstones = data.deviceRemovalTombstones + (userId to removedAt)
+            save(
+                data.copy(
+                    credentials = remaining,
+                    activeUserId = if (data.activeUserId == userId) remaining.firstOrNull()?.account?.userId else data.activeUserId,
+                    pending = null,
+                    deviceRemovalTombstones = nextTombstones,
+                ),
+            )
+            target
+        }
+        if (removed != null) {
+            runCatching { oauth.revoke(removed.refreshToken, removed.accessToken) }
+        }
+        return removedAt
     }
 
     /** Applies a verified peer's device-removal notification when [removedAt] is newer than local sign-in. */

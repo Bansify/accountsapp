@@ -11,6 +11,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Before
@@ -64,7 +65,7 @@ class OAuthClientSecurityTest {
     }
 
     @Test
-    fun parsesFullUserInfoIncludingOptionalDriveQuota() {
+    fun parsesFullUserInfoIncludingSecuritySummaryAndDriveQuota() {
         server.enqueue(
             MockResponse()
                 .setResponseCode(200)
@@ -76,7 +77,18 @@ class OAuthClientSecurityTest {
                       "name": "Arjun Sharma",
                       "email": "arjun@gothwadtech.com",
                       "picture": "https://accounts.gothwadtech.com/api/avatars/user-123?v=abc",
+                      "created_at": "2026-01-01T00:00:00Z",
                       "updated_at": "2026-11-16T00:00:00Z",
+                      "phone_number": "+919876543210",
+                      "recovery_email": "arjun.recovery@example.com",
+                      "recovery_email_verified": true,
+                      "security": {
+                        "has_password": true,
+                        "mfa_enabled": true,
+                        "passkey_count": 2,
+                        "linked_google_count": 1,
+                        "active_sessions_count": 3
+                      },
                       "drive": {
                         "used_bytes": 5242880,
                         "limit_bytes": 16106127360,
@@ -92,6 +104,15 @@ class OAuthClientSecurityTest {
         assertEquals("Arjun Sharma", account.name)
         assertEquals("arjun@gothwadtech.com", account.email)
         assertEquals("https://accounts.gothwadtech.com/api/avatars/user-123?v=abc", account.avatarUrl)
+        assertEquals("2026-01-01T00:00:00Z", account.createdAt)
+        assertEquals("+919876543210", account.phoneNumber)
+        assertEquals("arjun.recovery@example.com", account.recoveryEmail)
+        assertEquals(true, account.recoveryEmailVerified)
+        assertEquals(true, account.hasPassword)
+        assertEquals(true, account.mfaEnabled)
+        assertEquals(2, account.passkeyCount)
+        assertEquals(1, account.linkedGoogleCount)
+        assertEquals(3, account.activeSessionsCount)
         assertEquals(5242880L, account.storageUsedBytes)
         assertEquals(16106127360L, account.storageLimitBytes)
     }
@@ -139,5 +160,41 @@ class OAuthClientSecurityTest {
             assertFalse(err.rejected)
         }
         assertNull(server.takeRequest().getHeader("Referer"))
+    }
+
+    @Test
+    fun revokePostsClientAndRefreshTokenAndHandlesUnavailableGracefully() {
+        val oauth = testOAuthClient()
+        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"revoked":true}"""))
+
+        assertTrue(oauth.revoke("rt-123", "at-456"))
+        val recorded = server.takeRequest()
+        assertEquals("POST", recorded.method)
+        assertEquals("/api/oauth/revoke", recorded.path)
+        assertEquals("Bearer at-456", recorded.getHeader("Authorization"))
+        val body = recorded.body.readUtf8()
+        assertTrue(body.contains("client_id=gothwad-accounts-android"))
+        assertTrue(body.contains("token=rt-123"))
+        assertTrue(body.contains("token_type_hint=refresh_token"))
+
+        server.enqueue(MockResponse().setResponseCode(404))
+        assertFalse(oauth.revoke("rt-123", "at-456"))
+    }
+
+    @Test
+    fun productionConfigCanRequireHttpsAppLinkRedirects() {
+        assertThrows(IllegalArgumentException::class.java) {
+            GothwadConfig(
+                clientId = "gothwad-tube",
+                redirectUri = "com.gothwad.tube:/oauth/callback",
+                allowCustomSchemeRedirect = false,
+            )
+        }
+        val prodConfig = GothwadConfig(
+            clientId = "gothwad-tube",
+            redirectUri = "https://tube.gothwadtech.com/oauth/callback",
+            allowCustomSchemeRedirect = false,
+        )
+        assertEquals("https://tube.gothwadtech.com/oauth/callback", prodConfig.redirectUri)
     }
 }

@@ -42,6 +42,7 @@ class SessionManagerTest {
 
     private open class Service : OAuthService {
         val calls = AtomicInteger()
+        val revokeCalls = AtomicInteger()
         override fun exchange(code: String, verifier: String) = TokenResponse("access", "refresh", 3600, "Bearer")
         override fun refresh(token: String): TokenResponse {
             calls.incrementAndGet()
@@ -49,6 +50,10 @@ class SessionManagerTest {
         }
 
         override fun userInfo(token: String) = GothwadAccount("user", "pawan")
+        override fun revoke(refreshToken: String?, accessToken: String?): Boolean {
+            revokeCalls.incrementAndGet()
+            return true
+        }
     }
 
     private fun store() = MemoryStore(StoredSession(listOf(expired), "user"))
@@ -194,5 +199,22 @@ class SessionManagerTest {
         val updated = manager.refreshActiveProfile()
         assertEquals("Updated Name", updated?.name)
         assertEquals(1024L, (manager.state.value as AccountState.SignedIn).account.storageUsedBytes)
+    }
+
+    @Test
+    fun signOutWithServerRevokeAlwaysClearsLocalEvenIfServerFails() = runTest {
+        val store = store()
+        val failingRevokeService = object : Service() {
+            override fun revoke(refreshToken: String?, accessToken: String?): Boolean {
+                revokeCalls.incrementAndGet()
+                throw IOException("offline")
+            }
+        }
+        val manager = SessionManager(store, failingRevokeService) { 1000 }
+        manager.load()
+        manager.signOut("user", revokeOnServer = true)
+        assertEquals(1, failingRevokeService.revokeCalls.get())
+        assertEquals(AccountState.SignedOut, manager.state.value)
+        assertTrue(store.value.credentials.isEmpty())
     }
 }

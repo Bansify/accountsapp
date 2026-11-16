@@ -20,7 +20,7 @@ Register or update public OAuth clients in D1 `ecosystem_apps` (zero APK `client
 
 | App / Host | `client_id` | Allowed `redirect_uris` | Scopes |
 | --- | --- | --- | --- |
-| Accounts Android (`:app`) | `gothwad-accounts-android` | `https://accounts.gothwadtech.com/android/callback` (App Link), `com.gothwad.accounts:/oauth/callback` | `profile email offline_access` |
+| Accounts Android (`:app`) | `gothwad-accounts-android` | `https://accounts.gothwadtech.com/oauth/callback` (App Link), `com.gothwad.accounts:/oauth/callback` | `profile email offline_access drive.read account.read` |
 | Sample Alpha (`:sample:alpha`) | `gothwad-accounts-sample-alpha` | `com.gothwad.accounts.sample.alpha:/oauth/callback` | `profile email offline_access` |
 | Sample Beta (`:sample:beta`) | `gothwad-accounts-sample-beta` | `com.gothwad.accounts.sample.beta:/oauth/callback` | `profile email offline_access` |
 | Gothwad Mail (`mailapp`) | `gothwad-mail` | `https://mail.gothwadtech.com/oauth/callback`, `com.gothwad.mail:/oauth/callback` | `profile email mail offline_access` |

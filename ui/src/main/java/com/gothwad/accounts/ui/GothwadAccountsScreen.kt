@@ -221,7 +221,7 @@ fun GothwadAccountsScreen(
 
                                         AccountTab.SECURITY -> SecurityTabScreen(
                                             account = current,
-                                            localAccountsCount = accountState.all.size,
+                                            localAccounts = accountState.all,
                                             installedVerifiedPeers = uiState.installedVerifiedPeers,
                                             onManageSecurityOnWeb = {
                                                 activity?.let { accountViewModel.openWebSection(it, "security") }

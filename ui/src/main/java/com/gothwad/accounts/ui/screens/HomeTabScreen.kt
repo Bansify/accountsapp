@@ -317,6 +317,13 @@ fun HomeTabScreen(
                     icon = Icons.Rounded.CloudQueue,
                     supportingText = "Signed-in accounts in this app: $localAccountCount",
                 )
+                account.createdAt?.takeIf { it.isNotBlank() }?.let { created ->
+                    SectionDivider()
+                    AccountSettingRow(
+                        label = "Account created",
+                        value = created,
+                    )
+                }
                 account.updatedAt?.takeIf { it.isNotBlank() }?.let { updated ->
                     SectionDivider()
                     AccountSettingRow(
