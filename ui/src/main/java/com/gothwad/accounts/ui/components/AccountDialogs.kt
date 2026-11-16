@@ -1,5 +1,11 @@
 package com.gothwad.accounts.ui.components
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -30,6 +36,8 @@ import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.LinkOff
 import androidx.compose.material.icons.rounded.Logout
 import androidx.compose.material.icons.rounded.PersonAddAlt1
+import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Smartphone
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -53,6 +61,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -77,6 +86,9 @@ fun AccountSwitcherDialog(
     activeAccount: GothwadAccount,
     otherLocalAccounts: List<GothwadAccount>,
     peerAccountsToAuthorize: List<DiscoveredAccount>,
+    isRefreshing: Boolean = false,
+    onRefreshClick: (() -> Unit)? = null,
+    onOpenSettings: (() -> Unit)? = null,
     onDismiss: () -> Unit,
     onSwitchAccount: (String) -> Unit,
     onContinueWithPeerAccount: (DiscoveredAccount) -> Unit,
@@ -89,6 +101,16 @@ fun AccountSwitcherDialog(
     val semantic = LocalAccountColors.current
     val context = LocalContext.current
     val hasQuota = activeAccount.storageUsedBytes != null && activeAccount.storageLimitBytes != null
+    val refreshSpin = rememberInfiniteTransition(label = "control_centre_refresh")
+    val refreshAngle by refreshSpin.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 900, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "control_centre_refresh_angle",
+    )
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -146,7 +168,30 @@ fun AccountSwitcherDialog(
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
-                    Spacer(modifier = Modifier.size(40.dp))
+                    if (onRefreshClick != null) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            modifier = Modifier.size(40.dp),
+                        ) {
+                            IconButton(
+                                onClick = onRefreshClick,
+                                enabled = !isRefreshing,
+                                modifier = Modifier.testTag("top_refresh_button"),
+                            ) {
+                                Icon(
+                                    Icons.Rounded.Refresh,
+                                    contentDescription = stringResource(R.string.gothwad_refresh_profile),
+                                    tint = if (isRefreshing) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .rotate(if (isRefreshing) refreshAngle else 0f),
+                                )
+                            }
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.size(40.dp))
+                    }
                 }
 
                 // Active Account Control Hero Card
@@ -407,55 +452,105 @@ fun AccountSwitcherDialog(
                     }
                 }
 
-                // Sign-out / Account Removal Card
+                // App Settings & Sign-out Card
                 Surface(
                     shape = RoundedCornerShape(22.dp),
                     color = MaterialTheme.colorScheme.surface,
                     border = BorderStroke(1.dp, semantic.cardBorder),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .minimumInteractiveComponentSize()
-                            .clickable(role = Role.Button) { onRequestSignOut(activeAccount) }
-                            .padding(horizontal = 18.dp, vertical = 12.dp)
-                            .testTag("switcher_sign_out_active_button"),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Box(
+                    Column {
+                        if (onOpenSettings != null) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .minimumInteractiveComponentSize()
+                                    .clickable(role = Role.Button, onClick = onOpenSettings)
+                                    .padding(horizontal = 18.dp, vertical = 12.dp)
+                                    .testTag("switcher_app_settings_button"),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Icon(
+                                        Icons.Rounded.Settings,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(19.dp),
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(14.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = stringResource(R.string.gothwad_settings_title),
+                                        style = MaterialTheme.typography.titleSmall,
+                                    )
+                                    Text(
+                                        text = "Theme & navigation layout",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            }
+                            HorizontalDivider(
+                                color = semantic.cardBorder,
+                                modifier = Modifier.padding(horizontal = 18.dp),
+                            )
+                        }
+                        Row(
                             modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(semantic.criticalContainer),
-                            contentAlignment = Alignment.Center,
+                                .fillMaxWidth()
+                                .minimumInteractiveComponentSize()
+                                .clickable(role = Role.Button) { onRequestSignOut(activeAccount) }
+                                .padding(horizontal = 18.dp, vertical = 12.dp)
+                                .testTag("switcher_sign_out_active_button"),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(semantic.criticalContainer),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    Icons.Rounded.Logout,
+                                    contentDescription = null,
+                                    tint = semantic.onCriticalContainer,
+                                    modifier = Modifier.size(19.dp),
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(14.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = stringResource(R.string.gothwad_remove_local),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                                Text(
+                                    text = "Local, device, or server OAuth options",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                             Icon(
-                                Icons.Rounded.Logout,
+                                imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
                                 contentDescription = null,
-                                tint = semantic.onCriticalContainer,
-                                modifier = Modifier.size(19.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp),
                             )
                         }
-                        Spacer(modifier = Modifier.width(14.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = stringResource(R.string.gothwad_remove_local),
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.error,
-                            )
-                            Text(
-                                text = "Local, device, or server OAuth options",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(18.dp),
-                        )
                     }
                 }
 

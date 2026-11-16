@@ -3,12 +3,6 @@ package com.gothwad.accounts.ui.components
 import android.content.Context
 import android.text.format.Formatter
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -24,11 +18,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.union
@@ -37,8 +34,10 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.HelpOutline
@@ -46,14 +45,17 @@ import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.Group
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PrivacyTip
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -61,6 +63,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarDefaults
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -71,7 +79,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -156,29 +163,30 @@ fun GothwadBrandBadge(
     }
 }
 
+fun accountTabIcon(tab: AccountTab): ImageVector = when (tab) {
+    AccountTab.HOME -> Icons.Rounded.Home
+    AccountTab.PERSONAL_INFO -> Icons.Rounded.Person
+    AccountTab.SECURITY -> Icons.Rounded.Lock
+    AccountTab.DATA_PRIVACY -> Icons.Rounded.PrivacyTip
+    AccountTab.PEOPLE_SHARING -> Icons.Rounded.Group
+    AccountTab.CONNECTED_APPS -> Icons.Rounded.Apps
+}
+
 @Composable
 fun AccountsTopAppBar(
     activeAccount: GothwadAccount?,
     canNavigateBack: Boolean,
     subScreenTitle: String?,
     isRefreshing: Boolean,
+    showMenuButton: Boolean = false,
+    onMenuClick: () -> Unit = {},
     onBackClick: () -> Unit,
     onSearchClick: () -> Unit,
-    onRefreshClick: () -> Unit,
+    onSettingsClick: () -> Unit = {},
     onHelpClick: () -> Unit,
     onAvatarClick: () -> Unit,
 ) {
     val semantic = LocalAccountColors.current
-    val infiniteTransition = rememberInfiniteTransition(label = "refresh_spin")
-    val refreshAngle by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 900, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart,
-        ),
-        label = "refresh_angle",
-    )
     val topBarInsets = WindowInsets.statusBars.union(
         WindowInsets.displayCutout.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
     )
@@ -193,7 +201,7 @@ fun AccountsTopAppBar(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                    .padding(horizontal = 6.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (canNavigateBack) {
@@ -217,14 +225,27 @@ fun AccountsTopAppBar(
                             .semantics { heading() },
                     )
                 } else {
+                    if (showMenuButton) {
+                        IconButton(
+                            onClick = onMenuClick,
+                            modifier = Modifier.testTag("top_menu_button"),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Menu,
+                                contentDescription = stringResource(R.string.gothwad_cd_menu),
+                            )
+                        }
+                    }
                     Row(
                         modifier = Modifier
                             .weight(1f)
-                            .padding(start = 10.dp),
+                            .padding(start = if (showMenuButton) 2.dp else 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        GothwadBrandBadge(size = 28.dp)
+                        if (!showMenuButton) {
+                            GothwadBrandBadge(size = 26.dp)
+                        }
                         Text(
                             text = stringResource(R.string.gothwad_account_brand),
                             style = MaterialTheme.typography.titleLarge,
@@ -248,35 +269,43 @@ fun AccountsTopAppBar(
                         )
                     }
                     IconButton(
-                        onClick = onRefreshClick,
-                        enabled = !isRefreshing,
-                        modifier = Modifier.testTag("top_refresh_button"),
+                        onClick = onSettingsClick,
+                        modifier = Modifier.testTag("top_settings_button"),
                     ) {
                         Icon(
-                            imageVector = Icons.Rounded.Refresh,
-                            contentDescription = stringResource(R.string.gothwad_refresh_profile),
-                            tint = if (isRefreshing) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.rotate(if (isRefreshing) refreshAngle else 0f),
+                            imageVector = Icons.Rounded.Settings,
+                            contentDescription = stringResource(R.string.gothwad_cd_settings),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                }
-
-                IconButton(
-                    onClick = onHelpClick,
-                    modifier = Modifier.testTag("top_help_button"),
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Rounded.HelpOutline,
-                        contentDescription = stringResource(R.string.gothwad_cd_help),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                } else if (!canNavigateBack) {
+                    IconButton(
+                        onClick = onSettingsClick,
+                        modifier = Modifier.testTag("top_settings_button"),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Settings,
+                            contentDescription = stringResource(R.string.gothwad_cd_settings),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    IconButton(
+                        onClick = onHelpClick,
+                        modifier = Modifier.testTag("top_help_button"),
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.HelpOutline,
+                            contentDescription = stringResource(R.string.gothwad_cd_help),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
 
                 if (activeAccount != null) {
                     val accountLabel = activeAccount.displayName()
                     Box(
                         modifier = Modifier
-                            .padding(end = 6.dp)
+                            .padding(end = 4.dp)
                             .minimumInteractiveComponentSize()
                             .clip(CircleShape)
                             .clickable(
@@ -389,6 +418,221 @@ fun AccountsTabBar(
             }
             HorizontalDivider(color = semantic.cardBorder)
         }
+    }
+}
+
+@Composable
+fun AccountsBottomBar(
+    selectedTab: AccountTab,
+    isOthersSelected: Boolean,
+    onSelectTab: (AccountTab) -> Unit,
+    onSelectOthers: () -> Unit,
+) {
+    val semantic = LocalAccountColors.current
+    val itemColors = NavigationBarItemDefaults.colors(
+        selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        selectedTextColor = MaterialTheme.colorScheme.primary,
+        indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+
+    Column {
+        HorizontalDivider(color = semantic.cardBorder)
+        NavigationBar(
+            containerColor = semantic.canvasBackground,
+            tonalElevation = 0.dp,
+            windowInsets = NavigationBarDefaults.windowInsets,
+        ) {
+            NavigationBarItem(
+                selected = !isOthersSelected && selectedTab == AccountTab.HOME,
+                onClick = { onSelectTab(AccountTab.HOME) },
+                icon = { Icon(Icons.Rounded.Home, contentDescription = null) },
+                label = { Text("Home", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis) },
+                colors = itemColors,
+                modifier = Modifier.testTag("bottom_tab_home"),
+            )
+            NavigationBarItem(
+                selected = !isOthersSelected && selectedTab == AccountTab.PERSONAL_INFO,
+                onClick = { onSelectTab(AccountTab.PERSONAL_INFO) },
+                icon = { Icon(Icons.Rounded.Person, contentDescription = null) },
+                label = { Text("Personal", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis) },
+                colors = itemColors,
+                modifier = Modifier.testTag("bottom_tab_personal"),
+            )
+            NavigationBarItem(
+                selected = !isOthersSelected && selectedTab == AccountTab.SECURITY,
+                onClick = { onSelectTab(AccountTab.SECURITY) },
+                icon = { Icon(Icons.Rounded.Lock, contentDescription = null) },
+                label = { Text("Security", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis) },
+                colors = itemColors,
+                modifier = Modifier.testTag("bottom_tab_security"),
+            )
+            NavigationBarItem(
+                selected = !isOthersSelected && selectedTab == AccountTab.DATA_PRIVACY,
+                onClick = { onSelectTab(AccountTab.DATA_PRIVACY) },
+                icon = { Icon(Icons.Rounded.PrivacyTip, contentDescription = null) },
+                label = { Text("Privacy", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis) },
+                colors = itemColors,
+                modifier = Modifier.testTag("bottom_tab_data"),
+            )
+            NavigationBarItem(
+                selected = isOthersSelected,
+                onClick = onSelectOthers,
+                icon = { Icon(Icons.Rounded.GridView, contentDescription = null) },
+                label = {
+                    Text(
+                        text = stringResource(R.string.gothwad_tab_others),
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
+                colors = itemColors,
+                modifier = Modifier.testTag("bottom_tab_others"),
+            )
+        }
+    }
+}
+
+@Composable
+fun AccountsSidebarContent(
+    activeAccount: GothwadAccount?,
+    selectedTab: AccountTab,
+    isSettingsSelected: Boolean,
+    isHelpSelected: Boolean,
+    isRefreshing: Boolean,
+    onSelectTab: (AccountTab) -> Unit,
+    onOpenSettings: () -> Unit,
+    onOpenHelp: () -> Unit,
+    onRefreshClick: () -> Unit,
+) {
+    val semantic = LocalAccountColors.current
+    val navInsets = WindowInsets.safeDrawing.only(
+        WindowInsetsSides.Vertical + WindowInsetsSides.Start,
+    )
+    val itemColors = NavigationDrawerItemDefaults.colors(
+        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+        selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        selectedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        unselectedContainerColor = semantic.canvasBackground,
+        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        unselectedTextColor = MaterialTheme.colorScheme.onSurface,
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxHeight()
+            .windowInsetsPadding(navInsets)
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 12.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            GothwadBrandBadge(size = 26.dp)
+            Spacer(modifier = Modifier.width(10.dp))
+            Text(
+                text = stringResource(R.string.gothwad_account_brand),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f),
+            )
+            if (activeAccount != null) {
+                IconButton(
+                    onClick = onRefreshClick,
+                    enabled = !isRefreshing,
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Refresh,
+                        contentDescription = stringResource(R.string.gothwad_refresh_profile),
+                        tint = if (isRefreshing) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+
+        if (activeAccount != null) {
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                border = BorderStroke(1.dp, semantic.cardBorder),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp, vertical = 6.dp),
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    AccountAvatar(
+                        displayName = activeAccount.displayName(),
+                        initials = activeAccount.initials(),
+                        avatarUrl = activeAccount.avatarUrl,
+                        size = 40.dp,
+                        showBrandRing = true,
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = activeAccount.displayName(),
+                            style = MaterialTheme.typography.titleSmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = activeAccount.displayEmail(),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+        }
+
+        if (activeAccount != null) {
+            AccountTab.entries.forEach { tab ->
+                val selected = !isSettingsSelected && !isHelpSelected && selectedTab == tab
+                NavigationDrawerItem(
+                    label = { Text(stringResource(tab.titleRes), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    selected = selected,
+                    onClick = { onSelectTab(tab) },
+                    icon = { Icon(accountTabIcon(tab), contentDescription = null) },
+                    colors = itemColors,
+                    shape = RoundedCornerShape(50),
+                    modifier = Modifier.testTag("sidebar_tab_${tab.name.lowercase()}"),
+                )
+            }
+            HorizontalDivider(
+                color = semantic.cardBorder,
+                modifier = Modifier.padding(vertical = 8.dp, horizontal = 8.dp),
+            )
+        }
+
+        NavigationDrawerItem(
+            label = { Text(stringResource(R.string.gothwad_settings_title)) },
+            selected = isSettingsSelected,
+            onClick = onOpenSettings,
+            icon = { Icon(Icons.Rounded.Settings, contentDescription = null) },
+            colors = itemColors,
+            shape = RoundedCornerShape(50),
+            modifier = Modifier.testTag("sidebar_settings_item"),
+        )
+        NavigationDrawerItem(
+            label = { Text(stringResource(R.string.gothwad_help_title)) },
+            selected = isHelpSelected,
+            onClick = onOpenHelp,
+            icon = { Icon(Icons.AutoMirrored.Rounded.HelpOutline, contentDescription = null) },
+            colors = itemColors,
+            shape = RoundedCornerShape(50),
+            modifier = Modifier.testTag("sidebar_help_item"),
+        )
     }
 }
 

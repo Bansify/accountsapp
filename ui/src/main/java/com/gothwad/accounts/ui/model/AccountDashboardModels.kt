@@ -27,6 +27,19 @@ enum class AccountTab(
 sealed interface AccountSubScreen {
     data object SearchAccount : AccountSubScreen
     data object HelpLegal : AccountSubScreen
+    data object AppSettings : AccountSubScreen
+}
+
+enum class ThemePreference {
+    SYSTEM,
+    LIGHT,
+    DARK,
+}
+
+enum class NavigationLayoutMode {
+    HEADER_PILLS,
+    LEFT_SIDEBAR,
+    BOTTOM_BAR,
 }
 
 @Immutable
@@ -77,6 +90,9 @@ data class AccountDashboardUiState(
     val authorizations: List<ConnectedAppGrant> = emptyList(),
     val showEditProfileDialog: Boolean = false,
     val isSavingProfile: Boolean = false,
+    val themePreference: ThemePreference = ThemePreference.SYSTEM,
+    val navigationLayout: NavigationLayoutMode = NavigationLayoutMode.HEADER_PILLS,
+    val showOthersHub: Boolean = false,
 ) {
     val activeAccount: GothwadAccount?
         get() = (accountState as? AccountState.SignedIn)?.account
