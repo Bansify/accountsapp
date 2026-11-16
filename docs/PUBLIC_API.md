@@ -1,50 +1,121 @@
-# Current development API
+# Public API
 
-Initialize once from `Application.onCreate`, including after process recreation:
+## 1. Initialization (`core`)
+
+Initialize once from `Application.onCreate` (required on every process launch, including callback restoration after process death):
 
 ```kotlin
-GothwadAccounts.init(this, GothwadConfig(
-    clientId = "gothwad-tube",
-    redirectUri = "https://tube.gothwadtech.com/oauth/callback",
-))
+GothwadAccounts.init(
+    this,
+    GothwadConfig(
+        clientId = "gothwad-accounts-android",
+        redirectUri = if (BuildConfig.DEBUG) {
+            "$packageName:/oauth/callback"
+        } else {
+            "https://accounts.gothwadtech.com/oauth/callback"
+        },
+        allowCustomSchemeRedirect = BuildConfig.DEBUG, // Release enforces verified HTTPS App Links
+        scopes = setOf(
+            Scope.Profile,
+            Scope.Email,
+            Scope.OfflineAccess,
+            Scope.DriveRead,
+            Scope.AccountRead,
+            Scope.AccountProfileWrite,
+        ),
+        brokerPolicy = BrokerPolicy.PeerDiscovery(
+            trustPolicy = BrokerTrustPolicy.SameSigningCertificate(
+                allowDebugBuild = BuildConfig.DEBUG,
+            ),
+        ),
+    ),
+)
 ```
+
+For FOSS or zero-IPC builds, leave `brokerPolicy = BrokerPolicy.Disabled` (the default). Config is immutable per process.
+
+## 2. State flows (`core`)
 
 ```kotlin
 val state by GothwadAccounts.state.collectAsStateWithLifecycle()
+val discovered by GothwadAccounts.discoveredAccounts.collectAsStateWithLifecycle()
+val isRefreshing by GothwadAccounts.isRefreshing.collectAsStateWithLifecycle()
 val error by GothwadAccounts.error.collectAsStateWithLifecycle()
-GothwadAccounts.signIn(activity) // Existing web authentication
-GothwadAccounts.signIn(activity, chooseAccount = true) // Existing web account chooser
-GothwadAccounts.switchTo(userId)
-GothwadAccounts.signOut(userId) // Local removal ONLY in this development version
+val lastDisconnect by GothwadAccounts.lastDisconnectOutcome.collectAsStateWithLifecycle()
 ```
 
-Mutations return coroutine Jobs; failures are exposed through `error` (sanitized `AuthFailure`), not thrown to the UI. `clearError()` dismisses the message. Browser toolbar close may produce no OAuth callback: the UI remains usable and a new login replaces the old pending transaction. Transactions expire after ten minutes.
+- **`AccountState`** (host-local credentials):
+  - `Initializing` — initial encrypted storage load in progress.
+  - `SignedOut` — no locally authorized accounts in this app (`discoveredAccounts` may still contain peer accounts from verified sibling apps).
+  - `SignedIn(account, all)` — locally authorized account(s) in this app, with `account` selected for this app only.
+  - `StorageCorrupted(reason)` — encrypted storage or Android Keystore key became unreadable; fails closed (no plaintext fallback). Recover via `GothwadAccounts.recoverCorruptedStorage()`.
+- **`DiscoveredAccount`** (device-wide zero-token directory):
+  - Combines local accounts (`isAuthorizedLocally = true`) and verified sibling app metadata (`isAuthorizedLocally = false`, zero tokens).
+- **`DisconnectOutcome`**:
+  - `RevokedOnServer` — `POST /oauth/revoke` revoked the entire user/client grant across all installations of that app.
+  - `OfflineRemovedLocally` — offline/network failure; removed locally without claiming server revocation.
+  - `AlreadyInvalidOnServer` — grant already expired/revoked on server; local credential cleared.
 
-State is `Initializing`, `SignedOut`, or `SignedIn(account, all)`. Refresh keeps the current account visible. Request-time refresh failures propagate to the HTTP caller; transient errors do not erase credentials. Separate refreshing/retry UX remains follow-up work.
-
-From the `ui` module:
+## 3. Lifecycle & first-party mobile management actions (`core`)
 
 ```kotlin
-import com.gothwad.accounts.ui.openAccountManagement
-GothwadAccounts.openAccountManagement(activity)
-// Or embed the same root in your Compose navigation:
-GothwadAccountsTheme { GothwadAccountsScreen() }
+GothwadAccounts.signIn(activity)
+GothwadAccounts.signIn(activity, chooseAccount = true)
+GothwadAccounts.signIn(activity, loginHint = peer.email ?: peer.username)
+GothwadAccounts.switchTo(userId)
+GothwadAccounts.signOut(userId, revokeOnServer = false)      // Local installation sign-out only (default)
+GothwadAccounts.disconnectFromServer(userId)                 // Explicit POST /oauth/revoke + local clear -> DisconnectOutcome
+GothwadAccounts.removeFromDevice(userId)                     // Local removal + tombstone + verified peer IPC
+GothwadAccounts.refreshProfile()                             // Force /oauth/userinfo refresh (extended profile, security, quota)
+GothwadAccounts.syncDiscoveredAccounts()
+GothwadAccounts.recoverCorruptedStorage()
+GothwadAccounts.manageOnWeb(activity, section = "security")
+GothwadAccounts.openWebPage(activity, path = "/privacy")
+GothwadAccounts.installedVerifiedPeers()
+
+// First-party `gothwad-accounts-android` management APIs (`account.read` / `account.profile.write`):
+GothwadAccounts.listWebSessions()
+GothwadAccounts.revokeOtherWebSessions()
+GothwadAccounts.listActivity()
+GothwadAccounts.listAuthorizations()
+GothwadAccounts.revokeAuthorization(appId)
+GothwadAccounts.updateBasicProfile(firstName, lastName, dateOfBirth, gender)
+GothwadAccounts.fetchTrustedApps(pinnedPublicKey, expectedKeyId)
 ```
 
-Current components are `GothwadAccountsScreen`, `GothwadAccountsTheme`, and `SignInButton`. Avatar/sheets/settings drop-ins and full native management navigation are not implemented yet. `manageOnWeb(activity)` opens existing `/me` in Custom Tabs; browser account and active native account can differ. No token is put in the URL to bridge them.
+### Removal scope contract
 
-## Network authorization
+| Method | Scope | Server sessions & other installs |
+| --- | --- | --- |
+| `signOut(userId)` (`revokeOnServer = false`) | Clears only this installation's local credential | Other installs and browser sessions unaffected |
+| `disconnectFromServer(userId)` | Calls `POST /oauth/revoke` then clears local credential | Revokes entire user/client OAuth grant across all installations of that app (reports `OfflineRemovedLocally` if offline) |
+| `removeFromDevice(userId)` | Clears local credential + records removal tombstone + notifies verified sibling apps on this device | Other phones and browser sessions remain active until revoked on web |
+
+## 4. Network authorization (`core`)
 
 ```kotlin
 val client = OkHttpClient.Builder()
-    .addNetworkInterceptor(GothwadAccounts.authInterceptor(
-        allowedHosts = setOf("tube-api.gothwadtech.com"),
-    ))
+    .addNetworkInterceptor(
+        GothwadAccounts.authInterceptor(
+            allowedHosts = setOf("drive-api.gothwadtech.com"),
+        ),
+    )
     .build()
 ```
 
-Hostnames above are examples, not deployment confirmations. **Use addNetworkInterceptor, not addInterceptor**: each redirect hop is checked. This interceptor owns the Authorization header and removes it on disallowed requests; use a dedicated client for Gothwad-authenticated traffic. HTTPS default port 443 only. Cached responses are not account-partitioned by this library: do not share an authenticated response cache across users. Use OkHttp's default no-cache configuration or explicitly partition/clear it on account switch and logout. Never invoke blocking HTTP calls on the main thread.
+- **Must be installed with `addNetworkInterceptor`**, never `addInterceptor`; runtime guard throws if installed as an application interceptor.
+- Enforces HTTPS default port `443` and checks **every network redirect hop** against `allowedHosts`. Strips `Authorization` on disallowed targets.
+- Proactively refreshes tokens within 60 seconds of expiry using per-account single-flight mutexes.
 
-Tokens refresh proactively within 60 seconds of expiry. There is no automatic resource-server 401 retry yet. The backend must independently authorize token audience and scopes; a host allowlist does not replace server authorization.
+## 5. Shared UI & embeddable widgets (`ui`)
 
-Config is immutable for one app process. BrokerPolicy currently exposes only Disabled. All clients in this baseline must use the browser-facing Accounts host for authBaseUrl (default `https://accounts.gothwadtech.com/api`); hosted `/signin` and `/me` are derived from that origin.
+Full-screen account management (matches `accounts.gothwadtech.com/me` 6 sections: `Home`, `Personal info`, `Security`, `Data & privacy`, `People & sharing`, `Connected apps`):
+
+```kotlin
+import com.gothwad.accounts.ui.openAccountManagement
+
+GothwadAccounts.openAccountManagement(activity)
+GothwadAccountsScreen(onClose = { /* ... */ })
+```
+
+See [DISCOVERY_AND_TOKEN_ARCHITECTURE.md](DISCOVERY_AND_TOKEN_ARCHITECTURE.md) and [BROKER_PROTOCOL.md](BROKER_PROTOCOL.md) for cross-app design invariants.

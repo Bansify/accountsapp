@@ -1,18 +1,38 @@
-# Accounts backend changes — separate PR plan
+# Accounts & Ecosystem Backend Status (Aligned with `GothwadTech/accounts`)
 
-No Accounts code or deployment is modified by this scaffold.
+**Scope boundary**: No backend files in `GothwadTech/accounts`, `mail`, `drive`, or `store` are altered from `accountsapp`.
 
-## Browser-auth prerequisite
+---
 
-Register standalone, sample and consumer public OAuth clients (no APK client secret), exact HTTPS and fallback scheme redirects, supported scopes. Keep existing web auth design intact. Add App Link association files at the relevant host repositories. DEV_MODE localhost relaxation is not a production Android callback strategy.
+## 1. Landed `GothwadTech/accounts` Contract (`migrations/0014_first_party_native.sql` & `docs/NATIVE_ACCOUNTS.md`)
 
-## Extensions before broker
+Verified directly against `GothwadTech/accounts`:
+- **First-party OAuth clients (`0014_first_party_native.sql`)**:
+  - `gothwad-accounts-android` (`com.gothwad.accounts`) — `https://accounts.gothwadtech.com/oauth/callback`, `com.gothwad.accounts:/oauth/callback`, scopes `profile email offline_access drive.read account.read account.profile.write`.
+  - `gothwad-accounts-sample-alpha` / `gothwad-accounts-sample-beta` — custom scheme callbacks, `profile email offline_access`.
+  - `gothwad-mail`, `gothwad-drive`, `kiwi-store`, `gothwad-tube` — exact package/redirect/scope registrations.
+- **Extended `GET /oauth/userinfo`**:
+  - Returns `given_name`, `family_name`, `date_of_birth`, `gender`, `phone_number`, `phone_number_verified`, `recovery_email`, `recovery_email_verified`, `security` (`has_password`, `password_changed_at`, `mfa_enabled`, `passkey_count`, `authorization_count`, `session_count`), and `drive` (`used_bytes`, `limit_bytes`, `write_access`) gated by granted scopes.
+- **Native `POST /oauth/revoke` (`routes/oauth-native-revoke.ts`)**:
+  - Requires `Authorization: Bearer <access_token>` plus form `client_id`, `token`, optional `token_type_hint` (`refresh_token` / `access_token`), revoking the entire user/client grant.
+- **First-party `/mobile/*` endpoints (`gothwad-accounts-android` audience only)**:
+  - `GET /mobile/sessions` (`account.read`)
+  - `POST /mobile/sessions/revoke-others` (`account.profile.write`, requires recent session if `reauthentication_required`)
+  - `GET /mobile/activity` (`account.read`)
+  - `GET /mobile/authorizations` (`account.read`)
+  - `POST /mobile/authorizations/revoke` (`account.profile.write`)
+  - `PATCH /mobile/profile` (`first_name`, `last_name`, `date_of_birth`, `gender`; `account.profile.write`)
+- **Discovery & App Links**:
+  - `GET /.well-known/assetlinks.json` (served by Worker from `ANDROID_ASSETLINKS_JSON` or DB fingerprints).
+  - `GET /api/apps/trusted` (returns `signed: false` until `TRUSTED_APPS_SIGNING_JWK` + `TRUSTED_APPS_KEY_ID` are configured; unsigned responses must never authorize brokers).
 
-1. Backwards-compatible `ecosystem_apps.first_party boolean NOT NULL DEFAULT false`; admin-controlled classification. First-party consent policy must not bypass login, account selection, PKCE, redirect or scope checks.
-2. RFC 8693 token exchange restricted to allowed source/target clients, with validated source audience, no scope escalation, revocation checks, rate limits and auditing. Specify independent server proof of trusted app possession; first_party + public client_id alone is insufficient.
-3. Short-lived, atomic one-time target-bound handoff redemption with challenge and replay protection; determine transaction semantics and exact OAuth error responses.
-4. Signed public `GET /api/apps/trusted` registry (canonical Worker path `/apps/trusted`): package/certificate/client tuples, schema version, expiry, signing key rotation and rollback defense. No private key in SDK.
-5. Native revocation API and device/session-family model for per-app and device-wide logout. Existing cookie-authenticated `/oauth/revoke` cannot simply be called with an OAuth bearer and assumed equivalent. Document whether outstanding one-hour access tokens remain valid or are actively revoked.
-6. Inventory `/me` management capabilities; add scoped, reauthenticated native endpoints only where needed. Identity scopes alone must not authorize password/security updates.
+---
 
-Tests: existing web OAuth regression; public-client PKCE; redirect validation; untrusted exchange; audience/scope escalation; consent policy; replay/concurrency; rotation races; revoked family; registry signature expiry; denial vs upstream outage. Deploy schema → compatible Worker → mobile feature enablement. Do not enable broker before these contracts are implemented and reviewed.
+## 2. Remaining Production Deployment / Ops Prerequisites (Owner Action)
+
+1. **Accounts Cloudflare routing & fingerprints**:
+   - Route exact public `https://accounts.gothwadtech.com/.well-known/assetlinks.json` directly to the `accounts` Worker (outside `/api/*`, no auth/redirects).
+   - Apply `migrations/0014_first_party_native.sql` (if not already applied remotely) and populate lowercase 64-hex `android_cert_sha256` fingerprints for `com.gothwad.accounts` (and sibling Android apps) in `ecosystem_apps` once the release `.jks` key is finalized.
+   - Optionally configure `TRUSTED_APPS_SIGNING_JWK` (`EdDSA`/`ES256`) + `TRUSTED_APPS_KEY_ID` if consumers verify `/api/apps/trusted` signatures.
+2. **Resource Workers (`mail`, `drive`, `store`)**:
+   - Ensure each sibling service Worker validates JWT `aud` + client scopes (`mail` for Mail, `drive` / `drive.read` for Drive, `kiwi-store` for Store) before accepting OAuth bearer tokens directly.

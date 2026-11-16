@@ -1,62 +1,76 @@
-# Development integration and verification
+# Integration & Verification
 
-This checkout is an unreleased development SDK. Use project dependencies while validating; Maven coordinates must not be advertised as published until an external resolution test succeeds.
-
-## Modules
+## 1. Gradle modules
 
 ```kotlin
-implementation(project(":ui")) // Includes core; standalone/shared management UI
-// Or implementation(project(":core")) for a headless host.
+implementation(project(":ui")) // Includes :core; shared full-screen management UI + host widgets
+// Or headless:
+implementation(project(":core"))
 ```
 
-Initialize in Application, collect state, and launch signIn as described in [public API](PUBLIC_API.md). Add a host callback intent filter: the library declares the exported callback Activity, but intentionally does not claim every host's callback URL.
+Maven / JitPack publication targets are configured as multi-module coordinates (`com.github.GothwadTech.accountsapp:core:<tag>` and `com.github.GothwadTech.accountsapp:ui:<tag>`). Verify an external consumer resolution build before referencing a release tag in production apps.
+
+## 2. Host manifest setup
+
+`:core` automatically merges:
+- Exported `AccountCallbackActivity` (without hardcoded intent filters — each host defines its exact callback URI),
+- Host-scoped `broker.AccountDirectoryProvider` (`android:authorities="${applicationId}.gothwad.account.directory"`, `exported="true"`),
+- Bounded `<queries>` allowlist for first-party Gothwad packages (`com.gothwad.accounts`, `com.gothwad.mail`, `com.gothwad.drive`, `com.gothwad.store`, `com.gothwad.tube`, `com.gothwad.accounts.sample.alpha`, `com.gothwad.accounts.sample.beta`).
+
+Each host app adds its exact OAuth callback filter to `AccountCallbackActivity` in its own `AndroidManifest.xml`:
 
 ```xml
-<activity android:name="com.gothwad.accounts.core.AccountCallbackActivity"
+<activity
+    android:name="com.gothwad.accounts.core.AccountCallbackActivity"
     android:exported="true">
     <intent-filter android:autoVerify="true">
         <action android:name="android.intent.action.VIEW" />
         <category android:name="android.intent.category.DEFAULT" />
         <category android:name="android.intent.category.BROWSABLE" />
-        <data android:scheme="https" android:host="tube.gothwadtech.com"
+        <data
+            android:scheme="https"
+            android:host="tube.gothwadtech.com"
             android:path="/oauth/callback" />
     </intent-filter>
 </activity>
 ```
 
-Example host only: publish a real assetlinks.json with the actual package and release certificate before claiming verified App Links. Callback validation checks exact scheme/authority/path, state, duplicates, code/error exclusivity and expiry. App Links need actual device verification, not only a manifest declaration.
+For production HTTPS App Links, publish `https://<host>/.well-known/assetlinks.json` containing the actual release signing SHA-256 fingerprint for that app's `applicationId`.
 
-## Development clients requiring backend registration
+## 3. OAuth client registrations
 
-These IDs are proposed by this checkout, NOT verified live registrations:
+| Host | `client_id` | `redirect_uri` (dev / prod) | Required scopes |
+| --- | --- | --- | --- |
+| Standalone (`:app`) | `gothwad-accounts-android` | `com.gothwad.accounts:/oauth/callback` | `profile email offline_access drive.read` |
+| Sample alpha | `gothwad-accounts-sample-alpha` | `com.gothwad.accounts.sample.alpha:/oauth/callback` | `profile email offline_access` |
+| Sample beta | `gothwad-accounts-sample-beta` | `com.gothwad.accounts.sample.beta:/oauth/callback` | `profile email offline_access` |
+| Kiwi Store (`storeapp`) | `kiwi-store` | `com.gothwad.store:/oauth/callback` | `profile email offline_access` |
+| PlusTube (`tubeapp`) | `gothwad-tube` | `https://tube.gothwadtech.com/oauth/callback` (or `com.gothwad.tube:/oauth/callback`) | `profile email offline_access` |
+| Mail (`mailapp`) | `gothwad-mail` | `https://mail.gothwadtech.com/oauth/callback` (or `com.gothwad.mail:/oauth/callback`) | `profile email offline_access` |
+| Drive (`drive`) | `gothwad-drive` | `https://drive.gothwadtech.com/oauth/callback` (or `com.gothwad.drive:/oauth/callback`) | `profile email offline_access drive` |
 
-| Host | client_id | redirect_uri |
-| --- | --- | --- |
-| Standalone | gothwad-accounts-android | com.gothwad.accounts:/oauth/callback |
-| Sample alpha | gothwad-accounts-sample-alpha | com.gothwad.accounts.sample.alpha:/oauth/callback |
-| Sample beta | gothwad-accounts-sample-beta | com.gothwad.accounts.sample.beta:/oauth/callback |
+All mobile clients are **public PKCE (`S256`)** clients with no embedded `client_secret` in the APK.
 
-Register as public clients, allow `profile email offline_access`, and use exact redirects. No client secret in APK. The checked-in hosts use custom schemes for development; production should prefer verified HTTPS links. Do not add debug certificates to the production broker registry. Two sample packages test independent login/storage today, not broker handoff.
-
-## Commands
+## 4. Build & test commands
 
 ```sh
-./gradlew :core:testDebugUnitTest :core:lintDebug :ui:lintDebug
-./gradlew :app:assembleDebug :sample:assembleAlphaDebug :sample:assembleBetaDebug
-./gradlew :core:publishReleasePublicationToMavenLocal :ui:publishReleasePublicationToMavenLocal
+python3 tools/check_docs.py && python3 tools/check_android_scaffold.py
+
+./gradlew \
+  :core:testDebugUnitTest :ui:testDebugUnitTest \
+  :core:lintDebug :ui:lintDebug :app:lintDebug :sample:lintAlphaDebug :sample:lintBetaDebug \
+  :app:assembleDebug :sample:assembleAlphaDebug :sample:assembleBetaDebug \
+  :core:publishReleasePublicationToMavenLocal :ui:publishReleasePublicationToMavenLocal
 ```
 
-Source dependencies are pinned to a conservative AGP 8.13.2 / Kotlin 2.2.21 / Gradle 8.13 baseline, not asserted to be the latest stable release. Reconcile with the latest verified stable toolchain before release; do not copy PlusTube alpha Compose dependencies blindly. The sandbox has neither Java nor Android SDK and cannot access all Android dependency hosts, so Gradle compilation/test execution is unverified here. GitHub Android CI has now run for the initial implementation commit and failed during Android SDK setup, before compilation/tests. See [HANDOFF.md](HANDOFF.md) for run IDs and next steps.
+## 5. Device verification matrix
 
-## Device acceptance (pending)
+Verify on physical Android devices / emulators:
 
-- Register clients; install standalone and both sample variants.
-- Existing browser session, fresh signup, chooser, denial, toolbar close, missing browser.
-- Kill host process while browser is open; callback restores through Application and encrypted pending request. Replayed and wrong-state callbacks must not sign in.
-- HTTPS association verification, custom scheme interception resilience via PKCE.
-- Two accounts, active switching, process restart, offline/503 persistence, expiry and rotated refresh.
-- Slow refresh + local removal; no session resurrection. Keystore loss/corruption fails closed, no plaintext fallback. Recovery UX for unrecoverable storage remains a follow-up.
-- Same shared UI in standalone and embedded Activity; Hindi/dark mode/accessibility, browser chrome distinguished from hosted page.
-- Credential isolation and host/redirect Authorization leakage checks. No production release until these are exercised.
+1. **Independent install order**: Install `sampleAlphaDebug`, sign in with 2 accounts, switch active account. Install `sampleBetaDebug` afterwards (`app` NOT installed). Verify Beta sees both accounts via `AccountDirectoryProvider`, authorizes its chosen account separately without modifying Alpha's active selection or refresh tokens.
+2. **Uninstall resilience**: Uninstall Alpha while Beta + `app` remain installed; verify neither Beta nor `app` loses sessions or crashes.
+3. **Browser & callback resilience**: Existing SSO session, fresh signup, chooser, consent denial, toolbar close without callback, process death between Custom Tab launch and callback delivery, and replay of a consumed callback URI.
+4. **Corrupted storage recovery**: Simulate Keystore invalidation (`StorageCorrupted`) -> verify fail-closed state and clean reset via `recoverCorruptedStorage()`.
+5. **Localization & accessibility**: Verify English (`values`) and Hindi (`values-hi`), Dark Mode, dynamic font scaling, and TalkBack focus order across all 6 management tabs and sample widgets.
 
-Local removal is deliberately labeled as such. It does not revoke browser cookies or refresh tokens on the server. Native revocation and device-wide logout are blocked on Accounts backend work.
+See [UNINSTALL_AND_RECOVERY_MATRIX.md](UNINSTALL_AND_RECOVERY_MATRIX.md) and [SERVER_CHANGES.md](SERVER_CHANGES.md) for backend rollout details.

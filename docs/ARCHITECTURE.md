@@ -1,47 +1,100 @@
-# Architecture — agreed direction
+# Gothwad Multi-App Account Architecture Proposal
 
-Planning baseline: 2026-10-16. Browser-auth source baseline now exists; Android compilation and device verification remain pending.
+**Status**: Architecture & SDK Implementation Baseline (`accountsapp` branch `arena/926fcc7f-accountsapp`)
+**Backend Source of Truth**: `GothwadTech/accounts` (`100% Cloudflare Worker + D1 + R2`, zero Supabase)
+**Target Ecosystem**: `accountsapp` (`com.gothwad.accounts`), `mailapp` (`com.gothwad.mail`), `drive` (`com.gothwad.drive`), `storeapp` (`com.gothwad.store`), `tubeapp` (`com.gothwad.tube`), and side-by-side verification hosts (`sample:alpha`, `sample:beta`).
 
-## Responsibilities
+---
 
-`GothwadTech/accounts` owns the existing web UI, OAuth provider, Worker and Supabase schema. `GothwadTech/accountsapp` owns Android libraries and the optional Gothwad Accounts app (`com.gothwad.accounts`). No second identity backend or Android-specific database deployment.
+## 1. Design Goals & Non-Negotiable Principles
 
+1. **Zero Mandatory Hub App / Zero Play Services**: Every Gothwad app must install first, last, or alone and remain fully functional without Google Play Services, without a preinstalled system component, and without requiring `com.gothwad.accounts` ("Accounts") to be installed.
+2. **Three Strictly Separated State Axes**:
+   - **Device-Available Accounts (`DiscoveredAccount`)**: Identity-only directory of accounts signed in on installed, cryptographically verified Gothwad apps on this device (`userId`, `username`, `name`, `email`, `avatarUrl`, `addedAt`, `lastSeenAt`). Contains **zero tokens**.
+   - **App-Local Active Account (`activeUserId`)**: Strictly private to each app's encrypted store. Selecting Account B in `mailapp` **never** switches an already-open `drive` or `storeapp` from Account A to Account B.
+   - **Service-Scoped OAuth Grants & Tokens (`Credential`)**: Every app owns its own client-scoped `access_token` (`aud == client_id`) and rotating `refresh_token` (`offline_access`) stored in its own Android Keystore-backed Tink AEAD file inside `noBackupFilesDir`. Refresh tokens are **never** shared or exported across apps.
+3. **Existing Accounts Web UI Parity — No Unimplemented Demo Bloat**:
+   - Sign-in, signup, Google sign-in linking, passwordless sign-in, passkey registration, TOTP 2-Step Verification, and account recovery reuse `accounts.gothwadtech.com` over **Custom Tabs + Authorization Code + PKCE (`S256`)** — never an embedded third-party WebView, never collecting Google passwords, and never copying browser cookies.
+   - Native Compose UI in `:ui` mirrors only the six real sections present on `accounts.gothwadtech.com/me`: **Home**, **Personal info**, **Security**, **Data & privacy**, **People & sharing**, and **Connected apps** (removing unimplemented demo tabs like Payments & Subscriptions, Timeline/YouTube History, Password Manager, and hardcoded demo users).
+
+---
+
+## 2. Empirical Rejection of Multi-Authenticator `AccountManager`
+
+Android's `android.accounts.AccountManager` is structurally incompatible with independently installable, equally privileged first-party apps:
+
+1. **Single-Owner `RegisteredServicesCache`**: `AccountManagerService` indexes authenticators by `android:accountType` (e.g. `com.gothwad.account`) and binds at most **one** winning `AbstractAccountAuthenticator` package per `accountType`. If `mailapp`, `drive`, `storeapp`, and `accountsapp` all declare authenticators for the same `accountType`, Android selects one winner and ignores the rest—there is **no multi-authenticator failover**.
+2. **Catastrophic Uninstall Wipe (`onPackagesRemoved`)**: When the user uninstalls whichever app happened to own that `accountType` (for example, `mailapp` was installed first and later uninstalled while `drive` and `storeapp` are still actively used), `AccountManagerService` removes **all accounts** of that `accountType` across the device.
+3. **UID / Signature Coupling & Cross-Signer Failures**: Calling `addAccountExplicitly()`, `peekAuthToken()`, or `invalidateAuthToken()` from another package requires either matching authenticator UID or `AccountManager` authenticator signature rules. Separately signed FOSS/debug/legacy builds fail with `SecurityException` or lose access silently.
+
+**Executable Proof**: Tested empirically in `CrossAppBrokerAndAccountManagerProofTest` (`:core` unit/Robolectric suite).
+
+---
+
+## 3. Recommended Architecture: Distributed Verified Peer Directory + Per-App Encrypted Vault
+
+```text
++-----------------------------------------------------------------------------+
+|                        Android Device (No Play Services)                    |
+|                                                                             |
+|  +-----------------------+    +-----------------------+    +--------------+ |
+|  | Gothwad Mail          |    | Gothwad Drive         |    | Kiwi Store   | |
+|  | com.gothwad.mail      |    | com.gothwad.drive     |    | com.gothwad  | |
+|  |                       |    |                       |    | .store       | |
+|  | Vault (Keystore AEAD) |    | Vault (Keystore AEAD) |    | Vault (AEAD) | |
+|  |  - Active: Account B  |    |  - Active: Account A  |    |  - Active: A | |
+|  |  - Tokens: mail scope |    |  - Tokens: drive scope|    |  - Tokens:   | |
+|  |                       |    |                       |    |   store scope| |
+|  | AccountDirectoryProv. |<==>| AccountDirectoryProv. |<==>| AccountDir.  | |
+|  | (Binder UID + Cert    |    | (Binder UID + Cert    |    | (Binder UID  | |
+|  |  verified; NO tokens) |    |  verified; NO tokens) |    |  + Cert)     | |
+|  +-----------+-----------+    +-----------+-----------+    +------+-------+ |
+|              |                            |                       |         |
+|              +-------------+--------------+-----------------------+         |
+|                            |  Custom Tabs + S256 PKCE                       |
+|                            |  (+ Future Signed Server Handoff)              |
++----------------------------|------------------------------------------------+
+                             v
++-----------------------------------------------------------------------------+
+|            accounts.gothwadtech.com (Cloudflare Worker + D1 + R2)           |
+|  - /oauth/authorize, /oauth/token (PKCE S256, rotating refresh tokens)      |
+|  - /oauth/userinfo (oauth_credential_bindings live DB check)                |
+|  - /auth/* (cookie-authenticated web session management & MFA/Passkeys)     |
++-----------------------------------------------------------------------------+
 ```
-Standalone app ─┐
-PlusTube ───────┼─ shared ui → core → Accounts OAuth / Worker
-Other apps ────┘                └─ Custom Tabs → existing web auth
-```
 
-Login, signup, recovery and consent use the existing web implementation, not a Compose recreation. Browser chrome is platform-controlled. Browser-cookie SSO depends on the chosen browser/profile. Native encrypted sessions and browser cookies are distinct; never copy cookies or put tokens into URLs.
+### How First-Installed-App & Scenarios A–E Work
 
-Standalone launch and embedded Manage account open the same shared management root. Full-screen UI shares a theme; small host controls may inherit the host theme. M3 tokens only, no hardcoded hex colors, gradients, glass or custom shadows. English/Hindi resources and accessibility required. Existing `/me` capabilities must be inventoried before defining native management features: OAuth identity scopes do not automatically authorize profile/security mutations. Unsupported sensitive operations use browser reauthentication until explicit APIs exist.
+- **Scenario A (Mail installed first, no Accounts app)**: Mail sees zero verified peers with accounts. User signs into Account A and Account B via Custom Tabs PKCE (`client_id=gothwad-mail`). Mail stores `{A, B}` tokens in Mail's encrypted vault, sets `activeUserId`, and exposes non-secret directory records `{A, B}` via `com.gothwad.mail.gothwad.account.directory` (`AccountDirectoryProvider`).
+- **Scenario B (Drive installed later, no Accounts app)**: On launch, Drive queries installed known peers via `PackageManager` (`<queries>` allowlist, no `QUERY_ALL_PACKAGES`), verifies Mail's signing certificate, and Mail verifies Drive's Binder UID + package + SHA-256 certificate before returning `{A, B}` directory metadata. Drive renders **"Continue as A"**, **"Continue as B"**, or **"Add another account"**. Tapping **"Continue as A"** runs PKCE `/oauth/authorize` for `client_id=gothwad-drive` (`drive` scope, leveraging browser SSO if present or clean login without copying cookies) to issue Drive's own tokens. Mail stays independently selected on **B**!
+- **Scenario C (Drive adds Account C)**: Drive signs in Account C, stores C's tokens in Drive's vault (`Drive.activeUserId = C`), and advertises C in Drive's `AccountDirectoryProvider`. When Mail refreshes peer discovery, Mail learns `{A, B, C}` while remaining active on **B**.
+- **Scenario D (Accounts app installed later)**: `com.gothwad.accounts` queries installed verified peers (`mailapp`, `drive`, `storeapp`), adopts the union `{A, B, C}` in its device-available list immediately, and never overwrites or wipes Mail's or Drive's local state.
+- **Scenario E (Mail uninstalled; or Store/Mail/Drive running alone)**: Uninstalling Mail removes only Mail's app sandbox. Drive, Store, and Accounts continue holding their own tokens and sharing directory metadata with each other without interruption.
 
-## Modules
+---
 
-- `core`: namespace `com.gothwad.accounts.core`; config, PKCE/Custom Tabs, callback activity, encrypted per-user TokenStore, StateFlow session manager, userinfo, restricted OkHttp interceptor; broker later.
-- `ui`: namespace `com.gothwad.accounts.ui`; shared management navigation and screens, chooser, avatar, account sheet, sign-in button, settings section.
-- `app`: application ID `com.gothwad.accounts`; thin standalone host, own registered OAuth client.
-- `sample`: two application IDs and OAuth clients for concurrent device testing. Production trust never includes debug keys.
+## 4. Module Boundaries in `GothwadTech/accountsapp`
 
-All consumers have isolated credentials. Switching active account is local to the host. Core has no Compose dependency. SDK upgrades require host app updates; hosted auth page updates do not.
+| Module | Package / App ID | Responsibility |
+| --- | --- | --- |
+| `:core` | `com.gothwad.accounts.core` | Headless SDK (zero Compose): `GothwadConfig`, `GothwadAccounts`, `SessionManager`, `EncryptedTokenStore`, `OAuthClient`, `CallbackValidator`, `Pkce`, `AccountDirectoryProvider`, `CallerVerifier`, `TrustRegistry`, `PeerBrokerClient`, OkHttp `authInterceptor`. |
+| `:ui` | `com.gothwad.accounts.ui` | Shared M3 Compose account management experience (`GothwadAccountsScreen`, 6 web-aligned tabs) + embeddable host widgets (`GothwadAccountAvatarButton`, `GothwadAccountSwitcherSheet`, `GothwadAccountSettingsCard`, `GothwadAuthStatusBanner`) + EN/HI strings. |
+| `:app` | `com.gothwad.accounts` | Optional standalone Gothwad Accounts Android app hosting `GothwadAccountsScreen` cleanly. |
+| `:sample` | `com.gothwad.accounts.sample.{alpha,beta}` | Side-by-side multi-app verification hosts testing independent active accounts, embedded toolbar widgets, and peer discovery. |
 
-## Milestones / acceptance gates
+---
 
-1. Planning skeleton and API (completed); current implementation status is in README.
-2. Pin verified stable AGP/Kotlin/Gradle versions, wrapper and dependencies; browser PKCE auth, process-death-safe callback, encrypted sessions, refresh and sample. Validate real registered redirects on device.
-3. Shared management and account UI; verify standalone/embedded parity, locale, accessibility, dark mode.
-4. Accounts backend contract/migrations and separate PR; maintain old web/consumer compatibility.
-5. Broker enabled only after server authentication/replay/revocation design passes review; two-app device tests, unknown-cert/version/FOSS fallback.
-6. Signed standalone APK, independently consumable Maven modules, integration guide and release smoke tests. PlusTube integration is a separate session.
+## 5. Cross-Repo Audit & Required Backend-Contract Boundaries
 
-## Repository observations
+Based on direct inspection of `GothwadTech/accounts`, `mail`, `mailapp`, `drive`, `store`, `storeapp`, and `tubeapp` (no external repo was modified or deployed):
 
-Reviewed Accounts architecture/OAuth docs, Worker routes and core SQL (Accounts main observed at `a00407a5ac48376fce237bf96696d133d4792f74`), Mail session/auth redirect references, PlusTube AGENTS/build/signing references and keystore README.
-
-- Accounts has authorization-code and rotating refresh grants; `/oauth/authorize` currently renders consent for authenticated users.
-- SQL seeds `gothwad-tube` with empty redirect list; actual deployed DB registration is not verified.
-- Existing `/oauth/revoke` is browser-session based, not proof of a native-token revocation API.
-- Mail distinguishes upstream auth denial from availability failure; retain this rule in Android.
-- Accounts docs specify Pages frontend and Workers Builds deployment. No `.github/workflows` directory was found there; dashboard wiring is not verified.
-- Checked-in Wrangler config has `DEV_MODE = "true"`. Production config must be audited and false before release; this is not evidence of the live setting.
-- Keystore README does not establish signing key ownership or secret availability. Verify public certificate fingerprints; never retrieve private keys for planning.
+1. **`accounts` (`cloudflare-worker` + D1)**:
+   - Public OAuth PKCE (`/oauth/authorize`, `/oauth/token`, `/oauth/userinfo`) is live and validates `oauth_credential_bindings` against active password hashes and grants.
+   - `ecosystem_apps` currently seeds `kiwi-store` with app redirects, while `gothwad-mail`, `gothwad-drive`, and `gothwad-tube` have `redirect_uris = '[]'`, and `gothwad-accounts-android` / sample clients require registration (see [SERVER_CHANGES.md](SERVER_CHANGES.md)).
+   - `/oauth/authorizations`, `/oauth/revoke`, and `/auth/*` management routes (`update-profile`, `sessions`, `activity`, `mfa`, `passkeys`, `google`, `export`, `delete-account`) require `token_use === 'session'` cookies today; therefore `:ui` routes sensitive mutations cleanly to `accounts.gothwadtech.com/me` in Custom Tabs until scoped native management endpoints are approved and added to `accounts`.
+2. **Sibling Resource Workers (`mail`, `drive`, `store`)**:
+   - Resource servers **must** validate both OAuth `aud == <expected_service_client_id>` and required service scopes (`mail`, `drive` / `drive.read`, etc.), never treating `/oauth/userinfo` identity success alone as cross-service authorization.
+   - `drive/worker/src/auth.ts` must accept scoped OAuth Bearer tokens alongside web cookie sessions; `mail/worker/src/session.ts` and `store/worker/src/auth.ts` must verify client audience and scope.
+3. **Sibling Android Apps (`mailapp`, `storeapp`)**:
+   - `storeapp` currently mixes `StoreNetwork.downloadClient` with `authInterceptor`, attaches Bearer tokens broadly, and stores tokens in plaintext `SharedPreferences`; adopting `:core` fixes redirect token leakage, mutex deadlocks, and plaintext storage.
+   - `mailapp` is currently a local Room seed prototype with no `INTERNET` permission and release `debug.keystore`; it should integrate `:core` + `:ui` on a proper release key when wired to `mail`.

@@ -12,19 +12,30 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 @Serializable
-internal data class Credential(val account: GothwadAccount, val accessToken: String, val refreshToken: String?, val expiresAt: Long)
+internal data class Credential(
+    val account: GothwadAccount,
+    val accessToken: String,
+    val refreshToken: String?,
+    val expiresAt: Long,
+    val addedAt: Long = 0L,
+    val lastSeenAt: Long = 0L,
+)
+
 @Serializable
 internal data class PendingLogin(val state: String, val verifier: String, val createdAt: Long)
+
 @Serializable
 internal data class StoredSession(
     val credentials: List<Credential> = emptyList(),
     val activeUserId: String? = null,
     val pending: PendingLogin? = null,
+    val deviceRemovalTombstones: Map<String, Long> = emptyMap(),
 )
 
 internal interface TokenStore {
     fun read(): StoredSession
     fun write(value: StoredSession)
+    fun clear() {}
 }
 
 internal class EncryptedTokenStore(context: Context, config: GothwadConfig) : TokenStore {
@@ -54,6 +65,16 @@ internal class EncryptedTokenStore(context: Context, config: GothwadConfig) : To
         } catch (error: Exception) {
             file.failWrite(output)
             throw error
+        }
+    }
+
+    override fun clear() {
+        file.delete()
+        runCatching {
+            val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+            if (keyStore.containsAlias(alias)) {
+                keyStore.deleteEntry(alias)
+            }
         }
     }
 }

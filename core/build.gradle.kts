@@ -9,7 +9,11 @@ android {
     compileSdk = 36
     defaultConfig { minSdk = 26; consumerProguardFiles("consumer-rules.pro") }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
-
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
     publishing { singleVariant("release") { withSourcesJar() } }
 }
 kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
@@ -21,6 +25,10 @@ dependencies {
     implementation(libs.tink)
     testImplementation(libs.junit)
     testImplementation(libs.coroutines.test)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
+    testImplementation(libs.mockwebserver)
+    testImplementation(libs.okhttp.tls)
 }
 afterEvaluate {
     publishing { publications { register<MavenPublication>("release") {
