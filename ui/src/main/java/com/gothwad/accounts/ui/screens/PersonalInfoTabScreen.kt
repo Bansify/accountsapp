@@ -13,6 +13,7 @@ import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.AlternateEmail
 import androidx.compose.material.icons.rounded.Badge
 import androidx.compose.material.icons.rounded.Cake
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.MarkEmailRead
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Phone
@@ -40,6 +41,8 @@ import com.gothwad.accounts.ui.components.displayName
 @Composable
 fun PersonalInfoTabScreen(
     account: GothwadAccount,
+    canEditBasicProfileNatively: Boolean = false,
+    onEditBasicProfileClick: () -> Unit = {},
     onManagePersonalOnWeb: () -> Unit,
 ) {
     LazyColumn(
@@ -60,7 +63,11 @@ fun PersonalInfoTabScreen(
         item {
             AccountSectionCard(
                 title = "Basic info",
-                subtitle = "Changes saved on accounts.gothwadtech.com sync automatically to this app.",
+                subtitle = if (canEditBasicProfileNatively) {
+                    "Edit name, date of birth, or gender right here, or manage photos & contact info on web."
+                } else {
+                    "Changes saved on accounts.gothwadtech.com sync automatically to this app."
+                },
             ) {
                 AccountSettingRow(
                     label = "Profile photo",
@@ -75,8 +82,8 @@ fun PersonalInfoTabScreen(
                     label = "Name",
                     value = account.displayName(),
                     icon = Icons.Rounded.Person,
-                    trailingIcon = Icons.AutoMirrored.Rounded.OpenInNew,
-                    onClick = onManagePersonalOnWeb,
+                    trailingIcon = if (canEditBasicProfileNatively) Icons.Rounded.Edit else Icons.AutoMirrored.Rounded.OpenInNew,
+                    onClick = if (canEditBasicProfileNatively) onEditBasicProfileClick else onManagePersonalOnWeb,
                 )
                 SectionDivider()
                 AccountSettingRow(
@@ -89,20 +96,20 @@ fun PersonalInfoTabScreen(
                 SectionDivider()
                 AccountSettingRow(
                     label = "Date of birth",
-                    value = "Managed on Accounts web",
+                    value = account.dateOfBirth?.takeIf { it.isNotBlank() } ?: "Not set",
                     supportingText = "Optional personal detail stored on Gothwad Accounts",
                     icon = Icons.Rounded.Cake,
-                    trailingIcon = Icons.AutoMirrored.Rounded.OpenInNew,
-                    onClick = onManagePersonalOnWeb,
+                    trailingIcon = if (canEditBasicProfileNatively) Icons.Rounded.Edit else Icons.AutoMirrored.Rounded.OpenInNew,
+                    onClick = if (canEditBasicProfileNatively) onEditBasicProfileClick else onManagePersonalOnWeb,
                 )
                 SectionDivider()
                 AccountSettingRow(
                     label = "Gender",
-                    value = "Managed on Accounts web",
+                    value = account.gender?.takeIf { it.isNotBlank() } ?: "Not set",
                     supportingText = "Optional personal detail stored on Gothwad Accounts",
                     icon = Icons.Rounded.Wc,
-                    trailingIcon = Icons.AutoMirrored.Rounded.OpenInNew,
-                    onClick = onManagePersonalOnWeb,
+                    trailingIcon = if (canEditBasicProfileNatively) Icons.Rounded.Edit else Icons.AutoMirrored.Rounded.OpenInNew,
+                    onClick = if (canEditBasicProfileNatively) onEditBasicProfileClick else onManagePersonalOnWeb,
                 )
             }
         }
@@ -126,6 +133,14 @@ fun PersonalInfoTabScreen(
                     value = account.phoneNumber?.takeIf { it.isNotBlank() } ?: "View or update on Accounts web",
                     supportingText = "Used as a sign-in identifier when set",
                     icon = Icons.Rounded.Phone,
+                    statusBadge = account.phoneNumberVerified?.takeIf { !account.phoneNumber.isNullOrBlank() }?.let { verified ->
+                        {
+                            StatusPill(
+                                label = if (verified) "Verified" else "Unverified",
+                                tone = if (verified) StatusTone.VERIFIED else StatusTone.WARNING,
+                            )
+                        }
+                    },
                     trailingIcon = Icons.AutoMirrored.Rounded.OpenInNew,
                     onClick = onManagePersonalOnWeb,
                 )

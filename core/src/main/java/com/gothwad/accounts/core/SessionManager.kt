@@ -114,33 +114,37 @@ internal class SessionManager(
         save(data.copy(credentials = updated, activeUserId = userId))
     }
 
-    /** App-local removal only; persists locally first, then optionally performs best-effort server revoke. */
-    suspend fun signOut(userId: String, revokeOnServer: Boolean = false) {
-        val removed = mutex.withLock {
-            check(!corrupted) { "Account storage is corrupted" }
-            generation++
-            val target = data.credentials.find { it.account.userId == userId }
-            val remaining = data.credentials.filterNot { it.account.userId == userId }
-            save(
-                data.copy(
-                    credentials = remaining,
-                    activeUserId = if (data.activeUserId == userId) remaining.firstOrNull()?.account?.userId else data.activeUserId,
-                    pending = null,
-                ),
-            )
-            target
+    /**
+     * App-local removal by default (`revokeOnServer = false`), preserving grants on other devices.
+     * When `revokeOnServer = true`, attempts `POST /oauth/revoke` BEFORE deleting local tokens
+     * (refreshing the access token first if needed) and reports the true server vs offline outcome.
+     */
+    suspend fun signOut(userId: String, revokeOnServer: Boolean = false): DisconnectOutcome {
+        val outcome = if (revokeOnServer) {
+            revokeGrantForUser(userId)
+        } else {
+            DisconnectOutcome.OfflineRemovedLocally
         }
-        if (revokeOnServer && removed != null) {
-            runCatching { oauth.revoke(removed.refreshToken, removed.accessToken) }
-        }
+        removeLocalCredential(userId)
+        return outcome
     }
 
-    /** Removes local tokens, records a device-removal tombstone at [removedAt], and revokes this app's grant best-effort. */
-    suspend fun removeFromDevice(userId: String, removedAt: Long = clock()): Long {
-        val removed = mutex.withLock {
+    /**
+     * Removes local tokens and records a device-removal tombstone at [removedAt].
+     * Defaults to local/device-only (`revokeOnServer = false`) so sibling installations on other
+     * devices stay independent unless explicitly disconnected from server.
+     */
+    suspend fun removeFromDevice(
+        userId: String,
+        removedAt: Long = clock(),
+        revokeOnServer: Boolean = false,
+    ): Long {
+        if (revokeOnServer) {
+            revokeGrantForUser(userId)
+        }
+        mutex.withLock {
             check(!corrupted) { "Account storage is corrupted" }
             generation++
-            val target = data.credentials.find { it.account.userId == userId }
             val remaining = data.credentials.filterNot { it.account.userId == userId }
             val nextTombstones = data.deviceRemovalTombstones + (userId to removedAt)
             save(
@@ -151,12 +155,47 @@ internal class SessionManager(
                     deviceRemovalTombstones = nextTombstones,
                 ),
             )
-            target
-        }
-        if (removed != null) {
-            runCatching { oauth.revoke(removed.refreshToken, removed.accessToken) }
         }
         return removedAt
+    }
+
+    private suspend fun revokeGrantForUser(userId: String): DisconnectOutcome {
+        val cred = mutex.withLock {
+            check(!corrupted) { "Account storage is corrupted" }
+            data.credentials.find { it.account.userId == userId }
+        } ?: return DisconnectOutcome.AlreadyInvalidOnServer
+
+        var bearer = cred.accessToken
+        var refresh = cred.refreshToken
+        if (cred.expiresAt - clock() <= 60_000 && !refresh.isNullOrBlank()) {
+            val refreshed = runCatching { oauth.refresh(refresh) }
+            refreshed.onSuccess {
+                bearer = it.accessToken
+                refresh = it.refreshToken ?: refresh
+            }
+            val ex = refreshed.exceptionOrNull()
+            if (ex is OAuthException && ex.rejected) {
+                return DisconnectOutcome.AlreadyInvalidOnServer
+            }
+        }
+        return when (oauth.revoke(refresh, bearer)) {
+            RevokeStatus.Revoked -> DisconnectOutcome.RevokedOnServer
+            RevokeStatus.InvalidGrant -> DisconnectOutcome.AlreadyInvalidOnServer
+            RevokeStatus.Failed -> DisconnectOutcome.OfflineRemovedLocally
+        }
+    }
+
+    private suspend fun removeLocalCredential(userId: String) = mutex.withLock {
+        check(!corrupted) { "Account storage is corrupted" }
+        generation++
+        val remaining = data.credentials.filterNot { it.account.userId == userId }
+        save(
+            data.copy(
+                credentials = remaining,
+                activeUserId = if (data.activeUserId == userId) remaining.firstOrNull()?.account?.userId else data.activeUserId,
+                pending = null,
+            ),
+        )
     }
 
     /** Applies a verified peer's device-removal notification when [removedAt] is newer than local sign-in. */

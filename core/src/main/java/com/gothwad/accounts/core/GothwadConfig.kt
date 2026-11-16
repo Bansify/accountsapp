@@ -7,6 +7,7 @@ enum class Scope(val wireValue: String) {
     Profile("profile"),
     Email("email"),
     OfflineAccess("offline_access"),
+    Mail("mail"),
     Drive("drive"),
     DriveRead("drive.read"),
     Notes("notes"),

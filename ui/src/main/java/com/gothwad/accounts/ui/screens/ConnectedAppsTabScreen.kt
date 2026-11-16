@@ -8,6 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.Extension
+import androidx.compose.material.icons.rounded.LinkOff
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Smartphone
 import androidx.compose.runtime.Composable
@@ -15,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.gothwad.accounts.core.ConnectedAppGrant
 import com.gothwad.accounts.core.DiscoveredAccount
 import com.gothwad.accounts.ui.R
 import com.gothwad.accounts.ui.components.AccountSectionCard
@@ -29,6 +31,9 @@ import com.gothwad.accounts.ui.model.GothwadEcosystemCatalog
 fun ConnectedAppsTabScreen(
     installedVerifiedPeers: List<String>,
     discoveredAccounts: List<DiscoveredAccount>,
+    canManageNatively: Boolean = false,
+    authorizations: List<ConnectedAppGrant> = emptyList(),
+    onRevokeAuthorization: (String) -> Unit = {},
     onManageAppsOnWeb: () -> Unit,
     onOpenCatalogUrl: (String) -> Unit,
 ) {
@@ -46,15 +51,36 @@ fun ConnectedAppsTabScreen(
             )
         }
 
-        // OAuth permissions on Accounts web
+        // OAuth permissions (live from /mobile/authorizations when available + web link)
         item {
             AccountSectionCard(
-                title = "Authorized third-party & OAuth apps",
-                subtitle = "View or revoke OAuth token grants issued to apps and websites.",
+                title = "Authorized apps & OAuth grants",
+                subtitle = "Revoking an OAuth grant stops refresh tokens for that app across all devices.",
             ) {
+                if (canManageNatively && authorizations.isNotEmpty()) {
+                    authorizations.forEachIndexed { idx, grant ->
+                        if (idx > 0) SectionDivider()
+                        AccountSettingRow(
+                            label = grant.name,
+                            value = grant.scopes.joinToString(", ").ifBlank { grant.appId },
+                            supportingText = listOfNotNull(
+                                grant.grantedAt?.let { "Granted $it" },
+                                "Tap to revoke server grant",
+                            ).joinToString(" · "),
+                            icon = Icons.Rounded.Security,
+                            trailingIcon = Icons.Rounded.LinkOff,
+                            onClick = { onRevokeAuthorization(grant.appId) },
+                        )
+                    }
+                    SectionDivider()
+                }
                 AccountSettingRow(
                     label = "OAuth grants & connected sites",
-                    value = "Review and revoke app access on Accounts web",
+                    value = if (canManageNatively && authorizations.isEmpty()) {
+                        "No active OAuth grants · Open on Accounts web"
+                    } else {
+                        "Review and revoke app access on Accounts web"
+                    },
                     supportingText = "Revoking an OAuth grant stops refresh tokens across devices",
                     icon = Icons.Rounded.Security,
                     trailingIcon = Icons.AutoMirrored.Rounded.OpenInNew,

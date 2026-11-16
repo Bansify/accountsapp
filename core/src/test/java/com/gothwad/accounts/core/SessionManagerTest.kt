@@ -50,9 +50,9 @@ class SessionManagerTest {
         }
 
         override fun userInfo(token: String) = GothwadAccount("user", "pawan")
-        override fun revoke(refreshToken: String?, accessToken: String?): Boolean {
+        override fun revoke(refreshToken: String?, accessToken: String?): RevokeStatus {
             revokeCalls.incrementAndGet()
-            return true
+            return RevokeStatus.Revoked
         }
     }
 
@@ -89,7 +89,6 @@ class SessionManagerTest {
 
     @Test
     fun rejectedRefreshRemovesAccount() = runTest {
-        val store = store()
         val service = object : Service() {
             override fun refresh(token: String): TokenResponse = throw OAuthException(true)
         }
@@ -202,19 +201,46 @@ class SessionManagerTest {
     }
 
     @Test
-    fun signOutWithServerRevokeAlwaysClearsLocalEvenIfServerFails() = runTest {
+    fun localSignOutNeverCallsServerRevokeByDefault() = runTest {
         val store = store()
-        val failingRevokeService = object : Service() {
-            override fun revoke(refreshToken: String?, accessToken: String?): Boolean {
+        val service = Service()
+        val manager = SessionManager(store, service) { 1000 }
+        manager.load()
+        manager.signOut("user")
+        assertEquals(0, service.revokeCalls.get())
+        assertEquals(AccountState.SignedOut, manager.state.value)
+    }
+
+    @Test
+    fun serverDisconnectRefreshesExpiredBearerBeforeRevokeAndReportsOfflineTruthfully() = runTest {
+        val store = store()
+        var seenBearer: String? = null
+        var seenRefresh: String? = null
+        val onlineService = object : Service() {
+            override fun revoke(refreshToken: String?, accessToken: String?): RevokeStatus {
                 revokeCalls.incrementAndGet()
-                throw IOException("offline")
+                seenRefresh = refreshToken
+                seenBearer = accessToken
+                return RevokeStatus.Revoked
             }
         }
-        val manager = SessionManager(store, failingRevokeService) { 1000 }
-        manager.load()
-        manager.signOut("user", revokeOnServer = true)
-        assertEquals(1, failingRevokeService.revokeCalls.get())
-        assertEquals(AccountState.SignedOut, manager.state.value)
-        assertTrue(store.value.credentials.isEmpty())
+        val onlineManager = SessionManager(store, onlineService) { 1000 }
+        onlineManager.load()
+        val outcomeOnline = onlineManager.signOut("user", revokeOnServer = true)
+        assertEquals(DisconnectOutcome.RevokedOnServer, outcomeOnline)
+        assertEquals("new-access", seenBearer)
+        assertEquals("new-refresh", seenRefresh)
+        assertEquals(AccountState.SignedOut, onlineManager.state.value)
+
+        // Offline: must report OfflineRemovedLocally (never RevokedOnServer)
+        val offlineStore = MemoryStore(StoredSession(listOf(Credential(account, "valid-access", "rt", 999_999L)), "user"))
+        val offlineService = object : Service() {
+            override fun revoke(refreshToken: String?, accessToken: String?): RevokeStatus = RevokeStatus.Failed
+        }
+        val offlineManager = SessionManager(offlineStore, offlineService) { 1000 }
+        offlineManager.load()
+        val outcomeOffline = offlineManager.signOut("user", revokeOnServer = true)
+        assertEquals(DisconnectOutcome.OfflineRemovedLocally, outcomeOffline)
+        assertEquals(AccountState.SignedOut, offlineManager.state.value)
     }
 }

@@ -2,10 +2,13 @@ package com.gothwad.accounts.ui.model
 
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Immutable
+import com.gothwad.accounts.core.AccountActivityEntry
 import com.gothwad.accounts.core.AccountState
 import com.gothwad.accounts.core.AuthFailure
+import com.gothwad.accounts.core.ConnectedAppGrant
 import com.gothwad.accounts.core.DiscoveredAccount
 import com.gothwad.accounts.core.GothwadAccount
+import com.gothwad.accounts.core.WebSessionInfo
 import com.gothwad.accounts.ui.R
 
 /** Matches exact 6 sections on accounts.gothwadtech.com/me. */
@@ -67,6 +70,13 @@ data class AccountDashboardUiState(
     val showAccountSwitcher: Boolean = false,
     val signOutTarget: SignOutDialogTarget? = null,
     val snackbarMessage: String? = null,
+    val canManageNatively: Boolean = false,
+    val canWriteProfileNatively: Boolean = false,
+    val webSessions: List<WebSessionInfo> = emptyList(),
+    val activityFeed: List<AccountActivityEntry> = emptyList(),
+    val authorizations: List<ConnectedAppGrant> = emptyList(),
+    val showEditProfileDialog: Boolean = false,
+    val isSavingProfile: Boolean = false,
 ) {
     val activeAccount: GothwadAccount?
         get() = (accountState as? AccountState.SignedIn)?.account

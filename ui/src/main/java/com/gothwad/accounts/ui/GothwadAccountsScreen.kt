@@ -30,6 +30,7 @@ import com.gothwad.accounts.core.AccountState
 import com.gothwad.accounts.ui.components.AccountSwitcherDialog
 import com.gothwad.accounts.ui.components.AccountsTabBar
 import com.gothwad.accounts.ui.components.AccountsTopAppBar
+import com.gothwad.accounts.ui.components.EditBasicProfileDialog
 import com.gothwad.accounts.ui.components.GothwadAuthStatusBanner
 import com.gothwad.accounts.ui.components.SignOutOrRemoveDialog
 import com.gothwad.accounts.ui.model.AccountSubScreen
@@ -214,6 +215,8 @@ fun GothwadAccountsScreen(
 
                                         AccountTab.PERSONAL_INFO -> PersonalInfoTabScreen(
                                             account = current,
+                                            canEditBasicProfileNatively = uiState.canWriteProfileNatively,
+                                            onEditBasicProfileClick = { accountViewModel.openEditProfileDialog(true) },
                                             onManagePersonalOnWeb = {
                                                 activity?.let { accountViewModel.openWebSection(it, "personal") }
                                             },
@@ -223,6 +226,10 @@ fun GothwadAccountsScreen(
                                             account = current,
                                             localAccounts = accountState.all,
                                             installedVerifiedPeers = uiState.installedVerifiedPeers,
+                                            canManageNatively = uiState.canManageNatively,
+                                            webSessions = uiState.webSessions,
+                                            activityFeed = uiState.activityFeed,
+                                            onRevokeOtherWebSessions = accountViewModel::revokeOtherWebSessions,
                                             onManageSecurityOnWeb = {
                                                 activity?.let { accountViewModel.openWebSection(it, "security") }
                                             },
@@ -248,6 +255,9 @@ fun GothwadAccountsScreen(
                                         AccountTab.CONNECTED_APPS -> ConnectedAppsTabScreen(
                                             installedVerifiedPeers = uiState.installedVerifiedPeers,
                                             discoveredAccounts = uiState.discoveredAccounts,
+                                            canManageNatively = uiState.canManageNatively,
+                                            authorizations = uiState.authorizations,
+                                            onRevokeAuthorization = accountViewModel::revokeAppAuthorization,
                                             onManageAppsOnWeb = {
                                                 activity?.let { accountViewModel.openWebSection(it, "apps") }
                                             },
@@ -303,10 +313,20 @@ fun GothwadAccountsScreen(
                 onDismiss = accountViewModel::dismissSignOutDialog,
                 onSignOutThisApp = { accountViewModel.signOutThisApp(target.userId) },
                 onRemoveFromDevice = { accountViewModel.removeFromDevice(target.userId) },
+                onDisconnectGrantOnServer = { accountViewModel.disconnectGrantOnServer(target.userId) },
                 onManageWebSessions = {
                     accountViewModel.dismissSignOutDialog()
                     activity?.let { accountViewModel.openWebSection(it, "security") }
                 },
+            )
+        }
+
+        if (uiState.showEditProfileDialog && activeAccount != null) {
+            EditBasicProfileDialog(
+                account = activeAccount,
+                isSaving = uiState.isSavingProfile,
+                onDismiss = { accountViewModel.openEditProfileDialog(false) },
+                onSave = accountViewModel::saveBasicProfile,
             )
         }
     }

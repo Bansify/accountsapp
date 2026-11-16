@@ -14,7 +14,6 @@ import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.Devices
 import androidx.compose.material.icons.rounded.Fingerprint
 import androidx.compose.material.icons.rounded.History
-import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.Logout
 import androidx.compose.material.icons.rounded.MarkEmailRead
 import androidx.compose.material.icons.rounded.Password
@@ -31,7 +30,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.gothwad.accounts.core.AccountActivityEntry
 import com.gothwad.accounts.core.GothwadAccount
+import com.gothwad.accounts.core.WebSessionInfo
 import com.gothwad.accounts.ui.R
 import com.gothwad.accounts.ui.components.AccountSectionCard
 import com.gothwad.accounts.ui.components.AccountSettingRow
@@ -48,6 +49,10 @@ fun SecurityTabScreen(
     account: GothwadAccount,
     localAccounts: List<GothwadAccount>,
     installedVerifiedPeers: List<String>,
+    canManageNatively: Boolean = false,
+    webSessions: List<WebSessionInfo> = emptyList(),
+    activityFeed: List<AccountActivityEntry> = emptyList(),
+    onRevokeOtherWebSessions: () -> Unit = {},
     onManageSecurityOnWeb: () -> Unit,
     onRequestSignOutOrRemove: (GothwadAccount) -> Unit,
     onNavigateTab: (AccountTab) -> Unit,
@@ -79,7 +84,8 @@ fun SecurityTabScreen(
                         false -> "No password set"
                         null -> "Add or update password"
                     },
-                    supportingText = "Protected with PBKDF2-SHA256 / server session",
+                    supportingText = account.passwordChangedAt?.let { "Last changed $it" }
+                        ?: "Protected with PBKDF2-SHA256 / server session",
                     icon = Icons.Rounded.Password,
                     statusBadge = account.hasPassword?.let { set ->
                         { StatusPill(if (set) "Set" else "Not set", if (set) StatusTone.VERIFIED else StatusTone.WARNING) }
@@ -119,17 +125,6 @@ fun SecurityTabScreen(
                 )
                 SectionDivider()
                 AccountSettingRow(
-                    label = "Google accounts",
-                    value = account.linkedGoogleCount?.let { count ->
-                        if (count > 0) "$count Google account(s) linked" else "No Google account linked"
-                    } ?: "Linked Google sign-in accounts (up to 3)",
-                    supportingText = "Link or unlink Google login methods on Accounts web",
-                    icon = Icons.Rounded.Link,
-                    trailingIcon = Icons.AutoMirrored.Rounded.OpenInNew,
-                    onClick = onManageSecurityOnWeb,
-                )
-                SectionDivider()
-                AccountSettingRow(
                     label = "Recovery email",
                     value = account.recoveryEmail?.takeIf { it.isNotBlank() } ?: "Manage verified backup email",
                     icon = Icons.Rounded.MarkEmailRead,
@@ -150,14 +145,43 @@ fun SecurityTabScreen(
             ) {
                 AccountSettingRow(
                     label = "Web & browser sessions",
-                    value = account.activeSessionsCount?.let { count ->
-                        "$count active web session(s)"
-                    } ?: "Review active sessions & sign out other browsers",
+                    value = when {
+                        webSessions.isNotEmpty() -> "${webSessions.size} active web session(s)"
+                        account.activeSessionsCount != null -> "${account.activeSessionsCount} active web session(s)"
+                        else -> "Review active sessions & sign out other browsers"
+                    },
                     supportingText = "Opens Security & devices on accounts.gothwadtech.com",
                     icon = Icons.Rounded.Devices,
                     trailingIcon = Icons.AutoMirrored.Rounded.OpenInNew,
                     onClick = onManageSecurityOnWeb,
                 )
+                if (canManageNatively && webSessions.isNotEmpty()) {
+                    webSessions.take(5).forEach { ws ->
+                        SectionDivider()
+                        val label = listOfNotNull(ws.browser, ws.os).joinToString(" · ")
+                            .ifBlank { ws.deviceName ?: "Browser session" }
+                        AccountSettingRow(
+                            label = if (ws.current) "Current browser session" else "Web session",
+                            value = label,
+                            supportingText = listOfNotNull(ws.ipAddress, ws.lastActive).joinToString(" · "),
+                            icon = Icons.Rounded.Devices,
+                            statusBadge = if (ws.current) {
+                                { StatusPill("Current", StatusTone.VERIFIED) }
+                            } else null,
+                        )
+                    }
+                    if (webSessions.count { !it.current } > 0 || webSessions.size > 1) {
+                        Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)) {
+                            OutlinedButton(
+                                onClick = onRevokeOtherWebSessions,
+                                shape = RoundedCornerShape(50),
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text("Sign out all other web sessions")
+                            }
+                        }
+                    }
+                }
                 SectionDivider()
                 AccountSettingRow(
                     label = "Verified Gothwad apps on this device",
@@ -200,7 +224,7 @@ fun SecurityTabScreen(
                             .testTag("security_sign_out_or_remove_button"),
                     ) {
                         Icon(Icons.Rounded.Logout, contentDescription = null)
-                        Text("  Sign out of app or remove from device")
+                        Text("  Sign out, remove, or disconnect app")
                     }
                 }
             }
@@ -209,17 +233,32 @@ fun SecurityTabScreen(
         // Security activity & Connected apps
         item {
             AccountSectionCard(title = "Activity & app permissions") {
+                if (canManageNatively && activityFeed.isNotEmpty()) {
+                    activityFeed.take(5).forEachIndexed { idx, entry ->
+                        if (idx > 0) SectionDivider()
+                        AccountSettingRow(
+                            label = entry.title,
+                            value = entry.detail ?: entry.type,
+                            supportingText = listOfNotNull(entry.ipAddress, entry.createdAt).joinToString(" · "),
+                            icon = Icons.Rounded.History,
+                        )
+                    }
+                    SectionDivider()
+                } else {
+                    AccountSettingRow(
+                        label = "Recent security activity",
+                        value = "View recent sign-ins and security events",
+                        icon = Icons.Rounded.History,
+                        trailingIcon = Icons.AutoMirrored.Rounded.OpenInNew,
+                        onClick = onManageSecurityOnWeb,
+                    )
+                    SectionDivider()
+                }
                 AccountSettingRow(
-                    label = "Recent security activity",
-                    value = "View recent sign-ins and security events",
-                    icon = Icons.Rounded.History,
-                    trailingIcon = Icons.AutoMirrored.Rounded.OpenInNew,
-                    onClick = onManageSecurityOnWeb,
-                )
-                SectionDivider()
-                AccountSettingRow(
-                    label = "Signing in with other sites",
-                    value = "Manage Gothwad OAuth connections",
+                    label = "Connected apps & OAuth grants",
+                    value = account.authorizationCount?.let { count ->
+                        "$count authorized app(s)"
+                    } ?: "Manage Gothwad OAuth connections",
                     icon = Icons.Rounded.Apps,
                     onClick = { onNavigateTab(AccountTab.CONNECTED_APPS) },
                 )

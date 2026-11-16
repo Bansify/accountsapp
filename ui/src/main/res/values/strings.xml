@@ -14,10 +14,12 @@
     <string name="gothwad_manage_web">Manage your account on the web</string>
     <string name="gothwad_open_on_web">Open in Accounts web</string>
     <string name="gothwad_refresh_profile">Refresh</string>
-    <string name="gothwad_local_removal_notice">Signing out of this app clears only this app’s tokens. Other Gothwad apps and browser sessions stay signed in.</string>
-    <string name="gothwad_device_removal_notice">Removing from this device clears this account from verified Gothwad apps on this phone. Browser sessions and other devices must be revoked from Security on the web.</string>
-    <string name="gothwad_remove_local">Sign out of this app</string>
+    <string name="gothwad_local_removal_notice">Signing out of this app clears only this installation’s local tokens. Other devices and browser sessions stay signed in.</string>
+    <string name="gothwad_device_removal_notice">Removing from this device clears this account from verified Gothwad apps on this phone. Other phones and browser sessions stay signed in.</string>
+    <string name="gothwad_server_disconnect_notice">Disconnecting on the server calls OAuth revoke for this entire user/app grant across all installations of this app (if offline, it removes locally without server confirmation).</string>
+    <string name="gothwad_remove_local">Sign out locally</string>
     <string name="gothwad_remove_device">Remove from this device</string>
+    <string name="gothwad_disconnect_server">Disconnect app grant on server</string>
     <string name="gothwad_cancel">Cancel</string>
     <string name="gothwad_confirm">Confirm</string>
     <string name="gothwad_browser_error">Install or enable a browser to sign in.</string>

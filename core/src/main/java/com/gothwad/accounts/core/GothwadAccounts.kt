@@ -10,6 +10,7 @@ import com.gothwad.accounts.core.broker.AndroidPeerDirectoryTransport
 import com.gothwad.accounts.core.broker.DirectorySnapshot
 import com.gothwad.accounts.core.broker.PeerBrokerClient
 import java.io.IOException
+import java.security.PublicKey
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -25,8 +26,11 @@ import kotlinx.coroutines.withTimeout
 import okhttp3.Interceptor
 
 object GothwadAccounts {
+    private const val FIRST_PARTY_ACCOUNTS_CLIENT_ID = "gothwad-accounts-android"
+
     private lateinit var config: GothwadConfig
     private lateinit var session: SessionManager
+    private lateinit var mobileClient: MobileAccountClient
     private lateinit var peerBroker: PeerBrokerClient
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var ready: kotlinx.coroutines.Deferred<Unit>? = null
@@ -39,6 +43,9 @@ object GothwadAccounts {
 
     private val mutableIsRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = mutableIsRefreshing.asStateFlow()
+
+    private val mutableLastDisconnectOutcome = MutableStateFlow<DisconnectOutcome?>(null)
+    val lastDisconnectOutcome: StateFlow<DisconnectOutcome?> = mutableLastDisconnectOutcome.asStateFlow()
 
     val state: StateFlow<AccountState> get() = session.state
 
@@ -53,9 +60,10 @@ object GothwadAccounts {
         config: GothwadConfig,
         store: TokenStore,
         oauth: OAuthService = OAuthClient(config),
+        mobile: MobileAccountClient = MobileAccountClient(config),
     ) {
         ready = null
-        initInternal(application, config, store, oauth)
+        initInternal(application, config, store, oauth, mobile)
     }
 
     @Synchronized
@@ -64,6 +72,7 @@ object GothwadAccounts {
         mutableError.value = null
         mutableDiscoveredAccounts.value = emptyList()
         mutableIsRefreshing.value = false
+        mutableLastDisconnectOutcome.value = null
     }
 
     private fun initInternal(
@@ -71,12 +80,14 @@ object GothwadAccounts {
         config: GothwadConfig,
         store: TokenStore,
         oauth: OAuthService = OAuthClient(config),
+        mobile: MobileAccountClient = MobileAccountClient(config),
     ) {
         if (ready != null) {
             require(this.config == config) { "GothwadAccounts.init called twice with different GothwadConfig" }
             return
         }
         this.config = config
+        this.mobileClient = mobile
         this.session = SessionManager(
             store = store,
             oauth = oauth,
@@ -96,6 +107,14 @@ object GothwadAccounts {
             }
         }
     }
+
+    fun canManageAccountNatively(): Boolean =
+        ::config.isInitialized &&
+            config.clientId == FIRST_PARTY_ACCOUNTS_CLIENT_ID &&
+            Scope.AccountRead in config.scopes
+
+    fun canWriteProfileNatively(): Boolean =
+        canManageAccountNatively() && Scope.AccountProfileWrite in config.scopes
 
     fun manageOnWeb(activity: Activity, section: String? = null) = scope.launch {
         action {
@@ -121,6 +140,10 @@ object GothwadAccounts {
 
     fun clearError() {
         mutableError.value = null
+    }
+
+    fun clearDisconnectOutcome() {
+        mutableLastDisconnectOutcome.value = null
     }
 
     fun signIn(
@@ -163,23 +186,47 @@ object GothwadAccounts {
         }
     }
 
-    /** Removes local app credentials and optionally best-effort revokes this client's token on server. */
-    fun signOut(userId: String, revokeOnServer: Boolean = true) = scope.launch {
+    /**
+     * Removes credentials from THIS app installation (`revokeOnServer = false` by default).
+     * Grants on other Android installations/devices remain active unless [revokeOnServer] is true
+     * or [disconnectFromServer] is invoked explicitly.
+     */
+    fun signOut(userId: String, revokeOnServer: Boolean = false) = scope.launch {
         action {
             readyOrThrow()
-            session.signOut(userId, revokeOnServer = revokeOnServer)
+            val outcome = session.signOut(userId, revokeOnServer = revokeOnServer)
+            if (revokeOnServer) {
+                mutableLastDisconnectOutcome.value = outcome
+            }
             syncDiscoveredAccountsInternal()
         }
+    }
+
+    /**
+     * Explicitly disconnects the entire user/client OAuth grant via `POST /oauth/revoke` before
+     * removing local credentials. Records exact [DisconnectOutcome] in [lastDisconnectOutcome]
+     * so offline local removal is never misreported as server revocation.
+     */
+    suspend fun disconnectFromServer(userId: String): DisconnectOutcome = withContext(Dispatchers.IO) {
+        readyOrThrow()
+        val outcome = session.signOut(userId, revokeOnServer = true)
+        mutableLastDisconnectOutcome.value = outcome
+        syncDiscoveredAccountsInternal()
+        outcome
+    }
+
+    fun disconnectFromServerAsync(userId: String) = scope.launch {
+        action { disconnectFromServer(userId) }
     }
 
     /**
      * Removes credentials from this app AND notifies mutually verified peer Gothwad apps on this
      * device via tombstone + verified IPC. Server sessions and browser cookies remain independent.
      */
-    fun removeFromDevice(userId: String) = scope.launch {
+    fun removeFromDevice(userId: String, revokeOnServer: Boolean = false) = scope.launch {
         action {
             readyOrThrow()
-            val removedAt = session.removeFromDevice(userId)
+            val removedAt = session.removeFromDevice(userId, revokeOnServer = revokeOnServer)
             peerBroker.broadcastDeviceRemoval(userId, removedAt, config.brokerPolicy)
             syncDiscoveredAccountsInternal()
         }
@@ -210,6 +257,58 @@ object GothwadAccounts {
             readyOrThrow()
             session.recoverCorruptedStorage()
             syncDiscoveredAccountsInternal()
+        }
+    }
+
+    // --- Native first-party mobile management APIs (`gothwad-accounts-android` + `account.*` scopes) ---
+
+    suspend fun listWebSessions(): Result<List<WebSessionInfo>> = mobileCall { token ->
+        requireAccountReadScope()
+        mobileClient.listSessions(token)
+    }
+
+    suspend fun revokeOtherWebSessions(): Result<Int> = mobileCall { token ->
+        requireAccountProfileWriteScope()
+        mobileClient.revokeOtherSessions(token).also {
+            runCatching { session.refreshActiveProfile() }
+        }
+    }
+
+    suspend fun listActivity(): Result<List<AccountActivityEntry>> = mobileCall { token ->
+        requireAccountReadScope()
+        mobileClient.listActivity(token)
+    }
+
+    suspend fun listAuthorizations(): Result<List<ConnectedAppGrant>> = mobileCall { token ->
+        requireAccountReadScope()
+        mobileClient.listAuthorizations(token)
+    }
+
+    suspend fun revokeAuthorization(appId: String): Result<Unit> = mobileCall { token ->
+        requireAccountProfileWriteScope()
+        mobileClient.revokeAuthorization(token, appId)
+        runCatching { session.refreshActiveProfile() }
+        Unit
+    }
+
+    suspend fun updateBasicProfile(
+        firstName: String,
+        lastName: String,
+        dateOfBirth: String,
+        gender: String,
+    ): Result<GothwadAccount?> = mobileCall { token ->
+        requireAccountProfileWriteScope()
+        mobileClient.patchProfile(token, firstName, lastName, dateOfBirth, gender)
+        session.refreshActiveProfile()
+    }
+
+    suspend fun fetchTrustedApps(
+        pinnedPublicKey: PublicKey? = null,
+        expectedKeyId: String? = null,
+    ): Result<TrustedAppsManifest> = withContext(Dispatchers.IO) {
+        runCatching {
+            readyOrThrow()
+            mobileClient.fetchTrustedApps(pinnedPublicKey, expectedKeyId)
         }
     }
 
@@ -266,6 +365,27 @@ object GothwadAccounts {
             }
             chain.proceed(builder.build())
         }
+    }
+
+    private suspend fun <T> mobileCall(block: suspend (String) -> T): Result<T> = withContext(Dispatchers.IO) {
+        runCatching {
+            readyOrThrow()
+            val token = session.accessToken() ?: throw OAuthException(rejected = true)
+            block(token)
+        }.also { result ->
+            val err = result.exceptionOrNull()
+            if (err is OAuthException && err.rejected) {
+                mutableError.value = AuthFailure.SessionExpired
+            }
+        }
+    }
+
+    private fun requireAccountReadScope() {
+        check(Scope.AccountRead in config.scopes) { "Requires Scope.AccountRead" }
+    }
+
+    private fun requireAccountProfileWriteScope() {
+        check(Scope.AccountProfileWrite in config.scopes) { "Requires Scope.AccountProfileWrite" }
     }
 
     private suspend fun syncDiscoveredAccountsInternal() {

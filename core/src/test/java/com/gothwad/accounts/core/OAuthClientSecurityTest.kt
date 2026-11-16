@@ -65,7 +65,7 @@ class OAuthClientSecurityTest {
     }
 
     @Test
-    fun parsesFullUserInfoIncludingSecuritySummaryAndDriveQuota() {
+    fun parsesExactAccountsUserInfoContractIncludingExtendedProfileAndSecurity() {
         server.enqueue(
             MockResponse()
                 .setResponseCode(200)
@@ -75,19 +75,25 @@ class OAuthClientSecurityTest {
                       "sub": "user-123",
                       "preferred_username": "arjun",
                       "name": "Arjun Sharma",
+                      "given_name": "Arjun",
+                      "family_name": "Sharma",
                       "email": "arjun@gothwadtech.com",
                       "picture": "https://accounts.gothwadtech.com/api/avatars/user-123?v=abc",
                       "created_at": "2026-01-01T00:00:00Z",
                       "updated_at": "2026-11-16T00:00:00Z",
+                      "date_of_birth": "1998-05-14",
+                      "gender": "Male",
                       "phone_number": "+919876543210",
+                      "phone_number_verified": true,
                       "recovery_email": "arjun.recovery@example.com",
                       "recovery_email_verified": true,
                       "security": {
                         "has_password": true,
+                        "password_changed_at": "2026-10-01T12:00:00Z",
                         "mfa_enabled": true,
                         "passkey_count": 2,
-                        "linked_google_count": 1,
-                        "active_sessions_count": 3
+                        "authorization_count": 4,
+                        "session_count": 3
                       },
                       "drive": {
                         "used_bytes": 5242880,
@@ -102,16 +108,22 @@ class OAuthClientSecurityTest {
         assertEquals("user-123", account.userId)
         assertEquals("arjun", account.username)
         assertEquals("Arjun Sharma", account.name)
+        assertEquals("Arjun", account.firstName)
+        assertEquals("Sharma", account.lastName)
+        assertEquals("1998-05-14", account.dateOfBirth)
+        assertEquals("Male", account.gender)
         assertEquals("arjun@gothwadtech.com", account.email)
         assertEquals("https://accounts.gothwadtech.com/api/avatars/user-123?v=abc", account.avatarUrl)
         assertEquals("2026-01-01T00:00:00Z", account.createdAt)
         assertEquals("+919876543210", account.phoneNumber)
+        assertEquals(true, account.phoneNumberVerified)
         assertEquals("arjun.recovery@example.com", account.recoveryEmail)
         assertEquals(true, account.recoveryEmailVerified)
         assertEquals(true, account.hasPassword)
+        assertEquals("2026-10-01T12:00:00Z", account.passwordChangedAt)
         assertEquals(true, account.mfaEnabled)
         assertEquals(2, account.passkeyCount)
-        assertEquals(1, account.linkedGoogleCount)
+        assertEquals(4, account.authorizationCount)
         assertEquals(3, account.activeSessionsCount)
         assertEquals(5242880L, account.storageUsedBytes)
         assertEquals(16106127360L, account.storageLimitBytes)
@@ -163,11 +175,11 @@ class OAuthClientSecurityTest {
     }
 
     @Test
-    fun revokePostsClientAndRefreshTokenAndHandlesUnavailableGracefully() {
+    fun revokePostsClientAndRefreshTokenAndDistinguishesRevokedInvalidAndOutage() {
         val oauth = testOAuthClient()
-        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"revoked":true}"""))
+        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"ok":true}"""))
 
-        assertTrue(oauth.revoke("rt-123", "at-456"))
+        assertEquals(RevokeStatus.Revoked, oauth.revoke("rt-123", "at-456"))
         val recorded = server.takeRequest()
         assertEquals("POST", recorded.method)
         assertEquals("/api/oauth/revoke", recorded.path)
@@ -177,8 +189,11 @@ class OAuthClientSecurityTest {
         assertTrue(body.contains("token=rt-123"))
         assertTrue(body.contains("token_type_hint=refresh_token"))
 
-        server.enqueue(MockResponse().setResponseCode(404))
-        assertFalse(oauth.revoke("rt-123", "at-456"))
+        server.enqueue(MockResponse().setResponseCode(400).setBody("""{"error":"invalid_grant"}"""))
+        assertEquals(RevokeStatus.InvalidGrant, oauth.revoke("rt-123", "at-456"))
+
+        server.enqueue(MockResponse().setResponseCode(503))
+        assertEquals(RevokeStatus.Failed, oauth.revoke("rt-123", "at-456"))
     }
 
     @Test

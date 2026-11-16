@@ -14,10 +14,12 @@
     <string name="gothwad_manage_web">वेबसाइट पर अपना खाता मैनेज करें</string>
     <string name="gothwad_open_on_web">Accounts वेब पर खोलें</string>
     <string name="gothwad_refresh_profile">रिफ्रेश करें</string>
-    <string name="gothwad_local_removal_notice">इस ऐप से साइन आउट करने पर केवल इस ऐप के टोकन हटेंगे। दूसरे Gothwad ऐप और ब्राउज़र सत्र साइन इन रहेंगे।</string>
-    <string name="gothwad_device_removal_notice">इस डिवाइस से हटाने पर यह खाता फ़ोन के सत्यापित Gothwad ऐप्स से हट जाएगा। ब्राउज़र सत्र और दूसरे डिवाइस वेब सुरक्षा से हटाएँ।</string>
-    <string name="gothwad_remove_local">इस ऐप से साइन आउट करें</string>
+    <string name="gothwad_local_removal_notice">इस ऐप से स्थानीय साइन आउट करने पर केवल इस इंस्टॉलेशन के टोकन हटेंगे। दूसरे डिवाइस और ब्राउज़र सत्र साइन इन रहेंगे।</string>
+    <string name="gothwad_device_removal_notice">इस डिवाइस से हटाने पर यह खाता इस फ़ोन के सत्यापित Gothwad ऐप्स से हट जाएगा। अन्य फ़ोन और ब्राउज़र सत्र साइन इन रहेंगे।</string>
+    <string name="gothwad_server_disconnect_notice">सर्वर से डिस्कनेक्ट करने पर इस ऐप की पूरी OAuth अनुमति सभी इंस्टॉलेशन से रद्द हो जाएगी (ऑफ़लाइन होने पर केवल स्थानीय रूप से हटेगा)।</string>
+    <string name="gothwad_remove_local">स्थानीय साइन आउट</string>
     <string name="gothwad_remove_device">इस डिवाइस से हटाएँ</string>
+    <string name="gothwad_disconnect_server">सर्वर पर ऐप अनुमति रद्द करें</string>
     <string name="gothwad_cancel">रद्द करें</string>
     <string name="gothwad_confirm">पुष्टि करें</string>
     <string name="gothwad_browser_error">साइन इन करने के लिए ब्राउज़र इंस्टॉल या चालू करें।</string>

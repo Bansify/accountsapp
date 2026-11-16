@@ -44,7 +44,7 @@ jobs:
           if ./gradlew --no-daemon --max-workers=2 \
             :core:testDebugUnitTest :ui:testDebugUnitTest \
             :core:lintDebug :ui:lintDebug :app:lintDebug :sample:lintAlphaDebug :sample:lintBetaDebug \
-            :app:assembleDebug :sample:assembleAlphaDebug :sample:assembleBetaDebug \
+            :app:assembleDebug :app:assembleRelease :sample:assembleAlphaDebug :sample:assembleBetaDebug \
             :core:publishReleasePublicationToMavenLocal :ui:publishReleasePublicationToMavenLocal \
             > "$RUNNER_TEMP/ci-gradle.log" 2>&1; then
             tail -n 30 "$RUNNER_TEMP/ci-gradle.log"

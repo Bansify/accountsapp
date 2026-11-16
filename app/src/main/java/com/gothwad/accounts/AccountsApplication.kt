@@ -5,6 +5,7 @@ import com.gothwad.accounts.core.BrokerPolicy
 import com.gothwad.accounts.core.BrokerTrustPolicy
 import com.gothwad.accounts.core.GothwadAccounts
 import com.gothwad.accounts.core.GothwadConfig
+import com.gothwad.accounts.core.Scope
 
 class AccountsApplication : Application() {
     override fun onCreate() {
@@ -13,7 +14,20 @@ class AccountsApplication : Application() {
             this,
             GothwadConfig(
                 clientId = "gothwad-accounts-android",
-                redirectUri = "$packageName:/oauth/callback",
+                redirectUri = if (BuildConfig.DEBUG) {
+                    "$packageName:/oauth/callback"
+                } else {
+                    "https://accounts.gothwadtech.com/oauth/callback"
+                },
+                allowCustomSchemeRedirect = BuildConfig.DEBUG,
+                scopes = setOf(
+                    Scope.Profile,
+                    Scope.Email,
+                    Scope.OfflineAccess,
+                    Scope.DriveRead,
+                    Scope.AccountRead,
+                    Scope.AccountProfileWrite,
+                ),
                 brokerPolicy = BrokerPolicy.PeerDiscovery(
                     trustPolicy = BrokerTrustPolicy.SameSigningCertificate(
                         allowDebugBuild = BuildConfig.DEBUG,

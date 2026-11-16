@@ -25,15 +25,17 @@ internal data class TokenResponse(
 private data class DriveQuotaInfo(
     @SerialName("used_bytes") val usedBytes: Long? = null,
     @SerialName("limit_bytes") val limitBytes: Long? = null,
+    @SerialName("write_access") val writeAccess: Boolean? = null,
 )
 
 @Serializable
 private data class AccountSecuritySummary(
-    @SerialName("has_password") val hasPassword: Boolean? = null,
-    @SerialName("mfa_enabled") val mfaEnabled: Boolean? = null,
+    @SerialName("session_count") val sessionCount: Int? = null,
+    @SerialName("authorization_count") val authorizationCount: Int? = null,
     @SerialName("passkey_count") val passkeyCount: Int? = null,
-    @SerialName("linked_google_count") val linkedGoogleCount: Int? = null,
-    @SerialName("active_sessions_count") val activeSessionsCount: Int? = null,
+    @SerialName("has_password") val hasPassword: Boolean? = null,
+    @SerialName("password_changed_at") val passwordChangedAt: String? = null,
+    @SerialName("mfa_enabled") val mfaEnabled: Boolean? = null,
 )
 
 @Serializable
@@ -41,22 +43,33 @@ private data class UserInfo(
     val sub: String,
     @SerialName("preferred_username") val username: String? = null,
     val name: String? = null,
+    @SerialName("given_name") val givenName: String? = null,
+    @SerialName("family_name") val familyName: String? = null,
     val email: String? = null,
     val picture: String? = null,
     @SerialName("created_at") val createdAt: String? = null,
     @SerialName("updated_at") val updatedAt: String? = null,
+    @SerialName("date_of_birth") val dateOfBirth: String? = null,
+    val gender: String? = null,
     @SerialName("phone_number") val phoneNumber: String? = null,
+    @SerialName("phone_number_verified") val phoneNumberVerified: Boolean? = null,
     @SerialName("recovery_email") val recoveryEmail: String? = null,
     @SerialName("recovery_email_verified") val recoveryEmailVerified: Boolean? = null,
     val security: AccountSecuritySummary? = null,
     val drive: DriveQuotaInfo? = null,
 )
 
+internal enum class RevokeStatus {
+    Revoked,
+    InvalidGrant,
+    Failed,
+}
+
 internal interface OAuthService {
     fun exchange(code: String, verifier: String): TokenResponse
     fun refresh(token: String): TokenResponse
     fun userInfo(token: String): GothwadAccount
-    fun revoke(refreshToken: String?, accessToken: String? = null): Boolean = false
+    fun revoke(refreshToken: String?, accessToken: String?): RevokeStatus = RevokeStatus.Failed
 }
 
 internal class OAuthClient(
@@ -110,46 +123,58 @@ internal class OAuthClient(
             userId = info.sub,
             username = info.username,
             name = info.name,
+            firstName = info.givenName,
+            lastName = info.familyName,
             email = info.email,
             avatarUrl = info.picture,
             createdAt = info.createdAt,
             updatedAt = info.updatedAt,
+            dateOfBirth = info.dateOfBirth,
+            gender = info.gender,
             phoneNumber = info.phoneNumber,
+            phoneNumberVerified = info.phoneNumberVerified,
             recoveryEmail = info.recoveryEmail,
             recoveryEmailVerified = info.recoveryEmailVerified,
             hasPassword = info.security?.hasPassword,
+            passwordChangedAt = info.security?.passwordChangedAt,
             mfaEnabled = info.security?.mfaEnabled,
             passkeyCount = info.security?.passkeyCount,
-            linkedGoogleCount = info.security?.linkedGoogleCount,
-            activeSessionsCount = info.security?.activeSessionsCount,
+            authorizationCount = info.security?.authorizationCount,
+            activeSessionsCount = info.security?.sessionCount,
             storageUsedBytes = info.drive?.usedBytes,
             storageLimitBytes = info.drive?.limitBytes,
+            driveWriteAccess = info.drive?.writeAccess,
         )
     }
 
     /**
-     * Best-effort RFC 7009 token revocation for this client's refresh/access grant.
-     * Returns true on 2xx acceptance; never throws on offline/unimplemented (404/405/501) so local
-     * sign-out succeeds immediately and deterministically.
+     * Explicit server revocation (`POST /oauth/revoke` matching `oauth-native-revoke.ts`).
+     * Requires a valid `Authorization: Bearer <accessToken>` plus form `client_id` & `token`.
+     * Distinguishes server revocation (`Revoked`) from `InvalidGrant` vs offline/network errors (`Failed`).
      */
-    override fun revoke(refreshToken: String?, accessToken: String?): Boolean {
-        val targetToken = refreshToken?.takeIf { it.isNotBlank() } ?: accessToken?.takeIf { it.isNotBlank() } ?: return false
+    override fun revoke(refreshToken: String?, accessToken: String?): RevokeStatus {
+        val bearer = accessToken?.takeIf { it.isNotBlank() } ?: return RevokeStatus.Failed
+        val targetToken = refreshToken?.takeIf { it.isNotBlank() } ?: bearer
+        val hint = if (!refreshToken.isNullOrBlank()) "refresh_token" else "access_token"
         val form = FormBody.Builder()
             .add("client_id", config.clientId)
             .add("token", targetToken)
-            .apply {
-                if (!refreshToken.isNullOrBlank()) {
-                    add("token_type_hint", "refresh_token")
+            .add("token_type_hint", hint)
+            .build()
+        val request = Request.Builder()
+            .url("$base/oauth/revoke")
+            .header("Authorization", "Bearer $bearer")
+            .post(form)
+            .build()
+        return runCatching {
+            client.newCall(request).execute().use { response ->
+                when {
+                    response.isSuccessful -> RevokeStatus.Revoked
+                    response.code == 400 || response.code == 401 -> RevokeStatus.InvalidGrant
+                    else -> RevokeStatus.Failed
                 }
             }
-            .build()
-        val reqBuilder = Request.Builder().url("$base/oauth/revoke").post(form)
-        if (!accessToken.isNullOrBlank()) {
-            reqBuilder.header("Authorization", "Bearer $accessToken")
-        }
-        return runCatching {
-            client.newCall(reqBuilder.build()).execute().use { it.isSuccessful }
-        }.getOrDefault(false)
+        }.getOrDefault(RevokeStatus.Failed)
     }
 
     private fun execute(request: Request): String = client.newCall(request).execute().use { response ->

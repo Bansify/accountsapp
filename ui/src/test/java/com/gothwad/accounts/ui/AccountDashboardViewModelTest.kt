@@ -1,10 +1,14 @@
 package com.gothwad.accounts.ui
 
 import android.app.Activity
+import com.gothwad.accounts.core.AccountActivityEntry
 import com.gothwad.accounts.core.AccountState
 import com.gothwad.accounts.core.AuthFailure
+import com.gothwad.accounts.core.ConnectedAppGrant
+import com.gothwad.accounts.core.DisconnectOutcome
 import com.gothwad.accounts.core.DiscoveredAccount
 import com.gothwad.accounts.core.GothwadAccount
+import com.gothwad.accounts.core.WebSessionInfo
 import com.gothwad.accounts.ui.model.AccountSubScreen
 import com.gothwad.accounts.ui.model.AccountTab
 import com.gothwad.accounts.ui.state.AccountDashboardViewModel
@@ -30,14 +34,19 @@ class AccountDashboardViewModelTest {
 
     private val testDispatcher = StandardTestDispatcher()
 
-    private class FakeController : AccountSessionController {
+    private class FakeController(
+        private val nativeManage: Boolean = false,
+        private val nativeWrite: Boolean = false,
+    ) : AccountSessionController {
         override val state = MutableStateFlow<AccountState>(AccountState.Initializing)
         override val discoveredAccounts = MutableStateFlow<List<DiscoveredAccount>>(emptyList())
         override val isRefreshing = MutableStateFlow(false)
         override val error = MutableStateFlow<AuthFailure?>(null)
+        override val lastDisconnectOutcome = MutableStateFlow<DisconnectOutcome?>(null)
 
         var lastSwitchedUserId: String? = null
         var lastSignedOutUserId: String? = null
+        var lastDisconnectedUserId: String? = null
         var lastRemovedDeviceUserId: String? = null
         var refreshCalls = 0
         var syncCalls = 0
@@ -48,6 +57,11 @@ class AccountDashboardViewModelTest {
         override fun signIn(activity: Activity, chooseAccount: Boolean, loginHint: String?) = Unit
         override fun switchTo(userId: String) { lastSwitchedUserId = userId }
         override fun signOut(userId: String) { lastSignedOutUserId = userId }
+        override fun disconnectFromServer(userId: String) {
+            lastDisconnectedUserId = userId
+            lastDisconnectOutcome.value = DisconnectOutcome.OfflineRemovedLocally
+        }
+
         override fun removeFromDevice(userId: String) { lastRemovedDeviceUserId = userId }
         override fun refreshProfile() { refreshCalls++ }
         override fun syncDiscoveredAccounts() { syncCalls++ }
@@ -59,7 +73,33 @@ class AccountDashboardViewModelTest {
             error.value = null
         }
 
+        override fun clearDisconnectOutcome() {
+            lastDisconnectOutcome.value = null
+        }
+
         override fun installedVerifiedPeers(): List<String> = peers
+        override fun canManageAccountNatively(): Boolean = nativeManage
+        override fun canWriteProfileNatively(): Boolean = nativeWrite
+
+        override suspend fun listWebSessions(): Result<List<WebSessionInfo>> =
+            Result.success(listOf(WebSessionInfo(id = "ws-1", browser = "Chrome", os = "Android", current = true)))
+
+        override suspend fun listActivity(): Result<List<AccountActivityEntry>> =
+            Result.success(listOf(AccountActivityEntry(id = "act-1", type = "signin", title = "Signed in")))
+
+        override suspend fun listAuthorizations(): Result<List<ConnectedAppGrant>> =
+            Result.success(listOf(ConnectedAppGrant(appId = "gothwad-mail", name = "Gothwad Mail", scopes = listOf("profile"))))
+
+        override suspend fun updateBasicProfile(
+            firstName: String,
+            lastName: String,
+            dateOfBirth: String,
+            gender: String,
+        ): Result<GothwadAccount?> {
+            val updated = GothwadAccount("u-1", "arjun", "$firstName $lastName".trim(), firstName, lastName, "arjun@gothwadtech.com", dateOfBirth = dateOfBirth, gender = gender)
+            state.value = AccountState.SignedIn(updated, listOf(updated))
+            return Result.success(updated)
+        }
     }
 
     @Before
@@ -97,7 +137,7 @@ class AccountDashboardViewModelTest {
         assertNull(vm.uiState.value.activeAccount)
         assertEquals(1, vm.uiState.value.unauthorizedPeerAccounts.size)
 
-        val account = GothwadAccount("u-1", "arjun", "Arjun", "arjun@gothwadtech.com")
+        val account = GothwadAccount("u-1", "arjun", "Arjun", email = "arjun@gothwadtech.com")
         controller.state.value = AccountState.SignedIn(account, listOf(account))
         advanceUntilIdle()
         assertEquals("u-1", vm.uiState.value.activeAccount?.userId)
@@ -127,11 +167,23 @@ class AccountDashboardViewModelTest {
     }
 
     @Test
-    fun localSignOutVsDeviceRemovalAndSubScreenNavigationWorkCleanly() = runTest {
-        val controller = FakeController()
+    fun localSignOutVsDeviceRemovalAndServerDisconnectSurfaceTruthfully() = runTest {
+        val controller = FakeController(nativeManage = true, nativeWrite = true)
         val vm = AccountDashboardViewModel(controller)
 
-        val account = GothwadAccount("u-1", "arjun", "Arjun", "arjun@gothwadtech.com")
+        val account = GothwadAccount("u-1", "arjun", "Arjun", email = "arjun@gothwadtech.com")
+        controller.state.value = AccountState.SignedIn(account, listOf(account))
+        advanceUntilIdle()
+
+        assertEquals(1, vm.uiState.value.webSessions.size)
+        assertEquals(1, vm.uiState.value.activityFeed.size)
+        assertEquals(1, vm.uiState.value.authorizations.size)
+
+        vm.saveBasicProfile("Arjun", "Verma", "1999-01-01", "Male")
+        advanceUntilIdle()
+        assertEquals("Arjun Verma", vm.uiState.value.activeAccount?.name)
+        assertEquals("Personal info updated", vm.uiState.value.snackbarMessage)
+
         vm.openSignOutDialog(account)
         assertEquals("u-1", vm.uiState.value.signOutTarget?.userId)
 
@@ -142,6 +194,12 @@ class AccountDashboardViewModelTest {
         vm.openSignOutDialog(account)
         vm.removeFromDevice("u-1")
         assertEquals("u-1", controller.lastRemovedDeviceUserId)
+
+        vm.openSignOutDialog(account)
+        vm.disconnectGrantOnServer("u-1")
+        advanceUntilIdle()
+        assertEquals("u-1", controller.lastDisconnectedUserId)
+        assertTrue(vm.uiState.value.snackbarMessage?.contains("Offline") == true)
 
         vm.openSubScreen(AccountSubScreen.SearchAccount)
         assertEquals(AccountSubScreen.SearchAccount, vm.uiState.value.currentSubScreen)

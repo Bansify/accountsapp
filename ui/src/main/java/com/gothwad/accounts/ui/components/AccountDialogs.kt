@@ -21,22 +21,29 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.LinkOff
 import androidx.compose.material.icons.rounded.Logout
 import androidx.compose.material.icons.rounded.PersonAddAlt1
 import androidx.compose.material.icons.rounded.Smartphone
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,9 +55,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.gothwad.accounts.core.DiscoveredAccount
 import com.gothwad.accounts.core.GothwadAccount
+import com.gothwad.accounts.core.ProfileValidation
 import com.gothwad.accounts.ui.LocalAccountColors
 import com.gothwad.accounts.ui.R
 import com.gothwad.accounts.ui.model.SignOutDialogTarget
+import java.time.LocalDate
 
 @Composable
 fun AccountSwitcherDialog(
@@ -291,20 +300,24 @@ fun AccountSwitcherDialog(
     }
 }
 
-/** Explicitly separates app-local sign-out from device-wide removal and web session revocation. */
+/** Explicitly separates app-local sign-out, device-wide removal, and server OAuth grant disconnection. */
 @Composable
 fun SignOutOrRemoveDialog(
     target: SignOutDialogTarget,
     onDismiss: () -> Unit,
     onSignOutThisApp: () -> Unit,
     onRemoveFromDevice: () -> Unit,
+    onDisconnectGrantOnServer: () -> Unit = onSignOutThisApp,
     onManageWebSessions: () -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(target.displayName, fontWeight = FontWeight.SemiBold) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
                 Text(
                     text = target.email,
                     style = MaterialTheme.typography.bodyMedium,
@@ -320,6 +333,11 @@ fun SignOutOrRemoveDialog(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                Text(
+                    text = stringResource(R.string.gothwad_server_disconnect_notice),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 OutlinedButton(
                     onClick = onRemoveFromDevice,
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
@@ -329,6 +347,16 @@ fun SignOutOrRemoveDialog(
                     Icon(Icons.Rounded.DeleteOutline, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(stringResource(R.string.gothwad_remove_device))
+                }
+                OutlinedButton(
+                    onClick = onDisconnectGrantOnServer,
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                    shape = RoundedCornerShape(50),
+                    modifier = Modifier.fillMaxWidth().testTag("dialog_disconnect_server_button"),
+                ) {
+                    Icon(Icons.Rounded.LinkOff, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(stringResource(R.string.gothwad_disconnect_server))
                 }
                 TextButton(
                     onClick = onManageWebSessions,
@@ -348,6 +376,103 @@ fun SignOutOrRemoveDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.gothwad_cancel))
+            }
+        },
+    )
+}
+
+@Composable
+fun EditBasicProfileDialog(
+    account: GothwadAccount,
+    isSaving: Boolean,
+    onDismiss: () -> Unit,
+    onSave: (firstName: String, lastName: String, dateOfBirth: String, gender: String) -> Unit,
+) {
+    val splitName = remember(account.name) {
+        val parts = account.name?.trim()?.split(Regex("\\s+"), limit = 2).orEmpty()
+        parts.firstOrNull().orEmpty() to parts.getOrNull(1).orEmpty()
+    }
+    var firstName by remember(account) { mutableStateOf(account.firstName ?: splitName.first) }
+    var lastName by remember(account) { mutableStateOf(account.lastName ?: splitName.second) }
+    var dateOfBirth by remember(account) { mutableStateOf(account.dateOfBirth.orEmpty()) }
+    var gender by remember(account) { mutableStateOf(account.gender.orEmpty()) }
+
+    val todayIso = remember { LocalDate.now().toString() }
+    val firstNameValid = ProfileValidation.isValidFirstName(firstName)
+    val lastNameValid = ProfileValidation.isValidLastName(lastName)
+    val dobValid = ProfileValidation.isValidDateOfBirth(dateOfBirth, todayIso)
+    val genderValid = ProfileValidation.isValidGender(gender)
+    val genderOptions = remember { listOf("" to "Not set") + ProfileValidation.ALLOWED_GENDERS.map { it to it } }
+
+    AlertDialog(
+        onDismissRequest = { if (!isSaving) onDismiss() },
+        title = { Text("Edit personal info", fontWeight = FontWeight.SemiBold) },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                OutlinedTextField(
+                    value = firstName,
+                    onValueChange = { firstName = it },
+                    label = { Text("First name") },
+                    isError = !firstNameValid,
+                    singleLine = true,
+                    enabled = !isSaving,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = lastName,
+                    onValueChange = { lastName = it },
+                    label = { Text("Last name (optional)") },
+                    isError = !lastNameValid,
+                    singleLine = true,
+                    enabled = !isSaving,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = dateOfBirth,
+                    onValueChange = { dateOfBirth = it },
+                    label = { Text("Date of birth (YYYY-MM-DD)") },
+                    placeholder = { Text("YYYY-MM-DD or leave empty") },
+                    isError = !dobValid,
+                    singleLine = true,
+                    enabled = !isSaving,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text("Gender", style = MaterialTheme.typography.labelMedium)
+                genderOptions.chunked(2).forEach { pair ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        pair.forEach { (value, label) ->
+                            FilterChip(
+                                selected = gender == value,
+                                onClick = { if (!isSaving) gender = value },
+                                label = { Text(label) },
+                                enabled = !isSaving,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        if (pair.size == 1) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onSave(firstName.trim(), lastName.trim(), dateOfBirth.trim(), gender.trim()) },
+                enabled = !isSaving && firstNameValid && lastNameValid && dobValid && genderValid,
+            ) {
+                Text(if (isSaving) "Saving..." else "Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !isSaving) {
                 Text(stringResource(R.string.gothwad_cancel))
             }
         },
