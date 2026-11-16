@@ -16,6 +16,8 @@ class AccountManagementActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContent { GothwadAccountsTheme { GothwadAccountsScreen() } }
+        setContent {
+            GothwadAccountsScreen(onClose = { finish() })
+        }
     }
 }

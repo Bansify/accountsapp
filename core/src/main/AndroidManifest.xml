@@ -3,8 +3,19 @@
     <queries>
         <intent><action android:name="android.intent.action.VIEW" /><data android:scheme="https" /></intent>
         <intent><action android:name="android.support.customtabs.action.CustomTabsService" /></intent>
+        <package android:name="com.gothwad.accounts" />
+        <package android:name="com.gothwad.mail" />
+        <package android:name="com.gothwad.drive" />
+        <package android:name="com.gothwad.store" />
+        <package android:name="com.gothwad.tube" />
+        <package android:name="com.gothwad.accounts.sample.alpha" />
+        <package android:name="com.gothwad.accounts.sample.beta" />
     </queries>
     <application>
         <activity android:name=".AccountCallbackActivity" android:exported="true" android:excludeFromRecents="true" />
+        <provider
+            android:name=".broker.AccountDirectoryProvider"
+            android:authorities="${applicationId}.gothwad.account.directory"
+            android:exported="true" />
     </application>
 </manifest>

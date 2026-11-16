@@ -12,6 +12,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 
 internal class OAuthException(val rejected: Boolean) : IOException("OAuth request failed")
+
 @Serializable
 internal data class TokenResponse(
     @SerialName("access_token") val accessToken: String,
@@ -19,6 +20,13 @@ internal data class TokenResponse(
     @SerialName("expires_in") val expiresIn: Long,
     @SerialName("token_type") val tokenType: String,
 )
+
+@Serializable
+private data class DriveQuotaInfo(
+    @SerialName("used_bytes") val usedBytes: Long? = null,
+    @SerialName("limit_bytes") val limitBytes: Long? = null,
+)
+
 @Serializable
 private data class UserInfo(
     val sub: String,
@@ -26,44 +34,81 @@ private data class UserInfo(
     val name: String? = null,
     val email: String? = null,
     val picture: String? = null,
+    @SerialName("updated_at") val updatedAt: String? = null,
+    val drive: DriveQuotaInfo? = null,
 )
+
 internal interface OAuthService {
     fun exchange(code: String, verifier: String): TokenResponse
     fun refresh(token: String): TokenResponse
     fun userInfo(token: String): GothwadAccount
 }
-internal class OAuthClient(private val config: GothwadConfig) : OAuthService {
-    private val client = OkHttpClient.Builder().followRedirects(false).followSslRedirects(false)
-        .retryOnConnectionFailure(false).callTimeout(30, TimeUnit.SECONDS).build()
+
+internal class OAuthClient(
+    private val config: GothwadConfig,
+    private val client: OkHttpClient = defaultClient(),
+) : OAuthService {
     private val json = Json { ignoreUnknownKeys = true }
     private val base = config.authBaseUrl.trimEnd('/')
 
+    companion object {
+        private fun defaultClient(): OkHttpClient = OkHttpClient.Builder()
+            .followRedirects(false)
+            .followSslRedirects(false)
+            .retryOnConnectionFailure(false)
+            .callTimeout(30, TimeUnit.SECONDS)
+            .build()
+    }
+
     override fun exchange(code: String, verifier: String): TokenResponse = token(
-        "grant_type" to "authorization_code", "code" to code,
-        "code_verifier" to verifier, "redirect_uri" to config.redirectUri,
+        "grant_type" to "authorization_code",
+        "code" to code,
+        "code_verifier" to verifier,
+        "redirect_uri" to config.redirectUri,
     )
-    override fun refresh(token: String): TokenResponse = token("grant_type" to "refresh_token", "refresh_token" to token)
+
+    override fun refresh(token: String): TokenResponse =
+        token("grant_type" to "refresh_token", "refresh_token" to token)
 
     private fun token(vararg fields: Pair<String, String>): TokenResponse {
         val form = FormBody.Builder().add("client_id", config.clientId)
         fields.forEach { (key, value) -> form.add(key, value) }
-        return json.decodeFromString<TokenResponse>(execute(Request.Builder().url("$base/oauth/token").post(form.build()).build())).also {
+        return json.decodeFromString<TokenResponse>(
+            execute(Request.Builder().url("$base/oauth/token").post(form.build()).build()),
+        ).also {
             require(it.tokenType.equals("Bearer", ignoreCase = true) && it.accessToken.isNotBlank())
             require(it.expiresIn in 1..86400)
         }
     }
 
     override fun userInfo(token: String): GothwadAccount {
-        val info = json.decodeFromString<UserInfo>(execute(Request.Builder().url("$base/oauth/userinfo")
-            .header("Authorization", "Bearer $token").build()))
+        val info = json.decodeFromString<UserInfo>(
+            execute(
+                Request.Builder()
+                    .url("$base/oauth/userinfo")
+                    .header("Authorization", "Bearer $token")
+                    .build(),
+            ),
+        )
         require(info.sub.isNotBlank())
-        return GothwadAccount(info.sub, info.username, info.name, info.email, info.picture)
+        return GothwadAccount(
+            userId = info.sub,
+            username = info.username,
+            name = info.name,
+            email = info.email,
+            avatarUrl = info.picture,
+            updatedAt = info.updatedAt,
+            storageUsedBytes = info.drive?.usedBytes,
+            storageLimitBytes = info.drive?.limitBytes,
+        )
     }
 
     private fun execute(request: Request): String = client.newCall(request).execute().use { response ->
         val body = response.body?.string() ?: throw IOException("Empty OAuth response")
         if (!response.isSuccessful) {
-            val error = runCatching { json.parseToJsonElement(body).jsonObject["error"]?.jsonPrimitive?.content }.getOrNull()
+            val error = runCatching {
+                json.parseToJsonElement(body).jsonObject["error"]?.jsonPrimitive?.content
+            }.getOrNull()
             throw OAuthException(response.code in 400..499 && error == "invalid_grant")
         }
         body

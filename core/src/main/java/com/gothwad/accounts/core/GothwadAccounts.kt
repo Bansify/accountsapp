@@ -6,6 +6,9 @@ import android.content.ActivityNotFoundException
 import android.net.Uri
 import android.os.Looper
 import androidx.browser.customtabs.CustomTabsIntent
+import com.gothwad.accounts.core.broker.AndroidPeerDirectoryTransport
+import com.gothwad.accounts.core.broker.DirectorySnapshot
+import com.gothwad.accounts.core.broker.PeerBrokerClient
 import java.io.IOException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -18,68 +21,232 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import okhttp3.Interceptor
 
 object GothwadAccounts {
     private lateinit var config: GothwadConfig
     private lateinit var session: SessionManager
+    private lateinit var peerBroker: PeerBrokerClient
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var ready: kotlinx.coroutines.Deferred<Unit>? = null
+
     private val mutableError = MutableStateFlow<AuthFailure?>(null)
     val error: StateFlow<AuthFailure?> = mutableError.asStateFlow()
+
+    private val mutableDiscoveredAccounts = MutableStateFlow<List<DiscoveredAccount>>(emptyList())
+    val discoveredAccounts: StateFlow<List<DiscoveredAccount>> = mutableDiscoveredAccounts.asStateFlow()
+
+    private val mutableIsRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = mutableIsRefreshing.asStateFlow()
+
     val state: StateFlow<AccountState> get() = session.state
 
     @Synchronized
     fun init(application: Application, config: GothwadConfig) {
-        if (ready != null) { require(this.config == config); return }
+        initInternal(application, config, EncryptedTokenStore(application, config))
+    }
+
+    @Synchronized
+    internal fun initWithStoreForTesting(
+        application: Application,
+        config: GothwadConfig,
+        store: TokenStore,
+        oauth: OAuthService = OAuthClient(config),
+    ) {
+        ready = null
+        initInternal(application, config, store, oauth)
+    }
+
+    @Synchronized
+    internal fun resetForTesting() {
+        ready = null
+        mutableError.value = null
+        mutableDiscoveredAccounts.value = emptyList()
+        mutableIsRefreshing.value = false
+    }
+
+    private fun initInternal(
+        application: Application,
+        config: GothwadConfig,
+        store: TokenStore,
+        oauth: OAuthService = OAuthClient(config),
+    ) {
+        if (ready != null) {
+            require(this.config == config) { "GothwadAccounts.init called twice with different GothwadConfig" }
+            return
+        }
         this.config = config
-        session = SessionManager(EncryptedTokenStore(application, config), OAuthClient(config))
+        this.session = SessionManager(
+            store = store,
+            oauth = oauth,
+            packageName = application.packageName,
+        )
+        this.peerBroker = PeerBrokerClient(
+            localPackage = application.packageName,
+            transport = AndroidPeerDirectoryTransport(application),
+        )
         ready = scope.async {
-            try { session.load() } catch (error: Exception) {
+            try {
+                session.load()
+                syncDiscoveredAccountsInternal()
+            } catch (error: Exception) {
                 mutableError.value = AuthFailure.StorageUnavailable
                 throw error
             }
         }
     }
 
-    fun manageOnWeb(activity: Activity) = scope.launch {
+    fun manageOnWeb(activity: Activity, section: String? = null) = scope.launch {
         action {
             readyOrThrow()
             val base = Uri.parse(config.authBaseUrl)
-            val uri = base.buildUpon().path("/me").clearQuery().build()
+            val builder = base.buildUpon().path("/me").clearQuery()
+            if (!section.isNullOrBlank()) {
+                builder.fragment(section)
+            }
+            val uri = builder.build()
             withContext(Dispatchers.Main) { CustomTabsIntent.Builder().build().launchUrl(activity, uri) }
         }
     }
 
-    fun clearError() { mutableError.value = null }
+    fun openWebPage(activity: Activity, path: String) = scope.launch {
+        action {
+            readyOrThrow()
+            val normalizedPath = if (path.startsWith('/')) path else "/$path"
+            val uri = Uri.parse(config.authBaseUrl).buildUpon().path(normalizedPath).clearQuery().build()
+            withContext(Dispatchers.Main) { CustomTabsIntent.Builder().build().launchUrl(activity, uri) }
+        }
+    }
 
-    fun signIn(activity: Activity, chooseAccount: Boolean = false) = scope.launch {
+    fun clearError() {
+        mutableError.value = null
+    }
+
+    fun signIn(
+        activity: Activity,
+        chooseAccount: Boolean = false,
+        loginHint: String? = null,
+    ) = scope.launch {
         action {
             readyOrThrow()
             val pending = session.beginLogin()
-            val uri = Uri.parse("${config.authBaseUrl.trimEnd('/')}/oauth/authorize").buildUpon()
+            val authBuilder = Uri.parse("${config.authBaseUrl.trimEnd('/')}/oauth/authorize").buildUpon()
                 .appendQueryParameter("client_id", config.clientId)
                 .appendQueryParameter("redirect_uri", config.redirectUri)
                 .appendQueryParameter("response_type", "code")
                 .appendQueryParameter("scope", config.scopes.map { it.wireValue }.sorted().joinToString(" "))
                 .appendQueryParameter("state", pending.state)
                 .appendQueryParameter("code_challenge", Pkce.challenge(pending.verifier))
-                .appendQueryParameter("code_challenge_method", "S256").build()
+                .appendQueryParameter("code_challenge_method", "S256")
+            if (!loginHint.isNullOrBlank()) {
+                authBuilder.appendQueryParameter("login_hint", loginHint.trim())
+            }
+            val authorizeUri = authBuilder.build()
             val destination = if (chooseAccount) {
                 Uri.parse(config.authBaseUrl).buildUpon().path("/signin").clearQuery()
-                    .appendQueryParameter("choose", "1").appendQueryParameter("next", uri.toString()).build()
-            } else uri
+                    .appendQueryParameter("choose", "1")
+                    .appendQueryParameter("next", authorizeUri.toString())
+                    .build()
+            } else {
+                authorizeUri
+            }
             withContext(Dispatchers.Main) { CustomTabsIntent.Builder().build().launchUrl(activity, destination) }
         }
     }
 
-    fun switchTo(userId: String) = scope.launch { action { readyOrThrow(); session.switchTo(userId) } }
+    fun switchTo(userId: String) = scope.launch {
+        action {
+            readyOrThrow()
+            session.switchTo(userId)
+            syncDiscoveredAccountsInternal()
+        }
+    }
 
-    /** Removes local credentials only; native server revocation is not implemented yet. */
-    fun signOut(userId: String) = scope.launch { action { readyOrThrow(); session.signOut(userId) } }
+    /** Removes local app credentials only; peer apps and browser sessions stay signed in. */
+    fun signOut(userId: String) = scope.launch {
+        action {
+            readyOrThrow()
+            session.signOut(userId)
+            syncDiscoveredAccountsInternal()
+        }
+    }
+
+    /**
+     * Removes credentials from this app AND notifies mutually verified peer Gothwad apps on this
+     * device via tombstone + verified IPC. Server sessions and browser cookies remain independent.
+     */
+    fun removeFromDevice(userId: String) = scope.launch {
+        action {
+            readyOrThrow()
+            val removedAt = session.removeFromDevice(userId)
+            peerBroker.broadcastDeviceRemoval(userId, removedAt, config.brokerPolicy)
+            syncDiscoveredAccountsInternal()
+        }
+    }
+
+    fun refreshProfile() = scope.launch {
+        mutableIsRefreshing.value = true
+        try {
+            action {
+                readyOrThrow()
+                session.refreshActiveProfile()
+                syncDiscoveredAccountsInternal()
+            }
+        } finally {
+            mutableIsRefreshing.value = false
+        }
+    }
+
+    fun syncDiscoveredAccounts() = scope.launch {
+        action {
+            readyOrThrow()
+            syncDiscoveredAccountsInternal()
+        }
+    }
+
+    fun recoverCorruptedStorage() = scope.launch {
+        action {
+            readyOrThrow()
+            session.recoverCorruptedStorage()
+            syncDiscoveredAccountsInternal()
+        }
+    }
+
+    fun installedVerifiedPeers(): List<String> {
+        if (ready == null || !::peerBroker.isInitialized) return emptyList()
+        return runCatching { peerBroker.installedVerifiedPeers(config.brokerPolicy) }.getOrDefault(emptyList())
+    }
+
+    internal fun currentBrokerPolicy(): BrokerPolicy =
+        if (::config.isInitialized) config.brokerPolicy else BrokerPolicy.Disabled
+
+    internal fun directorySnapshotBlocking(): DirectorySnapshot = runBlocking(Dispatchers.IO) {
+        withTimeout(2_000L) {
+            readyOrThrow()
+            session.directorySnapshot()
+        }
+    }
+
+    internal fun applyPeerDeviceRemovalBlocking(userId: String, removedAt: Long) = runBlocking(Dispatchers.IO) {
+        withTimeout(2_000L) {
+            readyOrThrow()
+            session.applyPeerDeviceRemoval(userId, removedAt)
+            syncDiscoveredAccountsInternal()
+        }
+    }
 
     internal fun callback(uri: String) = scope.launch {
-        action { readyOrThrow(); session.completeLogin(uri, config.redirectUri) }
+        mutableIsRefreshing.value = true
+        try {
+            action {
+                readyOrThrow()
+                session.completeLogin(uri, config.redirectUri)
+                syncDiscoveredAccountsInternal()
+            }
+        } finally {
+            mutableIsRefreshing.value = false
+        }
     }
 
     /** Install as a NETWORK interceptor so every redirect hop is host-checked. */
@@ -87,7 +254,9 @@ object GothwadAccounts {
         require(allowedHosts.isNotEmpty())
         require(allowedHosts.all { it == it.lowercase() && '/' !in it && ':' !in it && it.isNotBlank() })
         return Interceptor { chain ->
-            check(Looper.myLooper() != Looper.getMainLooper()) { "Authenticated network requests must run off the main thread" }
+            check(Looper.myLooper() != Looper.getMainLooper()) {
+                "Authenticated network requests must run off the main thread"
+            }
             require(chain.connection() != null) { "Use addNetworkInterceptor, not addInterceptor" }
             val request = chain.request()
             val builder = request.newBuilder().removeHeader("Authorization")
@@ -99,10 +268,26 @@ object GothwadAccounts {
         }
     }
 
-    private suspend fun readyOrThrow() { checkNotNull(ready) { "Call GothwadAccounts.init from Application.onCreate" }.await() }
+    private suspend fun syncDiscoveredAccountsInternal() {
+        val localSnap = session.directorySnapshot()
+        val localAccounts = session.currentLocalAccounts()
+        val discovered = runCatching {
+            peerBroker.discoverAccounts(localSnap, localAccounts, config.brokerPolicy)
+        }.getOrDefault(emptyList())
+        mutableDiscoveredAccounts.value = discovered
+    }
+
+    private suspend fun readyOrThrow() {
+        checkNotNull(ready) { "Call GothwadAccounts.init from Application.onCreate" }.await()
+    }
+
     private suspend fun action(block: suspend () -> Unit) {
         mutableError.value = null
-        try { block() } catch (error: CancellationException) { throw error } catch (error: Exception) {
+        try {
+            block()
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
             mutableError.value = when (error) {
                 is ActivityNotFoundException -> AuthFailure.BrowserUnavailable
                 is LoginCancelledException -> AuthFailure.LoginCancelled

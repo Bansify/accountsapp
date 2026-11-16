@@ -1,59 +1,109 @@
 package com.gothwad.accounts.ui.state
 
+import android.app.Activity
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.gothwad.accounts.core.AccountState
+import com.gothwad.accounts.core.AuthFailure
+import com.gothwad.accounts.core.DiscoveredAccount
 import com.gothwad.accounts.core.GothwadAccount
+import com.gothwad.accounts.core.GothwadAccounts
 import com.gothwad.accounts.ui.model.AccountDashboardUiState
 import com.gothwad.accounts.ui.model.AccountSubScreen
 import com.gothwad.accounts.ui.model.AccountTab
-import com.gothwad.accounts.ui.model.ActivityControlItem
-import com.gothwad.accounts.ui.model.DemoAccountProfile
-import com.gothwad.accounts.ui.model.DeviceType
-import com.gothwad.accounts.ui.model.EditableField
-import com.gothwad.accounts.ui.model.FamilyMember
-import com.gothwad.accounts.ui.model.PaymentMethodItem
-import com.gothwad.accounts.ui.model.SavedPasswordEntry
 import com.gothwad.accounts.ui.model.SearchableSetting
-import com.gothwad.accounts.ui.model.SecurityActivityEvent
-import com.gothwad.accounts.ui.model.SecurityRecommendation
-import com.gothwad.accounts.ui.model.SignedInDevice
-import com.gothwad.accounts.ui.model.SubscriptionItem
-import com.gothwad.accounts.ui.model.ThirdPartyAppConnection
+import com.gothwad.accounts.ui.model.SignOutDialogTarget
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
-class AccountDashboardViewModel : ViewModel() {
+/** Testable adapter wrapping [GothwadAccounts] singleton calls. */
+interface AccountSessionController {
+    val state: StateFlow<AccountState>
+    val discoveredAccounts: StateFlow<List<DiscoveredAccount>>
+    val isRefreshing: StateFlow<Boolean>
+    val error: StateFlow<AuthFailure?>
 
-    private val mutableUiState = MutableStateFlow(createInitialDemoState())
+    fun signIn(activity: Activity, chooseAccount: Boolean = false, loginHint: String? = null)
+    fun switchTo(userId: String)
+    fun signOut(userId: String)
+    fun removeFromDevice(userId: String)
+    fun refreshProfile()
+    fun syncDiscoveredAccounts()
+    fun manageOnWeb(activity: Activity, section: String? = null)
+    fun openWebPage(activity: Activity, path: String)
+    fun recoverCorruptedStorage()
+    fun clearError()
+    fun installedVerifiedPeers(): List<String>
+}
+
+object LiveGothwadAccountController : AccountSessionController {
+    override val state: StateFlow<AccountState> get() = GothwadAccounts.state
+    override val discoveredAccounts: StateFlow<List<DiscoveredAccount>> get() = GothwadAccounts.discoveredAccounts
+    override val isRefreshing: StateFlow<Boolean> get() = GothwadAccounts.isRefreshing
+    override val error: StateFlow<AuthFailure?> get() = GothwadAccounts.error
+
+    override fun signIn(activity: Activity, chooseAccount: Boolean, loginHint: String?) {
+        GothwadAccounts.signIn(activity, chooseAccount, loginHint)
+    }
+
+    override fun switchTo(userId: String) { GothwadAccounts.switchTo(userId) }
+    override fun signOut(userId: String) { GothwadAccounts.signOut(userId) }
+    override fun removeFromDevice(userId: String) { GothwadAccounts.removeFromDevice(userId) }
+    override fun refreshProfile() { GothwadAccounts.refreshProfile() }
+    override fun syncDiscoveredAccounts() { GothwadAccounts.syncDiscoveredAccounts() }
+    override fun manageOnWeb(activity: Activity, section: String?) { GothwadAccounts.manageOnWeb(activity, section) }
+    override fun openWebPage(activity: Activity, path: String) { GothwadAccounts.openWebPage(activity, path) }
+    override fun recoverCorruptedStorage() { GothwadAccounts.recoverCorruptedStorage() }
+    override fun clearError() { GothwadAccounts.clearError() }
+    override fun installedVerifiedPeers(): List<String> = GothwadAccounts.installedVerifiedPeers()
+}
+
+class AccountDashboardViewModel(
+    private val controller: AccountSessionController = LiveGothwadAccountController,
+) : ViewModel() {
+
+    private val mutableUiState = MutableStateFlow(
+        AccountDashboardUiState(
+            accountState = controller.state.value,
+            discoveredAccounts = controller.discoveredAccounts.value,
+            isRefreshing = controller.isRefreshing.value,
+            authError = controller.error.value,
+            installedVerifiedPeers = runCatching { controller.installedVerifiedPeers() }.getOrDefault(emptyList()),
+        ),
+    )
     val uiState: StateFlow<AccountDashboardUiState> = mutableUiState.asStateFlow()
 
-    fun syncCoreSignedInAccount(coreAccount: GothwadAccount?) {
-        if (coreAccount == null) return
-        mutableUiState.update { state ->
-            val mapped = DemoAccountProfile(
-                id = coreAccount.userId,
-                name = coreAccount.name ?: coreAccount.username ?: "Pawan Gothwad",
-                email = coreAccount.email ?: "pawangothwad@gmail.com",
-                handle = "@${coreAccount.username ?: "pawangothwad"}",
-                birthday = "14 August 1998",
-                gender = "Male",
-                pronouns = "he/him",
-                phone = "+91 98765 ••••10",
-                recoveryEmail = "pawan.recovery@gothwadtech.com",
-                homeAddress = "Sector 62, Noida, Uttar Pradesh",
-                workAddress = "DLF Cyber Hub, Gurugram",
-                language = "English (India)",
-                profilePubliclyVisible = true,
-                useDemoAvatarArtwork = true,
-                avatarInitials = (coreAccount.name ?: "PG").take(2).uppercase(),
-            )
-            val updatedAccounts = listOf(mapped) + state.accounts.filterNot { it.id == mapped.id }
-            state.copy(
-                accounts = updatedAccounts,
-                activeAccountId = mapped.id,
-                isLiveCoreAccountLinked = true,
-            )
+    init {
+        viewModelScope.launch {
+            combine(
+                controller.state,
+                controller.discoveredAccounts,
+                controller.isRefreshing,
+                controller.error,
+            ) { accountState, discovered, refreshing, err ->
+                listOf(accountState, discovered, refreshing, err)
+            }.collect { values ->
+                @Suppress("UNCHECKED_CAST")
+                val accountState = values[0] as AccountState
+                @Suppress("UNCHECKED_CAST")
+                val discovered = values[1] as List<DiscoveredAccount>
+                val refreshing = values[2] as Boolean
+                val err = values[3] as AuthFailure?
+                val peers = runCatching { controller.installedVerifiedPeers() }.getOrDefault(emptyList())
+                mutableUiState.update { current ->
+                    current.copy(
+                        accountState = accountState,
+                        discoveredAccounts = discovered,
+                        isRefreshing = refreshing,
+                        authError = err,
+                        installedVerifiedPeers = peers,
+                    )
+                }
+            }
         }
     }
 
@@ -83,321 +133,74 @@ class AccountDashboardViewModel : ViewModel() {
     }
 
     fun toggleAccountSwitcher(show: Boolean) {
+        if (show) controller.syncDiscoveredAccounts()
         mutableUiState.update { it.copy(showAccountSwitcher = show) }
     }
 
-    fun switchAccount(accountId: String) {
-        mutableUiState.update { state ->
-            val target = state.accounts.firstOrNull { it.id == accountId } ?: return@update state
-            state.copy(
-                activeAccountId = accountId,
+    fun switchAccount(userId: String) {
+        controller.switchTo(userId)
+        mutableUiState.update { it.copy(showAccountSwitcher = false) }
+    }
+
+    fun openSignOutDialog(account: GothwadAccount) {
+        val displayName = account.name?.takeIf { it.isNotBlank() }
+            ?: account.username?.takeIf { it.isNotBlank() }
+            ?: account.userId
+        val email = account.email?.takeIf { it.isNotBlank() }
+            ?: account.username?.let { "$it@gothwadtech.com" }
+            ?: account.userId
+        mutableUiState.update {
+            it.copy(
                 showAccountSwitcher = false,
-                snackbarMessage = "Switched to ${target.email}",
+                signOutTarget = SignOutDialogTarget(account.userId, displayName, email),
             )
         }
     }
 
-    fun addDemoAccount(name: String, email: String) {
-        val trimmedName = name.trim().ifEmpty { "Demo Account" }
-        val trimmedEmail = email.trim().ifEmpty { "demo@gothwadtech.com" }
-        val initials = trimmedName.split(" ").mapNotNull { it.firstOrNull()?.uppercaseChar() }.take(2).joinToString("").ifEmpty { "DA" }
-        val newAccount = DemoAccountProfile(
-            id = "demo-${System.currentTimeMillis()}",
-            name = trimmedName,
-            email = trimmedEmail,
-            handle = "@${trimmedEmail.substringBefore("@")}",
-            birthday = "1 January 2000",
-            gender = "Prefer not to say",
-            pronouns = "Not set",
-            phone = "+91 90000 ••••01",
-            recoveryEmail = "pawangothwad@gmail.com",
-            homeAddress = "Not set",
-            workAddress = "Not set",
-            language = "English (India)",
-            profilePubliclyVisible = false,
-            useDemoAvatarArtwork = false,
-            avatarInitials = initials,
-        )
-        mutableUiState.update { state ->
-            state.copy(
-                accounts = state.accounts + newAccount,
-                activeAccountId = newAccount.id,
-                showAccountSwitcher = false,
-                snackbarMessage = "Added and switched to $trimmedEmail",
-            )
-        }
+    fun dismissSignOutDialog() {
+        mutableUiState.update { it.copy(signOutTarget = null) }
     }
 
-    fun openEditField(field: EditableField?) {
-        mutableUiState.update { it.copy(activeEditField = field) }
+    fun signOutThisApp(userId: String) {
+        controller.signOut(userId)
+        mutableUiState.update { it.copy(signOutTarget = null, showAccountSwitcher = false) }
     }
 
-    fun saveEditedField(field: EditableField, newValue: String) {
-        val cleaned = newValue.trim()
-        if (cleaned.isEmpty()) return
-        mutableUiState.update { state ->
-            val updatedAccounts = state.accounts.map { acc ->
-                if (acc.id != state.activeAccountId) acc
-                else when (field) {
-                    EditableField.NAME -> acc.copy(name = cleaned)
-                    EditableField.BIRTHDAY -> acc.copy(birthday = cleaned)
-                    EditableField.GENDER -> acc.copy(gender = cleaned)
-                    EditableField.PRONOUNS -> acc.copy(pronouns = cleaned)
-                    EditableField.RECOVERY_EMAIL -> acc.copy(recoveryEmail = cleaned)
-                    EditableField.RECOVERY_PHONE -> acc.copy(phone = cleaned)
-                    EditableField.HOME_ADDRESS -> acc.copy(homeAddress = cleaned)
-                    EditableField.WORK_ADDRESS -> acc.copy(workAddress = cleaned)
-                    EditableField.LANGUAGE -> acc.copy(language = cleaned)
-                }
-            }
-            state.copy(
-                accounts = updatedAccounts,
-                activeEditField = null,
-                snackbarMessage = "${field.title} updated",
-            )
-        }
+    fun removeFromDevice(userId: String) {
+        controller.removeFromDevice(userId)
+        mutableUiState.update { it.copy(signOutTarget = null, showAccountSwitcher = false) }
     }
 
-    fun toggleProfileVisibility(visible: Boolean) {
-        mutableUiState.update { state ->
-            val updated = state.accounts.map {
-                if (it.id == state.activeAccountId) it.copy(profilePubliclyVisible = visible) else it
-            }
-            state.copy(
-                accounts = updated,
-                snackbarMessage = if (visible) "Profile info visible to anyone" else "Profile info restricted",
-            )
-        }
+    fun startSignIn(activity: Activity, chooseAccount: Boolean = false, loginHint: String? = null) {
+        mutableUiState.update { it.copy(showAccountSwitcher = false) }
+        controller.signIn(activity, chooseAccount, loginHint)
     }
 
-    fun toggleActivityControl(controlId: String) {
-        mutableUiState.update { state ->
-            val updated = state.activityControls.map { item ->
-                if (item.id == controlId) item.copy(isEnabled = !item.isEnabled) else item
-            }
-            val changed = updated.firstOrNull { it.id == controlId }
-            state.copy(
-                activityControls = updated,
-                snackbarMessage = changed?.let {
-                    "${it.title} ${if (it.isEnabled) "turned on" else "paused"}"
-                },
-            )
-        }
+    fun openWebSection(activity: Activity, section: String? = null) {
+        controller.manageOnWeb(activity, section)
     }
 
-    fun updateAutoDeletePeriod(controlId: String, period: String) {
-        mutableUiState.update { state ->
-            val updated = state.activityControls.map { item ->
-                if (item.id == controlId) item.copy(autoDeleteLabel = period) else item
-            }
-            state.copy(
-                activityControls = updated,
-                snackbarMessage = "Auto-delete updated to $period",
-            )
-        }
+    fun openWebPath(activity: Activity, path: String) {
+        controller.openWebPage(activity, path)
     }
 
-    fun togglePersonalizedAds(enabled: Boolean) {
-        mutableUiState.update {
-            it.copy(
-                personalizedAdsEnabled = enabled,
-                snackbarMessage = if (enabled) "Personalized ads enabled" else "Personalized ads turned off",
-            )
-        }
+    fun refreshProfile() {
+        controller.refreshProfile()
     }
 
-    fun toggleLocationSharing(enabled: Boolean) {
-        mutableUiState.update {
-            it.copy(
-                locationSharingEnabled = enabled,
-                snackbarMessage = if (enabled) "Location sharing enabled" else "Location sharing turned off",
-            )
-        }
+    fun syncPeers() {
+        controller.syncDiscoveredAccounts()
     }
 
-    fun togglePartnerSharing(enabled: Boolean) {
-        mutableUiState.update {
-            it.copy(
-                partnerSharingEnabled = enabled,
-                snackbarMessage = if (enabled) "Partner sharing turned on" else "Partner sharing paused",
-            )
-        }
+    fun recoverCorruptedStorage() {
+        controller.recoverCorruptedStorage()
     }
 
-    fun toggleTwoStepVerification(enabled: Boolean) {
-        mutableUiState.update {
-            it.copy(
-                twoStepEnabled = enabled,
-                snackbarMessage = if (enabled) "2-Step Verification is ON" else "2-Step Verification turned OFF",
-            )
-        }
+    fun clearAuthError() {
+        controller.clearError()
     }
 
-    fun toggleEnhancedSafeBrowsing(enabled: Boolean) {
-        mutableUiState.update {
-            it.copy(
-                enhancedSafeBrowsing = enabled,
-                snackbarMessage = if (enabled) "Enhanced Safe Browsing enabled" else "Enhanced Safe Browsing disabled",
-            )
-        }
-    }
-
-    fun addPasskey() {
-        mutableUiState.update {
-            it.copy(
-                passkeyCount = it.passkeyCount + 1,
-                securityEvents = listOf(
-                    SecurityActivityEvent(
-                        id = "evt-${System.currentTimeMillis()}",
-                        title = "New hardware passkey created",
-                        timestamp = "Just now",
-                        location = "Noida, India",
-                        device = "Pixel 9 Pro",
-                    )
-                ) + it.securityEvents,
-                snackbarMessage = "Passkey created and synced to your Account",
-            )
-        }
-    }
-
-    fun regenerateBackupCodes() {
-        mutableUiState.update {
-            it.copy(
-                backupCodesRemaining = 10,
-                snackbarMessage = "10 fresh single-use backup codes generated",
-            )
-        }
-    }
-
-    fun resolveSecurityRecommendation(recId: String) {
-        mutableUiState.update { state ->
-            val updated = state.securityRecommendations.map {
-                if (it.id == recId) it.copy(isResolved = true) else it
-            }
-            state.copy(
-                securityRecommendations = updated,
-                snackbarMessage = "Security recommendation resolved",
-            )
-        }
-    }
-
-    fun togglePrivacyCheckupStep(stepIndex: Int) {
-        mutableUiState.update { state ->
-            val next = if (stepIndex in state.privacyCheckupStepsDone) {
-                state.privacyCheckupStepsDone - stepIndex
-            } else {
-                state.privacyCheckupStepsDone + stepIndex
-            }
-            state.copy(privacyCheckupStepsDone = next)
-        }
-    }
-
-    fun signOutDevice(deviceId: String) {
-        mutableUiState.update { state ->
-            val target = state.devices.firstOrNull { it.id == deviceId } ?: return@update state
-            if (target.isCurrentDevice) return@update state
-            state.copy(
-                devices = state.devices.filterNot { it.id == deviceId },
-                securityEvents = listOf(
-                    SecurityActivityEvent(
-                        id = "evt-${System.currentTimeMillis()}",
-                        title = "Signed out of ${target.name}",
-                        timestamp = "Just now",
-                        location = target.location,
-                        device = target.name,
-                    )
-                ) + state.securityEvents,
-                snackbarMessage = "Signed out from ${target.name}",
-            )
-        }
-    }
-
-    fun revokeThirdPartyApp(appId: String) {
-        mutableUiState.update { state ->
-            val target = state.thirdPartyApps.firstOrNull { it.id == appId } ?: return@update state
-            state.copy(
-                thirdPartyApps = state.thirdPartyApps.filterNot { it.id == appId },
-                snackbarMessage = "Removed ${target.appName} access to your Account",
-            )
-        }
-    }
-
-    fun unblockUser(email: String) {
-        mutableUiState.update { state ->
-            state.copy(
-                blockedUsers = state.blockedUsers - email,
-                snackbarMessage = "Unblocked $email",
-            )
-        }
-    }
-
-    fun toggleSharedEndorsements(enabled: Boolean) {
-        mutableUiState.update {
-            it.copy(
-                sharedEndorsementsEnabled = enabled,
-                snackbarMessage = if (enabled) "Shared endorsements enabled" else "Shared endorsements turned off",
-            )
-        }
-    }
-
-    fun addPaymentMethod(label: String, detail: String, type: String) {
-        if (label.isBlank() || detail.isBlank()) return
-        mutableUiState.update { state ->
-            val item = PaymentMethodItem(
-                id = "pm-${System.currentTimeMillis()}",
-                label = label.trim(),
-                detail = detail.trim(),
-                isPrimary = false,
-                type = type,
-            )
-            state.copy(
-                paymentMethods = state.paymentMethods + item,
-                showAddPaymentDialog = false,
-                snackbarMessage = "Added ${item.label}",
-            )
-        }
-    }
-
-    fun updatePassword() {
-        mutableUiState.update { state ->
-            state.copy(
-                passwordLastChanged = "Just now",
-                showChangePasswordDialog = false,
-                securityEvents = listOf(
-                    SecurityActivityEvent(
-                        id = "evt-${System.currentTimeMillis()}",
-                        title = "Account password changed",
-                        timestamp = "Just now",
-                        location = "Noida, India",
-                        device = "Pixel 9 Pro",
-                    )
-                ) + state.securityEvents,
-                snackbarMessage = "Password updated successfully",
-            )
-        }
-    }
-
-    fun setDialogFlags(
-        changePassword: Boolean? = null,
-        photoPicker: Boolean? = null,
-        takeout: Boolean? = null,
-        deleteAccount: Boolean? = null,
-        addPayment: Boolean? = null,
-        feedback: Boolean? = null,
-    ) {
-        mutableUiState.update { state ->
-            state.copy(
-                showChangePasswordDialog = changePassword ?: state.showChangePasswordDialog,
-                showPhotoPickerDialog = photoPicker ?: state.showPhotoPickerDialog,
-                showTakeoutDialog = takeout ?: state.showTakeoutDialog,
-                showDeleteAccountDialog = deleteAccount ?: state.showDeleteAccountDialog,
-                showAddPaymentDialog = addPayment ?: state.showAddPaymentDialog,
-                showFeedbackDialog = feedback ?: state.showFeedbackDialog,
-            )
-        }
-    }
-
-    fun showToastMessage(message: String) {
+    fun showMessage(message: String) {
         mutableUiState.update { it.copy(snackbarMessage = message) }
     }
 
@@ -405,267 +208,28 @@ class AccountDashboardViewModel : ViewModel() {
         mutableUiState.update { it.copy(snackbarMessage = null) }
     }
 
+    /** Exact settings index matching accounts/web/me/js/search-index.js (no invented settings). */
     fun getSearchIndex(): List<SearchableSetting> = listOf(
-        SearchableSetting("s1", "Name", "Edit your display name", AccountTab.PERSONAL_INFO, targetEditField = EditableField.NAME),
-        SearchableSetting("s2", "Birthday", "View or update date of birth", AccountTab.PERSONAL_INFO, targetEditField = EditableField.BIRTHDAY),
-        SearchableSetting("s3", "Gender & pronouns", "Manage gender identity and visibility", AccountTab.PERSONAL_INFO, targetEditField = EditableField.GENDER),
-        SearchableSetting("s4", "Recovery email", "Backup email for security alerts", AccountTab.PERSONAL_INFO, targetEditField = EditableField.RECOVERY_EMAIL),
-        SearchableSetting("s5", "Recovery phone", "Phone number for sign-in verification", AccountTab.PERSONAL_INFO, targetEditField = EditableField.RECOVERY_PHONE),
-        SearchableSetting("s6", "Home & Work addresses", "Saved locations across services", AccountTab.PERSONAL_INFO, targetEditField = EditableField.HOME_ADDRESS),
-        SearchableSetting("s7", "Language preferences", "English (India), Hindi, input tools", AccountTab.PERSONAL_INFO, targetEditField = EditableField.LANGUAGE),
-        SearchableSetting("s8", "Privacy Checkup", "Step-by-step guide to privacy settings", AccountTab.DATA_PRIVACY, targetSubScreen = AccountSubScreen.PrivacyCheckup),
-        SearchableSetting("s9", "Web & App Activity", "Activity controls & auto-delete", AccountTab.DATA_PRIVACY, targetSubScreen = AccountSubScreen.ActivityControlDetail("web_app")),
-        SearchableSetting("s10", "Timeline (Location History)", "Places you visit and routes", AccountTab.DATA_PRIVACY, targetSubScreen = AccountSubScreen.ActivityControlDetail("timeline")),
-        SearchableSetting("s11", "YouTube History", "Videos watched and search history", AccountTab.DATA_PRIVACY, targetSubScreen = AccountSubScreen.ActivityControlDetail("youtube")),
-        SearchableSetting("s12", "My Ad Center", "Personalized ads and topic controls", AccountTab.DATA_PRIVACY),
-        SearchableSetting("s13", "Download your data", "Create an archive of your Account data", AccountTab.DATA_PRIVACY),
-        SearchableSetting("s14", "Security Checkup", "Review recommendations & sign-in protection", AccountTab.SECURITY, targetSubScreen = AccountSubScreen.SecurityCheckup),
-        SearchableSetting("s15", "2-Step Verification", "Authenticator, prompts, and backup codes", AccountTab.SECURITY, targetSubScreen = AccountSubScreen.TwoStepVerification),
-        SearchableSetting("s16", "Passkeys and security keys", "Passwordless biometric sign-in", AccountTab.SECURITY, targetSubScreen = AccountSubScreen.TwoStepVerification),
-        SearchableSetting("s17", "Your devices", "Manage signed-in phones and laptops", AccountTab.SECURITY, targetSubScreen = AccountSubScreen.DeviceManagement),
-        SearchableSetting("s18", "Third-party apps & services", "Apps with OAuth access to your Account", AccountTab.SECURITY, targetSubScreen = AccountSubScreen.ThirdPartyApps),
-        SearchableSetting("s19", "Password Manager", "Saved passwords & security audit", AccountTab.SECURITY, targetSubScreen = AccountSubScreen.PasswordManager),
-        SearchableSetting("s20", "Family group", "Gothwad Family sharing & controls", AccountTab.PEOPLE_SHARING),
-        SearchableSetting("s21", "Blocked users", "Manage blocked email addresses", AccountTab.PEOPLE_SHARING),
-        SearchableSetting("s22", "Account storage", "41.2 GB of 100 GB used across Drive, Mail & Photos", AccountTab.PAYMENTS_SUBSCRIPTIONS, targetSubScreen = AccountSubScreen.StorageDetails),
-        SearchableSetting("s23", "Payment methods", "Cards, UPI & billing profiles", AccountTab.PAYMENTS_SUBSCRIPTIONS),
-        SearchableSetting("s24", "Subscriptions", "Google One, YouTube Premium", AccountTab.PAYMENTS_SUBSCRIPTIONS),
+        SearchableSetting("home", "Home", "Overview", "dashboard overview home", AccountTab.HOME),
+        SearchableSetting("name", "Change your name", "Personal info · Profile", "first last surname display name", AccountTab.PERSONAL_INFO, webSection = "personal"),
+        SearchableSetting("photo", "Change your photo", "Personal info · Profile", "avatar picture image crop profile", AccountTab.PERSONAL_INFO, webSection = "personal"),
+        SearchableSetting("dob", "Date of birth", "Personal info · Optional details", "birthday dob age birth date", AccountTab.PERSONAL_INFO, webSection = "personal"),
+        SearchableSetting("gender", "Gender", "Personal info · Optional details", "optional male female gender", AccountTab.PERSONAL_INFO, webSection = "personal"),
+        SearchableSetting("phone", "Phone number", "Personal info · Sign-in identifier", "mobile telephone number", AccountTab.PERSONAL_INFO, webSection = "personal"),
+        SearchableSetting("recovery", "Recovery email", "Personal info · Account recovery", "backup email address verify recovery", AccountTab.PERSONAL_INFO, webSection = "personal"),
+        SearchableSetting("email", "Account email address", "Personal info · Fixed identifier", "gothwad email username mailbox address", AccountTab.PERSONAL_INFO),
+        SearchableSetting("visibility", "Profile visibility", "Personal info · Sharing information", "public private privacy sharing visibility", AccountTab.PERSONAL_INFO),
+        SearchableSetting("password", "Add or change password", "Security · Sign-in methods", "password reset update login", AccountTab.SECURITY, webSection = "security"),
+        SearchableSetting("mfa", "2-Step Verification", "Security · Authenticator", "2fa mfa two factor two step authenticator otp totp verification", AccountTab.SECURITY, webSection = "security"),
+        SearchableSetting("google", "Google accounts", "Security · Sign-in methods", "gmail connect linked google login", AccountTab.SECURITY, webSection = "security"),
+        SearchableSetting("passkeys", "Passkeys", "Security · Sign-in methods", "fingerprint face biometric security key passwordless", AccountTab.SECURITY, webSection = "security"),
+        SearchableSetting("devices", "Your devices", "Security · Active sessions", "sessions browsers computers phones device sign out", AccountTab.SECURITY, webSection = "security"),
+        SearchableSetting("sec_activity", "Recent security activity", "Security · Sign-in history", "login history events activity", AccountTab.SECURITY, webSection = "security"),
+        SearchableSetting("storage", "Storage", "Data & privacy · Shared quota", "space quota drive mail usage", AccountTab.DATA_PRIVACY, webSection = "data"),
+        SearchableSetting("export", "Export your data", "Data & privacy · Account data", "download export backup account data json", AccountTab.DATA_PRIVACY, webSection = "data"),
+        SearchableSetting("delete", "Delete your account", "Data & privacy · Account data", "remove close erase delete account", AccountTab.DATA_PRIVACY, webSection = "data"),
+        SearchableSetting("contacts", "Gothwad Contacts", "People & sharing", "people contacts address book", AccountTab.PEOPLE_SHARING),
+        SearchableSetting("services", "Gothwad Services", "Connected apps", "services products applications mail drive store", AccountTab.CONNECTED_APPS),
+        SearchableSetting("disconnect", "Disconnect an app", "Connected apps · Permissions", "revoke permission disconnect third party app oauth", AccountTab.CONNECTED_APPS, webSection = "apps"),
     )
-
-    private fun createInitialDemoState(): AccountDashboardUiState {
-        val primary = DemoAccountProfile(
-            id = "pawan-main",
-            name = "Pawan Gothwad",
-            email = "pawangothwad@gmail.com",
-            handle = "@pawangothwad",
-            birthday = "14 August 1998",
-            gender = "Male",
-            pronouns = "he/him",
-            phone = "+91 98765 ••••10",
-            recoveryEmail = "pawan.recovery@gothwadtech.com",
-            homeAddress = "Sector 62, Noida, Uttar Pradesh",
-            workAddress = "DLF Cyber Hub, Gurugram",
-            language = "English (India)",
-            profilePubliclyVisible = true,
-            useDemoAvatarArtwork = true,
-            avatarInitials = "PG",
-        )
-        val work = DemoAccountProfile(
-            id = "pawan-work",
-            name = "Pawan Gothwad (Work)",
-            email = "pawan@gothwadtech.com",
-            handle = "@gothwadtech",
-            birthday = "14 August 1998",
-            gender = "Male",
-            pronouns = "he/him",
-            phone = "+91 98765 ••••10",
-            recoveryEmail = "pawangothwad@gmail.com",
-            homeAddress = "Sector 62, Noida, Uttar Pradesh",
-            workAddress = "Gothwad Tech Tower, Gurugram",
-            language = "English (India)",
-            profilePubliclyVisible = true,
-            useDemoAvatarArtwork = false,
-            avatarInitials = "GW",
-            isWorkAccount = true,
-        )
-        val studio = DemoAccountProfile(
-            id = "pawan-studio",
-            name = "Gothwad Studio",
-            email = "studio@gothwadtech.com",
-            handle = "@gothwadstudio",
-            birthday = "5 May 2021",
-            gender = "Organization",
-            pronouns = "they/them",
-            phone = "+91 98110 ••••42",
-            recoveryEmail = "pawangothwad@gmail.com",
-            homeAddress = "Noida, UP",
-            workAddress = "DLF Cyber Hub, Gurugram",
-            language = "English (India)",
-            profilePubliclyVisible = false,
-            useDemoAvatarArtwork = false,
-            avatarInitials = "GS",
-        )
-
-        return AccountDashboardUiState(
-            accounts = listOf(primary, work, studio),
-            activeAccountId = primary.id,
-            activityControls = listOf(
-                ActivityControlItem(
-                    id = "web_app",
-                    title = "Web & App Activity",
-                    subtitle = "Saves your activity on sites and apps, including Search and Maps",
-                    isEnabled = true,
-                    autoDeleteLabel = "Auto-delete (18 months)",
-                    recentEntries = listOf(
-                        "Searched 'Jetpack Compose Material 3 expressive' • Today, 6:42 PM",
-                        "Opened Android Studio Docs • Today, 4:15 PM",
-                        "Directions to Sector 62 Metro Station • Yesterday",
-                    ),
-                ),
-                ActivityControlItem(
-                    id = "timeline",
-                    title = "Timeline",
-                    subtitle = "Saves where you go with your devices, even when you aren't using Maps",
-                    isEnabled = false,
-                    autoDeleteLabel = "Auto-delete (3 months)",
-                    recentEntries = listOf(
-                        "Timeline is currently paused. Existing visits remain encrypted on-device.",
-                    ),
-                ),
-                ActivityControlItem(
-                    id = "youtube",
-                    title = "YouTube History",
-                    subtitle = "Saves the YouTube videos you watch and what you search on YouTube",
-                    isEnabled = true,
-                    autoDeleteLabel = "Auto-delete (36 months)",
-                    recentEntries = listOf(
-                        "Watched 'Kotlin Multiplatform & Compose State Deep Dive' • Today",
-                        "Watched 'Material Design 3 Architecture on Android' • 2 days ago",
-                    ),
-                ),
-            ),
-            devices = listOf(
-                SignedInDevice(
-                    id = "dev-1",
-                    name = "Pixel 9 Pro",
-                    platform = "Android 16",
-                    location = "Noida, India",
-                    lastActive = "Active now",
-                    isCurrentDevice = true,
-                    ipAddress = "103.82.•••.14",
-                    deviceType = DeviceType.PHONE,
-                ),
-                SignedInDevice(
-                    id = "dev-2",
-                    name = "MacBook Pro 14\"",
-                    platform = "macOS Sequoia • Chrome",
-                    location = "Gurugram, India",
-                    lastActive = "2 hours ago",
-                    isCurrentDevice = false,
-                    ipAddress = "103.82.•••.91",
-                    deviceType = DeviceType.LAPTOP,
-                ),
-                SignedInDevice(
-                    id = "dev-3",
-                    name = "Galaxy Tab S9",
-                    platform = "Android 15",
-                    location = "Noida, India",
-                    lastActive = "Nov 13, 2026",
-                    isCurrentDevice = false,
-                    ipAddress = "49.36.•••.204",
-                    deviceType = DeviceType.TABLET,
-                ),
-                SignedInDevice(
-                    id = "dev-4",
-                    name = "Windows Workstation",
-                    platform = "Windows 11 • Edge",
-                    location = "New Delhi, India",
-                    lastActive = "Nov 09, 2026",
-                    isCurrentDevice = false,
-                    ipAddress = "122.161.•••.78",
-                    deviceType = DeviceType.DESKTOP,
-                ),
-            ),
-            securityEvents = listOf(
-                SecurityActivityEvent(
-                    id = "se-1",
-                    title = "New sign-in on Pixel 9 Pro",
-                    timestamp = "Today, 7:12 PM",
-                    location = "Noida, India",
-                    device = "Pixel 9 Pro",
-                ),
-                SecurityActivityEvent(
-                    id = "se-2",
-                    title = "Passkey verified for Gothwad Cloud",
-                    timestamp = "Nov 13, 2026",
-                    location = "Gurugram, India",
-                    device = "MacBook Pro 14\"",
-                ),
-                SecurityActivityEvent(
-                    id = "se-3",
-                    title = "Recovery email verified",
-                    timestamp = "Nov 08, 2026",
-                    location = "Noida, India",
-                    device = "Pixel 9 Pro",
-                ),
-            ),
-            securityRecommendations = listOf(
-                SecurityRecommendation(
-                    id = "rec-1",
-                    title = "Review recent sign-in on Windows Workstation",
-                    description = "Verify that you signed in from New Delhi on Nov 09, 2026.",
-                    actionLabel = "Confirm it was me",
-                    isResolved = false,
-                ),
-                SecurityRecommendation(
-                    id = "rec-2",
-                    title = "Recovery phone and email up to date",
-                    description = "Both recovery options are verified and reachable.",
-                    actionLabel = "Done",
-                    isResolved = true,
-                ),
-                SecurityRecommendation(
-                    id = "rec-3",
-                    title = "2-Step Verification active",
-                    description = "Device prompts and passkeys protect your sign-in.",
-                    actionLabel = "Done",
-                    isResolved = true,
-                ),
-            ),
-            thirdPartyApps = listOf(
-                ThirdPartyAppConnection(
-                    id = "tp-1",
-                    appName = "GitHub",
-                    developer = "GitHub, Inc.",
-                    accessSummary = "Basic profile info, verified email",
-                    connectedSince = "Jan 18, 2025",
-                    scopes = listOf("View your email address", "View your basic profile info"),
-                ),
-                ThirdPartyAppConnection(
-                    id = "tp-2",
-                    appName = "Figma",
-                    developer = "Figma, Inc.",
-                    accessSummary = "Profile info, Drive file picker",
-                    connectedSince = "Apr 02, 2025",
-                    scopes = listOf("View your email address", "See and download specific Drive files"),
-                ),
-                ThirdPartyAppConnection(
-                    id = "tp-3",
-                    appName = "Spotify",
-                    developer = "Spotify AB",
-                    accessSummary = "Sign in with Account",
-                    connectedSince = "Aug 11, 2025",
-                    scopes = listOf("Associate you with your personal info"),
-                ),
-                ThirdPartyAppConnection(
-                    id = "tp-4",
-                    appName = "Notion",
-                    developer = "Notion Labs, Inc.",
-                    accessSummary = "Calendar events & Drive previews",
-                    connectedSince = "Feb 24, 2026",
-                    scopes = listOf("View your email address", "View your Calendar events"),
-                ),
-            ),
-            savedPasswords = listOf(
-                SavedPasswordEntry("pw-1", "GitHub", "github.com", "pawangothwad", "Gh#94!kL20xQ", "Oct 2026"),
-                SavedPasswordEntry("pw-2", "Figma", "figma.com", "pawangothwad@gmail.com", "Fg_88mP!vZ91", "Sep 2026"),
-                SavedPasswordEntry("pw-3", "Vercel", "vercel.com", "pawan@gothwadtech.com", "Vc$71nW@44pR", "Aug 2026"),
-                SavedPasswordEntry("pw-4", "Amazon India", "amazon.in", "+91 9876543210", "Amz!55tK#19d", "Jul 2026"),
-            ),
-            familyMembers = listOf(
-                FamilyMember("fm-1", "Pawan Gothwad", "pawangothwad@gmail.com", "Family manager"),
-                FamilyMember("fm-2", "Ananya Gothwad", "ananya.gothwad@gmail.com", "Member"),
-                FamilyMember("fm-3", "Rajesh Gothwad", "rajesh.gothwad@gmail.com", "Parent"),
-                FamilyMember("fm-4", "Meera Gothwad", "meera.gothwad@gmail.com", "Member"),
-            ),
-            paymentMethods = listOf(
-                PaymentMethodItem("pm-1", "Visa •••• 4821", "Expires 09/29 • Default", true, "Card"),
-                PaymentMethodItem("pm-2", "UPI • pawan@okaxis", "Instant bank transfer", false, "UPI"),
-            ),
-            subscriptions = listOf(
-                SubscriptionItem("sub-1", "Cloud Storage 100 GB", "Monthly plan", "₹130 / month", "Renews Dec 01, 2026", true),
-                SubscriptionItem("sub-2", "Media Premium Individual", "Ad-free & offline", "₹149 / month", "Renews Nov 24, 2026", true),
-            ),
-        )
-    }
 }

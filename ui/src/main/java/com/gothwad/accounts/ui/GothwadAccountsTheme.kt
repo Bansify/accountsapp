@@ -32,14 +32,10 @@ data class AccountSemanticColors(
     val criticalRed: Color,
     val criticalContainer: Color,
     val onCriticalContainer: Color,
-    val googleBlue: Color,
-    val googleRed: Color,
-    val googleYellow: Color,
-    val googleGreen: Color,
-    val driveBlue: Color,
-    val mailRed: Color,
-    val photosAmber: Color,
-    val otherGreen: Color,
+    val brandPrimary: Color,
+    val brandSecondary: Color,
+    val brandTertiary: Color,
+    val brandHighlight: Color,
 )
 
 private val LightSemanticColors = AccountSemanticColors(
@@ -54,14 +50,10 @@ private val LightSemanticColors = AccountSemanticColors(
     criticalRed = Color(0xFFB3261E),
     criticalContainer = Color(0xFFFCE8E6),
     onCriticalContainer = Color(0xFF410E0B),
-    googleBlue = Color(0xFF1A73E8),
-    googleRed = Color(0xFFEA4335),
-    googleYellow = Color(0xFFFBBC04),
-    googleGreen = Color(0xFF34A853),
-    driveBlue = Color(0xFF1A73E8),
-    mailRed = Color(0xFFEA4335),
-    photosAmber = Color(0xFFFBBC04),
-    otherGreen = Color(0xFF34A853),
+    brandPrimary = Color(0xFF0B57D0),
+    brandSecondary = Color(0xFF146C2E),
+    brandTertiary = Color(0xFFB06000),
+    brandHighlight = Color(0xFFB3261E),
 )
 
 private val DarkSemanticColors = AccountSemanticColors(
@@ -76,14 +68,10 @@ private val DarkSemanticColors = AccountSemanticColors(
     criticalRed = Color(0xFFF28B82),
     criticalContainer = Color(0xFF531B16),
     onCriticalContainer = Color(0xFFF9DEDC),
-    googleBlue = Color(0xFF8AB4F8),
-    googleRed = Color(0xFFF28B82),
-    googleYellow = Color(0xFFFDD663),
-    googleGreen = Color(0xFF81C995),
-    driveBlue = Color(0xFF8AB4F8),
-    mailRed = Color(0xFFF28B82),
-    photosAmber = Color(0xFFFDD663),
-    otherGreen = Color(0xFF81C995),
+    brandPrimary = Color(0xFFA8C7FA),
+    brandSecondary = Color(0xFF6DD58C),
+    brandTertiary = Color(0xFFFCC934),
+    brandHighlight = Color(0xFFF28B82),
 )
 
 val LocalAccountColors = staticCompositionLocalOf { LightSemanticColors }
