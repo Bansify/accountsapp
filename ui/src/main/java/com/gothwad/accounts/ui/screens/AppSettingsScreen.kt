@@ -80,9 +80,9 @@ fun AppSettingsScreen(
         modifier = Modifier
             .fillMaxSize()
             .testTag("app_settings_screen"),
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
             TabIntroHeader(
@@ -100,8 +100,8 @@ fun AppSettingsScreen(
                 modifier = Modifier.widthIn(max = 600.dp),
             ) {
                 Column(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     ThemeOptionCard(
                         title = stringResource(R.string.gothwad_theme_system),
@@ -142,8 +142,8 @@ fun AppSettingsScreen(
                 modifier = Modifier.widthIn(max = 600.dp),
             ) {
                 Column(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     NavigationOptionCard(
                         title = stringResource(R.string.gothwad_nav_header_pills),
@@ -217,9 +217,9 @@ fun OthersHubScreen(
         modifier = Modifier
             .fillMaxSize()
             .testTag("others_hub_screen"),
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
             TabIntroHeader(
@@ -302,22 +302,22 @@ private fun ThemeOptionCard(
     val borderColor = if (selected) MaterialTheme.colorScheme.primary else semantic.cardBorder
 
     Surface(
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(14.dp),
         color = containerColor,
         border = BorderStroke(if (selected) 1.5.dp else 1.dp, borderColor),
         modifier = Modifier
             .fillMaxWidth()
             .minimumInteractiveComponentSize()
-            .clip(RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(14.dp))
             .clickable(role = Role.RadioButton, onClick = onClick)
             .testTag(testTag),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             ThemePaletteSwatch(swatchType = swatchType, borderColor = semantic.cardBorder)
-            Spacer(modifier = Modifier.width(14.dp))
+            Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -327,7 +327,7 @@ private fun ThemeOptionCard(
                         imageVector = icon,
                         contentDescription = null,
                         tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp),
+                        modifier = Modifier.size(15.dp),
                     )
                     Text(
                         text = title,
@@ -336,7 +336,7 @@ private fun ThemeOptionCard(
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                 }
-                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.height(1.dp))
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
@@ -355,7 +355,7 @@ private fun ThemePaletteSwatch(
 ) {
     Box(
         modifier = Modifier
-            .size(40.dp)
+            .size(34.dp)
             .clip(CircleShape)
             .border(1.dp, borderColor, CircleShape),
         contentAlignment = Alignment.Center,
@@ -369,7 +369,7 @@ private fun ThemePaletteSwatch(
                 )
                 Box(
                     modifier = Modifier
-                        .size(16.dp)
+                        .size(13.dp)
                         .clip(CircleShape)
                         .background(Color(0xFF0B57D0)),
                 )
@@ -383,7 +383,7 @@ private fun ThemePaletteSwatch(
                 )
                 Box(
                     modifier = Modifier
-                        .size(16.dp)
+                        .size(13.dp)
                         .clip(CircleShape)
                         .background(Color(0xFFA8C7FA)),
                 )
@@ -427,24 +427,24 @@ private fun NavigationOptionCard(
     val borderColor = if (selected) MaterialTheme.colorScheme.primary else semantic.cardBorder
 
     Surface(
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(14.dp),
         color = containerColor,
         border = BorderStroke(if (selected) 1.5.dp else 1.dp, borderColor),
         modifier = Modifier
             .fillMaxWidth()
             .minimumInteractiveComponentSize()
-            .clip(RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(14.dp))
             .clickable(role = Role.RadioButton, onClick = onClick)
             .testTag(testTag),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
                 modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .size(34.dp)
+                    .clip(RoundedCornerShape(10.dp))
                     .background(
                         if (selected) MaterialTheme.colorScheme.primaryContainer
                         else MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -455,10 +455,10 @@ private fun NavigationOptionCard(
                     imageVector = icon,
                     contentDescription = null,
                     tint = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(18.dp),
                 )
             }
-            Spacer(modifier = Modifier.width(14.dp))
+            Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
@@ -466,7 +466,7 @@ private fun NavigationOptionCard(
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
-                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.height(1.dp))
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,

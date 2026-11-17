@@ -117,20 +117,20 @@ fun AccountSwitcherDialog(
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         Surface(
-            shape = RoundedCornerShape(32.dp),
+            shape = RoundedCornerShape(22.dp),
             color = MaterialTheme.colorScheme.surfaceContainer,
             border = BorderStroke(1.dp, semantic.cardBorder),
-            shadowElevation = 12.dp,
+            shadowElevation = 10.dp,
             modifier = Modifier
-                .padding(horizontal = 14.dp, vertical = 20.dp)
+                .padding(horizontal = 14.dp, vertical = 16.dp)
                 .fillMaxWidth()
-                .widthIn(max = 460.dp),
+                .widthIn(max = 440.dp),
         ) {
             Column(
                 modifier = Modifier
                     .verticalScroll(rememberScrollState())
-                    .padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                    .padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 // Branded Control Centre Header
                 Row(
@@ -140,7 +140,7 @@ fun AccountSwitcherDialog(
                     Surface(
                         shape = CircleShape,
                         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        modifier = Modifier.size(40.dp),
+                        modifier = Modifier.size(36.dp),
                     ) {
                         IconButton(
                             onClick = onDismiss,
@@ -149,7 +149,7 @@ fun AccountSwitcherDialog(
                             Icon(
                                 Icons.Rounded.Close,
                                 contentDescription = stringResource(R.string.gothwad_cd_close),
-                                modifier = Modifier.size(20.dp),
+                                modifier = Modifier.size(18.dp),
                             )
                         }
                     }
@@ -158,7 +158,7 @@ fun AccountSwitcherDialog(
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        GothwadBrandBadge(size = 24.dp)
+                        GothwadBrandBadge(size = 22.dp)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = stringResource(R.string.gothwad_account_brand),
@@ -172,7 +172,7 @@ fun AccountSwitcherDialog(
                         Surface(
                             shape = CircleShape,
                             color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            modifier = Modifier.size(40.dp),
+                            modifier = Modifier.size(36.dp),
                         ) {
                             IconButton(
                                 onClick = onRefreshClick,
@@ -184,25 +184,25 @@ fun AccountSwitcherDialog(
                                     contentDescription = stringResource(R.string.gothwad_refresh_profile),
                                     tint = if (isRefreshing) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier
-                                        .size(20.dp)
+                                        .size(18.dp)
                                         .rotate(if (isRefreshing) refreshAngle else 0f),
                                 )
                             }
                         }
                     } else {
-                        Spacer(modifier = Modifier.size(40.dp))
+                        Spacer(modifier = Modifier.size(36.dp))
                     }
                 }
 
                 // Active Account Control Hero Card
                 Surface(
-                    shape = RoundedCornerShape(26.dp),
+                    shape = RoundedCornerShape(18.dp),
                     color = MaterialTheme.colorScheme.surface,
                     border = BorderStroke(1.dp, semantic.cardBorder),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Column(
-                        modifier = Modifier.padding(20.dp),
+                        modifier = Modifier.padding(16.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Box(contentAlignment = Alignment.BottomEnd) {
@@ -210,44 +210,44 @@ fun AccountSwitcherDialog(
                                 displayName = activeAccount.displayName(),
                                 initials = activeAccount.initials(),
                                 avatarUrl = activeAccount.avatarUrl,
-                                size = 72.dp,
+                                size = 60.dp,
                                 showBrandRing = true,
                             )
                             Surface(
                                 shape = CircleShape,
                                 color = MaterialTheme.colorScheme.surface,
                                 border = BorderStroke(1.5.dp, semantic.cardBorder),
-                                modifier = Modifier.size(24.dp),
+                                modifier = Modifier.size(20.dp),
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
                                         imageVector = Icons.Rounded.CheckCircle,
                                         contentDescription = null,
                                         tint = semantic.verifiedGreen,
-                                        modifier = Modifier.size(16.dp),
+                                        modifier = Modifier.size(14.dp),
                                     )
                                 }
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
                         Text(
                             text = activeAccount.displayName(),
-                            style = MaterialTheme.typography.titleLarge,
+                            style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
                             textAlign = TextAlign.Center,
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = activeAccount.displayEmail(),
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,
                         )
 
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
                         FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
                             verticalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
                             StatusPill(
@@ -261,9 +261,9 @@ fun AccountSwitcherDialog(
                                 ) {
                                     Text(
                                         text = "@$handle",
-                                        style = MaterialTheme.typography.labelMedium,
+                                        style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
                                     )
                                 }
                             }
@@ -276,14 +276,14 @@ fun AccountSwitcherDialog(
                         }
 
                         if (hasQuota) {
-                            Spacer(modifier = Modifier.height(14.dp))
+                            Spacer(modifier = Modifier.height(10.dp))
                             Surface(
-                                shape = RoundedCornerShape(18.dp),
+                                shape = RoundedCornerShape(14.dp),
                                 color = MaterialTheme.colorScheme.surfaceContainerLow,
                                 border = BorderStroke(1.dp, semantic.cardBorder),
                                 modifier = Modifier.fillMaxWidth(),
                             ) {
-                                Column(modifier = Modifier.padding(14.dp)) {
+                                Column(modifier = Modifier.padding(12.dp)) {
                                     GothwadQuotaSummary(
                                         context = context,
                                         usedBytes = activeAccount.storageUsedBytes,
@@ -293,13 +293,13 @@ fun AccountSwitcherDialog(
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
                         Button(
                             onClick = onManageOnWeb,
                             shape = RoundedCornerShape(50),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .heightIn(min = 48.dp)
+                                .heightIn(min = 42.dp)
                                 .testTag("switcher_manage_web_button"),
                         ) {
                             Text(
@@ -310,7 +310,7 @@ fun AccountSwitcherDialog(
                             Icon(
                                 Icons.AutoMirrored.Rounded.OpenInNew,
                                 contentDescription = null,
-                                modifier = Modifier.size(16.dp),
+                                modifier = Modifier.size(15.dp),
                             )
                         }
                     }
@@ -318,18 +318,18 @@ fun AccountSwitcherDialog(
 
                 // Switch / Add Account Card
                 Surface(
-                    shape = RoundedCornerShape(24.dp),
+                    shape = RoundedCornerShape(16.dp),
                     color = MaterialTheme.colorScheme.surface,
                     border = BorderStroke(1.dp, semantic.cardBorder),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                    Column(modifier = Modifier.padding(vertical = 4.dp)) {
                         if (otherLocalAccounts.isNotEmpty() || peerAccountsToAuthorize.isNotEmpty()) {
                             Text(
                                 text = stringResource(R.string.gothwad_choose_account),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp),
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
                             )
                         }
 
@@ -339,7 +339,7 @@ fun AccountSwitcherDialog(
                                     .fillMaxWidth()
                                     .minimumInteractiveComponentSize()
                                     .clickable(role = Role.Button) { onSwitchAccount(acc.userId) }
-                                    .padding(horizontal = 18.dp, vertical = 12.dp)
+                                    .padding(horizontal = 16.dp, vertical = 10.dp)
                                     .testTag("switch_to_${acc.userId}"),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
@@ -347,9 +347,9 @@ fun AccountSwitcherDialog(
                                     displayName = acc.displayName(),
                                     initials = acc.initials(),
                                     avatarUrl = acc.avatarUrl,
-                                    size = 42.dp,
+                                    size = 36.dp,
                                 )
-                                Spacer(modifier = Modifier.width(14.dp))
+                                Spacer(modifier = Modifier.width(12.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(acc.displayName(), style = MaterialTheme.typography.titleSmall)
                                     Text(
@@ -367,7 +367,7 @@ fun AccountSwitcherDialog(
                             }
                             HorizontalDivider(
                                 color = semantic.cardBorder,
-                                modifier = Modifier.padding(horizontal = 18.dp),
+                                modifier = Modifier.padding(horizontal = 16.dp),
                             )
                         }
 
@@ -377,7 +377,7 @@ fun AccountSwitcherDialog(
                                     .fillMaxWidth()
                                     .minimumInteractiveComponentSize()
                                     .clickable(role = Role.Button) { onContinueWithPeerAccount(peer) }
-                                    .padding(horizontal = 18.dp, vertical = 12.dp)
+                                    .padding(horizontal = 16.dp, vertical = 10.dp)
                                     .testTag("continue_peer_${peer.userId}"),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
@@ -385,10 +385,10 @@ fun AccountSwitcherDialog(
                                     displayName = peer.displayName(),
                                     initials = peer.initials(),
                                     avatarUrl = peer.avatarUrl,
-                                    size = 42.dp,
+                                    size = 36.dp,
                                     showBrandRing = true,
                                 )
-                                Spacer(modifier = Modifier.width(14.dp))
+                                Spacer(modifier = Modifier.width(12.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = stringResource(R.string.gothwad_continue_as, peer.displayName()),
@@ -404,12 +404,12 @@ fun AccountSwitcherDialog(
                                     Icons.Rounded.Smartphone,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(18.dp),
+                                    modifier = Modifier.size(17.dp),
                                 )
                             }
                             HorizontalDivider(
                                 color = semantic.cardBorder,
-                                modifier = Modifier.padding(horizontal = 18.dp),
+                                modifier = Modifier.padding(horizontal = 16.dp),
                             )
                         }
 
@@ -418,13 +418,13 @@ fun AccountSwitcherDialog(
                                 .fillMaxWidth()
                                 .minimumInteractiveComponentSize()
                                 .clickable(role = Role.Button) { onAddAnotherAccount() }
-                                .padding(horizontal = 18.dp, vertical = 12.dp)
+                                .padding(horizontal = 16.dp, vertical = 10.dp)
                                 .testTag("add_another_account_button"),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(40.dp)
+                                    .size(34.dp)
                                     .clip(CircleShape)
                                     .background(MaterialTheme.colorScheme.surfaceContainerHigh),
                                 contentAlignment = Alignment.Center,
@@ -433,10 +433,10 @@ fun AccountSwitcherDialog(
                                     Icons.Rounded.PersonAddAlt1,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(20.dp),
+                                    modifier = Modifier.size(18.dp),
                                 )
                             }
-                            Spacer(modifier = Modifier.width(14.dp))
+                            Spacer(modifier = Modifier.width(12.dp))
                             Text(
                                 text = stringResource(R.string.gothwad_add_account),
                                 style = MaterialTheme.typography.titleSmall,
@@ -454,7 +454,7 @@ fun AccountSwitcherDialog(
 
                 // App Settings & Sign-out Card
                 Surface(
-                    shape = RoundedCornerShape(22.dp),
+                    shape = RoundedCornerShape(16.dp),
                     color = MaterialTheme.colorScheme.surface,
                     border = BorderStroke(1.dp, semantic.cardBorder),
                     modifier = Modifier.fillMaxWidth(),
@@ -466,13 +466,13 @@ fun AccountSwitcherDialog(
                                     .fillMaxWidth()
                                     .minimumInteractiveComponentSize()
                                     .clickable(role = Role.Button, onClick = onOpenSettings)
-                                    .padding(horizontal = 18.dp, vertical = 12.dp)
+                                    .padding(horizontal = 16.dp, vertical = 10.dp)
                                     .testTag("switcher_app_settings_button"),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .size(40.dp)
+                                        .size(34.dp)
                                         .clip(CircleShape)
                                         .background(MaterialTheme.colorScheme.surfaceContainerHigh),
                                     contentAlignment = Alignment.Center,
@@ -481,10 +481,10 @@ fun AccountSwitcherDialog(
                                         Icons.Rounded.Settings,
                                         contentDescription = null,
                                         tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(19.dp),
+                                        modifier = Modifier.size(18.dp),
                                     )
                                 }
-                                Spacer(modifier = Modifier.width(14.dp))
+                                Spacer(modifier = Modifier.width(12.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = stringResource(R.string.gothwad_settings_title),
@@ -505,7 +505,7 @@ fun AccountSwitcherDialog(
                             }
                             HorizontalDivider(
                                 color = semantic.cardBorder,
-                                modifier = Modifier.padding(horizontal = 18.dp),
+                                modifier = Modifier.padding(horizontal = 16.dp),
                             )
                         }
                         Row(
@@ -513,13 +513,13 @@ fun AccountSwitcherDialog(
                                 .fillMaxWidth()
                                 .minimumInteractiveComponentSize()
                                 .clickable(role = Role.Button) { onRequestSignOut(activeAccount) }
-                                .padding(horizontal = 18.dp, vertical = 12.dp)
+                                .padding(horizontal = 16.dp, vertical = 10.dp)
                                 .testTag("switcher_sign_out_active_button"),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(40.dp)
+                                    .size(34.dp)
                                     .clip(CircleShape)
                                     .background(semantic.criticalContainer),
                                 contentAlignment = Alignment.Center,
@@ -528,10 +528,10 @@ fun AccountSwitcherDialog(
                                     Icons.Rounded.Logout,
                                     contentDescription = null,
                                     tint = semantic.onCriticalContainer,
-                                    modifier = Modifier.size(19.dp),
+                                    modifier = Modifier.size(18.dp),
                                 )
                             }
-                            Spacer(modifier = Modifier.width(14.dp))
+                            Spacer(modifier = Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = stringResource(R.string.gothwad_remove_local),
@@ -612,11 +612,11 @@ fun SignOutOrRemoveDialog(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Surface(
-                    shape = RoundedCornerShape(18.dp),
+                    shape = RoundedCornerShape(14.dp),
                     color = MaterialTheme.colorScheme.surface,
                     border = BorderStroke(1.dp, semantic.cardBorder),
                 ) {
-                    Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
                             text = stringResource(R.string.gothwad_local_removal_notice),
                             style = MaterialTheme.typography.bodySmall,
@@ -635,11 +635,11 @@ fun SignOutOrRemoveDialog(
                 }
 
                 Surface(
-                    shape = RoundedCornerShape(18.dp),
+                    shape = RoundedCornerShape(14.dp),
                     color = MaterialTheme.colorScheme.surface,
                     border = BorderStroke(1.dp, semantic.cardBorder),
                 ) {
-                    Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
                             text = stringResource(R.string.gothwad_device_removal_notice),
                             style = MaterialTheme.typography.bodySmall,
@@ -659,11 +659,11 @@ fun SignOutOrRemoveDialog(
                 }
 
                 Surface(
-                    shape = RoundedCornerShape(18.dp),
+                    shape = RoundedCornerShape(14.dp),
                     color = semantic.criticalContainer.copy(alpha = 0.55f),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.35f)),
                 ) {
-                    Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
                             text = stringResource(R.string.gothwad_server_disconnect_notice),
                             style = MaterialTheme.typography.bodySmall,

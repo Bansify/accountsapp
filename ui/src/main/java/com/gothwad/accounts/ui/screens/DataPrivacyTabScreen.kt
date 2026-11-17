@@ -67,9 +67,9 @@ fun DataPrivacyTabScreen(
         modifier = Modifier
             .fillMaxSize()
             .testTag("data_privacy_tab_screen"),
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
             TabIntroHeader(
@@ -82,7 +82,7 @@ fun DataPrivacyTabScreen(
         // Privacy Hero Card
         item {
             Surface(
-                shape = RoundedCornerShape(24.dp),
+                shape = RoundedCornerShape(16.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerLow,
                 border = BorderStroke(1.dp, semantic.cardBorder),
                 modifier = Modifier
@@ -93,17 +93,17 @@ fun DataPrivacyTabScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(20.dp),
+                            .padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(
                             modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(5.dp),
                         ) {
                             StatusPill("Your data", StatusTone.VERIFIED)
                             Text(
                                 text = "Data transparency & control",
-                                style = MaterialTheme.typography.titleLarge,
+                                style = MaterialTheme.typography.titleMedium,
                             )
                             Text(
                                 text = "Export your account snapshot or review account lifecycle actions.",
@@ -111,14 +111,14 @@ fun DataPrivacyTabScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        Spacer(modifier = Modifier.width(14.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
                         Image(
                             painter = painterResource(id = R.drawable.img_privacy_checkup),
                             contentDescription = "Data and privacy illustration",
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
-                                .size(82.dp)
-                                .clip(RoundedCornerShape(18.dp)),
+                                .size(64.dp)
+                                .clip(RoundedCornerShape(14.dp)),
                         )
                     }
                     HorizontalDivider(color = semantic.cardBorder)
@@ -126,7 +126,7 @@ fun DataPrivacyTabScreen(
                         onClick = if (canManageNatively && !isExportingData) onExportDataClick else onManageDataOnWeb,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 2.dp),
+                            .padding(horizontal = 8.dp),
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -141,7 +141,7 @@ fun DataPrivacyTabScreen(
                             )
                             if (!canManageNatively) {
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, modifier = Modifier.size(14.dp))
                             }
                         }
                     }
@@ -159,7 +159,7 @@ fun DataPrivacyTabScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 10.dp),
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
@@ -169,14 +169,14 @@ fun DataPrivacyTabScreen(
                             limitBytes = account.storageLimitBytes,
                         )
                     }
-                    Spacer(modifier = Modifier.width(14.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
                     Image(
                         painter = painterResource(id = R.drawable.img_cloud_storage),
                         contentDescription = "Cloud storage illustration",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
-                            .size(68.dp)
-                            .clip(RoundedCornerShape(14.dp)),
+                            .size(56.dp)
+                            .clip(RoundedCornerShape(12.dp)),
                     )
                 }
                 if (!canManageNatively) {
@@ -238,14 +238,14 @@ fun DataPrivacyTabScreen(
         // Separated Danger Zone Card
         item {
             Surface(
-                shape = RoundedCornerShape(24.dp),
+                shape = RoundedCornerShape(16.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerLow,
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.35f)),
                 modifier = Modifier
                     .fillMaxWidth()
                     .widthIn(max = 600.dp),
             ) {
-                Column(modifier = Modifier.padding(vertical = 6.dp)) {
+                Column(modifier = Modifier.padding(vertical = 2.dp)) {
                     AccountSettingRow(
                         label = "Account deletion",
                         value = "Delete your Gothwad Account",

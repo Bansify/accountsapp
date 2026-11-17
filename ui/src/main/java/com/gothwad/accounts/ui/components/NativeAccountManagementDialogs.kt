@@ -121,7 +121,7 @@ fun AvatarManagementDialog(
                     displayName = account.displayName(),
                     initials = account.initials(),
                     avatarUrl = account.avatarUrl,
-                    size = 84.dp,
+                    size = 68.dp,
                     showBrandRing = true,
                 )
                 Text(

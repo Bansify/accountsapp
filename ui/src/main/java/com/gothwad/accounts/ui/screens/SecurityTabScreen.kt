@@ -95,9 +95,9 @@ fun SecurityTabScreen(
         modifier = Modifier
             .fillMaxSize()
             .testTag("security_tab_screen"),
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
             TabIntroHeader(
@@ -110,7 +110,7 @@ fun SecurityTabScreen(
         // Dynamic Security Status Hero Card
         item {
             Surface(
-                shape = RoundedCornerShape(24.dp),
+                shape = RoundedCornerShape(16.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerLow,
                 border = BorderStroke(1.dp, semantic.cardBorder),
                 modifier = Modifier
@@ -121,12 +121,12 @@ fun SecurityTabScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(20.dp),
+                            .padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(
                             modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
                             StatusPill(
                                 label = when {
@@ -146,7 +146,7 @@ fun SecurityTabScreen(
                                 } else {
                                     "Security checkup & sign-in"
                                 },
-                                style = MaterialTheme.typography.titleLarge,
+                                style = MaterialTheme.typography.titleMedium,
                             )
                             Text(
                                 text = "Manage password, TOTP 2-Step Verification, passkeys, and active sessions.",
@@ -154,20 +154,20 @@ fun SecurityTabScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        Spacer(modifier = Modifier.width(14.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
                         Image(
                             painter = painterResource(id = R.drawable.img_security_shield),
                             contentDescription = "Security checkup illustration",
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
-                                .size(82.dp)
-                                .clip(RoundedCornerShape(18.dp)),
+                                .size(64.dp)
+                                .clip(RoundedCornerShape(14.dp)),
                         )
                     }
                     FlowRow(
-                        modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 14.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         account.hasPassword?.let { hasPwd ->
                             StatusPill(
@@ -404,12 +404,12 @@ fun SecurityTabScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 20.dp, vertical = 12.dp),
+                                .padding(horizontal = 16.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(36.dp)
+                                    .size(32.dp)
                                     .clip(CircleShape)
                                     .background(semantic.verifiedContainer),
                                 contentAlignment = Alignment.Center,
@@ -418,10 +418,10 @@ fun SecurityTabScreen(
                                     imageVector = Icons.Rounded.History,
                                     contentDescription = null,
                                     tint = semantic.onVerifiedContainer,
-                                    modifier = Modifier.size(18.dp),
+                                    modifier = Modifier.size(16.dp),
                                 )
                             }
-                            Spacer(modifier = Modifier.width(14.dp))
+                            Spacer(modifier = Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(entry.title, style = MaterialTheme.typography.titleSmall)
                                 Text(

@@ -139,7 +139,7 @@ fun DiscoveredAccount.initials(): String {
 
 @Composable
 fun GothwadBrandBadge(
-    size: Dp = 28.dp,
+    size: Dp = 24.dp,
     modifier: Modifier = Modifier,
 ) {
     val semantic = LocalAccountColors.current
@@ -148,7 +148,7 @@ fun GothwadBrandBadge(
         contentAlignment = Alignment.Center,
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val stroke = Stroke(width = (size.toPx() * 0.11f).coerceAtLeast(2.4.dp.toPx()), cap = StrokeCap.Round)
+            val stroke = Stroke(width = (size.toPx() * 0.10f).coerceAtLeast(2.dp.toPx()), cap = StrokeCap.Round)
             drawArc(semantic.brandHighlight, startAngle = -140f, sweepAngle = 80f, useCenter = false, style = stroke)
             drawArc(semantic.brandTertiary, startAngle = -52f, sweepAngle = 80f, useCenter = false, style = stroke)
             drawArc(semantic.brandSecondary, startAngle = 36f, sweepAngle = 86f, useCenter = false, style = stroke)
@@ -156,7 +156,7 @@ fun GothwadBrandBadge(
         }
         Text(
             text = "G",
-            style = MaterialTheme.typography.labelMedium,
+            style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Bold,
             color = semantic.brandPrimary,
         )
@@ -201,7 +201,7 @@ fun AccountsTopAppBar(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 6.dp, vertical = 6.dp),
+                    .padding(horizontal = 4.dp, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (canNavigateBack) {
@@ -216,12 +216,12 @@ fun AccountsTopAppBar(
                     }
                     Text(
                         text = subScreenTitle ?: stringResource(R.string.gothwad_account_brand),
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.titleMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier
                             .weight(1f)
-                            .padding(start = 4.dp)
+                            .padding(start = 2.dp)
                             .semantics { heading() },
                     )
                 } else {
@@ -241,14 +241,14 @@ fun AccountsTopAppBar(
                             .weight(1f)
                             .padding(start = if (showMenuButton) 2.dp else 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         if (!showMenuButton) {
-                            GothwadBrandBadge(size = 26.dp)
+                            GothwadBrandBadge(size = 22.dp)
                         }
                         Text(
                             text = stringResource(R.string.gothwad_account_brand),
-                            style = MaterialTheme.typography.titleLarge,
+                            style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -266,6 +266,7 @@ fun AccountsTopAppBar(
                             imageVector = Icons.Rounded.Search,
                             contentDescription = stringResource(R.string.gothwad_cd_search),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(21.dp),
                         )
                     }
                     IconButton(
@@ -276,6 +277,7 @@ fun AccountsTopAppBar(
                             imageVector = Icons.Rounded.Settings,
                             contentDescription = stringResource(R.string.gothwad_cd_settings),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(21.dp),
                         )
                     }
                 } else if (!canNavigateBack) {
@@ -287,6 +289,7 @@ fun AccountsTopAppBar(
                             imageVector = Icons.Rounded.Settings,
                             contentDescription = stringResource(R.string.gothwad_cd_settings),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(21.dp),
                         )
                     }
                     IconButton(
@@ -297,6 +300,7 @@ fun AccountsTopAppBar(
                             imageVector = Icons.AutoMirrored.Rounded.HelpOutline,
                             contentDescription = stringResource(R.string.gothwad_cd_help),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(21.dp),
                         )
                     }
                 }
@@ -321,7 +325,7 @@ fun AccountsTopAppBar(
                             displayName = accountLabel,
                             initials = activeAccount.initials(),
                             avatarUrl = activeAccount.avatarUrl,
-                            size = 34.dp,
+                            size = 30.dp,
                             showBrandRing = true,
                         )
                     }
@@ -352,8 +356,8 @@ fun AccountsTabBar(
             LazyRow(
                 state = listState,
                 modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 items(tabs, key = { it.name }) { tab ->
@@ -388,25 +392,24 @@ fun AccountsTabBar(
                         color = containerColor,
                         border = if (isSelected) null else BorderStroke(1.dp, semantic.cardBorder),
                         modifier = Modifier
-                            .minimumInteractiveComponentSize()
                             .clip(RoundedCornerShape(50))
                             .clickable(role = Role.Tab) { onSelectTab(tab) }
                             .testTag("tab_${tab.name.lowercase()}"),
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
+                            modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(5.dp),
                         ) {
                             Icon(
                                 imageVector = icon,
                                 contentDescription = null,
                                 tint = contentColor,
-                                modifier = Modifier.size(16.dp),
+                                modifier = Modifier.size(14.dp),
                             )
                             Text(
                                 text = stringResource(tab.titleRes),
-                                style = MaterialTheme.typography.labelLarge.copy(
+                                style = MaterialTheme.typography.labelMedium.copy(
                                     fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
                                 ),
                                 color = contentColor,
@@ -447,42 +450,43 @@ fun AccountsBottomBar(
             NavigationBarItem(
                 selected = !isOthersSelected && selectedTab == AccountTab.HOME,
                 onClick = { onSelectTab(AccountTab.HOME) },
-                icon = { Icon(Icons.Rounded.Home, contentDescription = null) },
-                label = { Text("Home", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis) },
+                icon = { Icon(Icons.Rounded.Home, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                label = { Text("Home", style = MaterialTheme.typography.labelSmall, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis) },
                 colors = itemColors,
                 modifier = Modifier.testTag("bottom_tab_home"),
             )
             NavigationBarItem(
                 selected = !isOthersSelected && selectedTab == AccountTab.PERSONAL_INFO,
                 onClick = { onSelectTab(AccountTab.PERSONAL_INFO) },
-                icon = { Icon(Icons.Rounded.Person, contentDescription = null) },
-                label = { Text("Personal", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis) },
+                icon = { Icon(Icons.Rounded.Person, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                label = { Text("Personal", style = MaterialTheme.typography.labelSmall, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis) },
                 colors = itemColors,
                 modifier = Modifier.testTag("bottom_tab_personal"),
             )
             NavigationBarItem(
                 selected = !isOthersSelected && selectedTab == AccountTab.SECURITY,
                 onClick = { onSelectTab(AccountTab.SECURITY) },
-                icon = { Icon(Icons.Rounded.Lock, contentDescription = null) },
-                label = { Text("Security", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis) },
+                icon = { Icon(Icons.Rounded.Lock, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                label = { Text("Security", style = MaterialTheme.typography.labelSmall, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis) },
                 colors = itemColors,
                 modifier = Modifier.testTag("bottom_tab_security"),
             )
             NavigationBarItem(
                 selected = !isOthersSelected && selectedTab == AccountTab.DATA_PRIVACY,
                 onClick = { onSelectTab(AccountTab.DATA_PRIVACY) },
-                icon = { Icon(Icons.Rounded.PrivacyTip, contentDescription = null) },
-                label = { Text("Privacy", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis) },
+                icon = { Icon(Icons.Rounded.PrivacyTip, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                label = { Text("Privacy", style = MaterialTheme.typography.labelSmall, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis) },
                 colors = itemColors,
                 modifier = Modifier.testTag("bottom_tab_data"),
             )
             NavigationBarItem(
                 selected = isOthersSelected,
                 onClick = onSelectOthers,
-                icon = { Icon(Icons.Rounded.GridView, contentDescription = null) },
+                icon = { Icon(Icons.Rounded.GridView, contentDescription = null, modifier = Modifier.size(20.dp)) },
                 label = {
                     Text(
                         text = stringResource(R.string.gothwad_tab_others),
+                        style = MaterialTheme.typography.labelSmall,
                         maxLines = 1,
                         softWrap = false,
                         overflow = TextOverflow.Ellipsis,
@@ -525,17 +529,17 @@ fun AccountsSidebarContent(
             .fillMaxHeight()
             .windowInsetsPadding(navInsets)
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 12.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+            .padding(horizontal = 10.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .padding(horizontal = 10.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            GothwadBrandBadge(size = 26.dp)
-            Spacer(modifier = Modifier.width(10.dp))
+            GothwadBrandBadge(size = 22.dp)
+            Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = stringResource(R.string.gothwad_account_brand),
                 style = MaterialTheme.typography.titleMedium,
@@ -558,22 +562,22 @@ fun AccountsSidebarContent(
 
         if (activeAccount != null) {
             Surface(
-                shape = RoundedCornerShape(18.dp),
+                shape = RoundedCornerShape(14.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerLow,
                 border = BorderStroke(1.dp, semantic.cardBorder),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 4.dp, vertical = 6.dp),
+                    .padding(horizontal = 4.dp, vertical = 4.dp),
             ) {
                 Row(
-                    modifier = Modifier.padding(12.dp),
+                    modifier = Modifier.padding(10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     AccountAvatar(
                         displayName = activeAccount.displayName(),
                         initials = activeAccount.initials(),
                         avatarUrl = activeAccount.avatarUrl,
-                        size = 40.dp,
+                        size = 34.dp,
                         showBrandRing = true,
                     )
                     Spacer(modifier = Modifier.width(10.dp))
@@ -600,37 +604,37 @@ fun AccountsSidebarContent(
             AccountTab.entries.forEach { tab ->
                 val selected = !isSettingsSelected && !isHelpSelected && selectedTab == tab
                 NavigationDrawerItem(
-                    label = { Text(stringResource(tab.titleRes), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    label = { Text(stringResource(tab.titleRes), style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     selected = selected,
                     onClick = { onSelectTab(tab) },
-                    icon = { Icon(accountTabIcon(tab), contentDescription = null) },
+                    icon = { Icon(accountTabIcon(tab), contentDescription = null, modifier = Modifier.size(19.dp)) },
                     colors = itemColors,
-                    shape = RoundedCornerShape(50),
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.testTag("sidebar_tab_${tab.name.lowercase()}"),
                 )
             }
             HorizontalDivider(
                 color = semantic.cardBorder,
-                modifier = Modifier.padding(vertical = 8.dp, horizontal = 8.dp),
+                modifier = Modifier.padding(vertical = 6.dp, horizontal = 8.dp),
             )
         }
 
         NavigationDrawerItem(
-            label = { Text(stringResource(R.string.gothwad_settings_title)) },
+            label = { Text(stringResource(R.string.gothwad_settings_title), style = MaterialTheme.typography.bodyMedium) },
             selected = isSettingsSelected,
             onClick = onOpenSettings,
-            icon = { Icon(Icons.Rounded.Settings, contentDescription = null) },
+            icon = { Icon(Icons.Rounded.Settings, contentDescription = null, modifier = Modifier.size(19.dp)) },
             colors = itemColors,
-            shape = RoundedCornerShape(50),
+            shape = RoundedCornerShape(12.dp),
             modifier = Modifier.testTag("sidebar_settings_item"),
         )
         NavigationDrawerItem(
-            label = { Text(stringResource(R.string.gothwad_help_title)) },
+            label = { Text(stringResource(R.string.gothwad_help_title), style = MaterialTheme.typography.bodyMedium) },
             selected = isHelpSelected,
             onClick = onOpenHelp,
-            icon = { Icon(Icons.AutoMirrored.Rounded.HelpOutline, contentDescription = null) },
+            icon = { Icon(Icons.AutoMirrored.Rounded.HelpOutline, contentDescription = null, modifier = Modifier.size(19.dp)) },
             colors = itemColors,
-            shape = RoundedCornerShape(50),
+            shape = RoundedCornerShape(12.dp),
             modifier = Modifier.testTag("sidebar_help_item"),
         )
     }
@@ -647,7 +651,7 @@ fun AccountAvatar(
 ) {
     val semantic = LocalAccountColors.current
     val bitmap = rememberAvatarBitmap(avatarUrl)
-    val outerSize = if (showBrandRing) size + 8.dp else size
+    val outerSize = if (showBrandRing) size + 6.dp else size
 
     Box(
         modifier = Modifier
@@ -665,7 +669,7 @@ fun AccountAvatar(
     ) {
         if (showBrandRing) {
             Canvas(modifier = Modifier.fillMaxSize()) {
-                val strokeWidth = (size.toPx() * 0.075f).coerceIn(2.dp.toPx(), 4.dp.toPx())
+                val strokeWidth = (size.toPx() * 0.065f).coerceIn(1.75.dp.toPx(), 3.dp.toPx())
                 val stroke = Stroke(width = strokeWidth, cap = StrokeCap.Butt)
                 drawArc(semantic.brandHighlight, startAngle = -140f, sweepAngle = 82f, useCenter = false, style = stroke)
                 drawArc(semantic.brandTertiary, startAngle = -58f, sweepAngle = 82f, useCenter = false, style = stroke)
@@ -692,7 +696,7 @@ fun AccountAvatar(
             ) {
                 Text(
                     text = initials,
-                    style = if (size >= 64.dp) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.titleSmall,
+                    style = if (size >= 60.dp) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                     fontWeight = FontWeight.SemiBold,
                 )
@@ -710,21 +714,21 @@ fun AccountSectionCard(
 ) {
     val semantic = LocalAccountColors.current
     Surface(
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         border = BorderStroke(1.dp, semantic.cardBorder),
         modifier = modifier.fillMaxWidth(),
     ) {
-        Column(modifier = Modifier.padding(vertical = 8.dp)) {
+        Column(modifier = Modifier.padding(vertical = 4.dp)) {
             if (title != null || subtitle != null) {
                 Column(
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     if (title != null) {
                         Text(
                             text = title,
-                            style = MaterialTheme.typography.titleLarge,
+                            style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.semantics { heading() },
                         )
@@ -732,7 +736,7 @@ fun AccountSectionCard(
                     if (subtitle != null) {
                         Text(
                             text = subtitle,
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -747,7 +751,7 @@ fun AccountSectionCard(
 fun SectionDivider() {
     HorizontalDivider(
         color = LocalAccountColors.current.cardBorder,
-        modifier = Modifier.padding(horizontal = 20.dp),
+        modifier = Modifier.padding(horizontal = 16.dp),
     )
 }
 
@@ -768,13 +772,13 @@ fun AccountSettingRow(
             .then(if (testTag != null) Modifier.testTag(testTag) else Modifier)
             .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
             .minimumInteractiveComponentSize()
-            .padding(horizontal = 20.dp, vertical = 14.dp),
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) {
             Box(
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(34.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh),
                 contentAlignment = Alignment.Center,
@@ -783,25 +787,26 @@ fun AccountSettingRow(
                     imageVector = icon,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(18.dp),
                 )
             }
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width(12.dp))
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = label,
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(modifier = Modifier.height(2.dp))
+            Spacer(modifier = Modifier.height(1.dp))
             Text(
                 text = value,
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurface,
             )
             if (supportingText != null) {
-                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.height(1.dp))
                 Text(
                     text = supportingText,
                     style = MaterialTheme.typography.bodySmall,
@@ -814,11 +819,12 @@ fun AccountSettingRow(
             statusBadge()
         }
         if (trailingIcon != null && onClick != null) {
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(6.dp))
             Icon(
                 imageVector = trailingIcon,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp),
             )
         }
     }
@@ -843,7 +849,7 @@ fun StatusPill(
         color = container,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
@@ -851,11 +857,11 @@ fun StatusPill(
                 imageVector = icon,
                 contentDescription = null,
                 tint = content,
-                modifier = Modifier.size(14.dp),
+                modifier = Modifier.size(12.dp),
             )
             Text(
                 text = label,
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.labelSmall,
                 color = content,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -873,18 +879,18 @@ fun TabIntroHeader(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 4.dp, vertical = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+            .padding(horizontal = 2.dp, vertical = 2.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         Text(
             text = title,
-            style = MaterialTheme.typography.headlineSmall,
+            style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier.semantics { heading() },
         )
         Text(
             text = subtitle,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
@@ -911,7 +917,7 @@ fun GothwadQuotaSummary(
         else -> MaterialTheme.colorScheme.primary
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         if (knownUsed && knownLimit) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -932,7 +938,7 @@ fun GothwadQuotaSummary(
                         text = "$percent% used",
                         style = MaterialTheme.typography.labelSmall,
                         color = barColor,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
                     )
                 }
             }
@@ -944,8 +950,8 @@ fun GothwadQuotaSummary(
             strokeCap = StrokeCap.Round,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(10.dp)
-                .clip(RoundedCornerShape(5.dp)),
+                .height(6.dp)
+                .clip(RoundedCornerShape(3.dp)),
         )
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -984,12 +990,12 @@ fun GothwadAuthStatusBanner(
     }
 
     Surface(
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(14.dp),
         color = if (isCritical) semantic.criticalContainer else semantic.warningContainer,
         modifier = modifier.fillMaxWidth(),
     ) {
         val textColor = if (isCritical) semantic.onCriticalContainer else semantic.onWarningContainer
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Icon(
                     imageVector = if (isCritical) Icons.Rounded.ErrorOutline else Icons.Rounded.WarningAmber,

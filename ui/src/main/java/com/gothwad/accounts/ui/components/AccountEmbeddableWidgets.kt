@@ -65,7 +65,7 @@ fun GothwadAccountAvatarButton(
                 displayName = active.displayName(),
                 initials = active.initials(),
                 avatarUrl = active.avatarUrl,
-                size = 34.dp,
+                size = 30.dp,
                 showBrandRing = true,
             )
         } else {
@@ -73,7 +73,7 @@ fun GothwadAccountAvatarButton(
                 imageVector = Icons.Rounded.AccountCircle,
                 contentDescription = label,
                 tint = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.size(30.dp),
+                modifier = Modifier.size(28.dp),
             )
         }
     }
@@ -129,12 +129,12 @@ fun GothwadAccountSettingsCard(
     modifier: Modifier = Modifier,
 ) {
     Surface(
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = modifier.fillMaxWidth(),
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             when (accountState) {
                 AccountState.Initializing -> {
                     Text(
@@ -181,7 +181,7 @@ fun GothwadAccountSettingsCard(
                             displayName = active.displayName(),
                             initials = active.initials(),
                             avatarUrl = active.avatarUrl,
-                            size = 44.dp,
+                            size = 40.dp,
                             showBrandRing = true,
                         )
                         Spacer(modifier = Modifier.width(12.dp))

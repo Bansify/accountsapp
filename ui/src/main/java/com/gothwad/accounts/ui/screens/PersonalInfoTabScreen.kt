@@ -68,9 +68,9 @@ fun PersonalInfoTabScreen(
         modifier = Modifier
             .fillMaxSize()
             .testTag("personal_info_tab_screen"),
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
             TabIntroHeader(
@@ -83,7 +83,7 @@ fun PersonalInfoTabScreen(
         // Identity preview card
         item {
             Surface(
-                shape = RoundedCornerShape(24.dp),
+                shape = RoundedCornerShape(16.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerLow,
                 border = BorderStroke(1.dp, semantic.cardBorder),
                 modifier = Modifier
@@ -93,35 +93,35 @@ fun PersonalInfoTabScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(20.dp),
+                        .padding(14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     AccountAvatar(
                         displayName = account.displayName(),
                         initials = account.initials(),
                         avatarUrl = account.avatarUrl,
-                        size = 64.dp,
+                        size = 52.dp,
                         showBrandRing = true,
                         onClick = if (canEditBasicProfileNatively) onEditAvatarClick else onManagePersonalOnWeb,
                     )
-                    Spacer(modifier = Modifier.width(16.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
                     Column(
                         modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(3.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
                     ) {
                         Text(
                             text = account.displayName(),
-                            style = MaterialTheme.typography.titleLarge,
+                            style = MaterialTheme.typography.titleMedium,
                         )
                         Text(
                             text = account.displayEmail(),
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         account.username?.takeIf { it.isNotBlank() }?.let {
                             Text(
                                 text = "@$it",
-                                style = MaterialTheme.typography.labelMedium,
+                                style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.primary,
                             )
                         }
@@ -130,10 +130,11 @@ fun PersonalInfoTabScreen(
                         Button(
                             onClick = onEditBasicProfileClick,
                             shape = RoundedCornerShape(50),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
                         ) {
-                            Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Edit")
+                            Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(15.dp))
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text("Edit", style = MaterialTheme.typography.labelLarge)
                         }
                     }
                 }
