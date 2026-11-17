@@ -2,6 +2,7 @@ package com.gothwad.accounts.ui.components
 
 import android.content.Context
 import android.text.format.Formatter
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -11,25 +12,50 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.HelpOutline
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material.icons.rounded.GridView
+import androidx.compose.material.icons.rounded.Group
+import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Menu
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.PrivacyTip
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -37,14 +63,19 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.PrimaryScrollableTabRow
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarDefaults
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -107,26 +138,70 @@ fun DiscoveredAccount.initials(): String {
 }
 
 @Composable
+fun GothwadBrandBadge(
+    size: Dp = 28.dp,
+    modifier: Modifier = Modifier,
+) {
+    val semantic = LocalAccountColors.current
+    Box(
+        modifier = modifier.size(size),
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val stroke = Stroke(width = (size.toPx() * 0.11f).coerceAtLeast(2.4.dp.toPx()), cap = StrokeCap.Round)
+            drawArc(semantic.brandHighlight, startAngle = -140f, sweepAngle = 80f, useCenter = false, style = stroke)
+            drawArc(semantic.brandTertiary, startAngle = -52f, sweepAngle = 80f, useCenter = false, style = stroke)
+            drawArc(semantic.brandSecondary, startAngle = 36f, sweepAngle = 86f, useCenter = false, style = stroke)
+            drawArc(semantic.brandPrimary, startAngle = 130f, sweepAngle = 82f, useCenter = false, style = stroke)
+        }
+        Text(
+            text = "G",
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = semantic.brandPrimary,
+        )
+    }
+}
+
+fun accountTabIcon(tab: AccountTab): ImageVector = when (tab) {
+    AccountTab.HOME -> Icons.Rounded.Home
+    AccountTab.PERSONAL_INFO -> Icons.Rounded.Person
+    AccountTab.SECURITY -> Icons.Rounded.Lock
+    AccountTab.DATA_PRIVACY -> Icons.Rounded.PrivacyTip
+    AccountTab.PEOPLE_SHARING -> Icons.Rounded.Group
+    AccountTab.CONNECTED_APPS -> Icons.Rounded.Apps
+}
+
+@Composable
 fun AccountsTopAppBar(
     activeAccount: GothwadAccount?,
     canNavigateBack: Boolean,
     subScreenTitle: String?,
     isRefreshing: Boolean,
+    showMenuButton: Boolean = false,
+    onMenuClick: () -> Unit = {},
     onBackClick: () -> Unit,
     onSearchClick: () -> Unit,
-    onRefreshClick: () -> Unit,
+    onSettingsClick: () -> Unit = {},
     onHelpClick: () -> Unit,
     onAvatarClick: () -> Unit,
 ) {
+    val semantic = LocalAccountColors.current
+    val topBarInsets = WindowInsets.statusBars.union(
+        WindowInsets.displayCutout.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
+    )
+
+    // Paints the exact #FFFFFF / #212121 canvas color behind the system status bar while keeping
+    // all header controls cleanly below the battery/network/clock bar.
     Surface(
-        color = MaterialTheme.colorScheme.surface,
+        color = semantic.canvasBackground,
         tonalElevation = 0.dp,
     ) {
-        Column {
+        Column(modifier = Modifier.windowInsetsPadding(topBarInsets)) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                    .padding(horizontal = 6.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (canNavigateBack) {
@@ -150,17 +225,36 @@ fun AccountsTopAppBar(
                             .semantics { heading() },
                     )
                 } else {
-                    Text(
-                        text = stringResource(R.string.gothwad_account_brand),
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                    if (showMenuButton) {
+                        IconButton(
+                            onClick = onMenuClick,
+                            modifier = Modifier.testTag("top_menu_button"),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Menu,
+                                contentDescription = stringResource(R.string.gothwad_cd_menu),
+                            )
+                        }
+                    }
+                    Row(
                         modifier = Modifier
                             .weight(1f)
-                            .padding(start = 12.dp)
-                            .semantics { heading() },
-                    )
+                            .padding(start = if (showMenuButton) 2.dp else 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        if (!showMenuButton) {
+                            GothwadBrandBadge(size = 26.dp)
+                        }
+                        Text(
+                            text = stringResource(R.string.gothwad_account_brand),
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.semantics { heading() },
+                        )
+                    }
                 }
 
                 if (activeAccount != null && !canNavigateBack) {
@@ -175,34 +269,43 @@ fun AccountsTopAppBar(
                         )
                     }
                     IconButton(
-                        onClick = onRefreshClick,
-                        enabled = !isRefreshing,
-                        modifier = Modifier.testTag("top_refresh_button"),
+                        onClick = onSettingsClick,
+                        modifier = Modifier.testTag("top_settings_button"),
                     ) {
                         Icon(
-                            imageVector = Icons.Rounded.Refresh,
-                            contentDescription = stringResource(R.string.gothwad_refresh_profile),
+                            imageVector = Icons.Rounded.Settings,
+                            contentDescription = stringResource(R.string.gothwad_cd_settings),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                }
-
-                IconButton(
-                    onClick = onHelpClick,
-                    modifier = Modifier.testTag("top_help_button"),
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Rounded.HelpOutline,
-                        contentDescription = stringResource(R.string.gothwad_cd_help),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                } else if (!canNavigateBack) {
+                    IconButton(
+                        onClick = onSettingsClick,
+                        modifier = Modifier.testTag("top_settings_button"),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Settings,
+                            contentDescription = stringResource(R.string.gothwad_cd_settings),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    IconButton(
+                        onClick = onHelpClick,
+                        modifier = Modifier.testTag("top_help_button"),
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.HelpOutline,
+                            contentDescription = stringResource(R.string.gothwad_cd_help),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
 
                 if (activeAccount != null) {
                     val accountLabel = activeAccount.displayName()
                     Box(
                         modifier = Modifier
-                            .padding(end = 6.dp)
+                            .padding(end = 4.dp)
                             .minimumInteractiveComponentSize()
                             .clip(CircleShape)
                             .clickable(
@@ -236,50 +339,300 @@ fun AccountsTabBar(
     selectedTab: AccountTab,
     onSelectTab: (AccountTab) -> Unit,
 ) {
+    val semantic = LocalAccountColors.current
     val tabs = AccountTab.entries
-    val selectedIndex = tabs.indexOf(selectedTab).coerceAtLeast(0)
-    Surface(color = MaterialTheme.colorScheme.surface) {
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(selectedTab) {
+        listState.animateScrollToItem(selectedTab.ordinal)
+    }
+
+    Surface(color = semantic.canvasBackground) {
         Column {
-            PrimaryScrollableTabRow(
-                selectedTabIndex = selectedIndex,
-                containerColor = MaterialTheme.colorScheme.surface,
-                contentColor = MaterialTheme.colorScheme.primary,
-                edgePadding = 16.dp,
-                divider = {},
-                indicator = {
-                    TabRowDefaults.PrimaryIndicator(
-                        modifier = Modifier.tabIndicatorOffset(selectedIndex, matchContentSize = true),
-                        width = 36.dp,
-                        height = 3.dp,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                },
+            LazyRow(
+                state = listState,
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                tabs.forEach { tab ->
+                items(tabs, key = { it.name }) { tab ->
                     val isSelected = tab == selectedTab
-                    Tab(
-                        selected = isSelected,
-                        onClick = { onSelectTab(tab) },
-                        modifier = Modifier.testTag("tab_${tab.name.lowercase()}"),
-                        text = {
+                    val containerColor by animateColorAsState(
+                        targetValue = if (isSelected) {
+                            MaterialTheme.colorScheme.primaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.surfaceContainerLow
+                        },
+                        label = "tab_bg_${tab.name}",
+                    )
+                    val contentColor by animateColorAsState(
+                        targetValue = if (isSelected) {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        label = "tab_fg_${tab.name}",
+                    )
+                    val icon = when (tab) {
+                        AccountTab.HOME -> Icons.Rounded.Home
+                        AccountTab.PERSONAL_INFO -> Icons.Rounded.Person
+                        AccountTab.SECURITY -> Icons.Rounded.Lock
+                        AccountTab.DATA_PRIVACY -> Icons.Rounded.PrivacyTip
+                        AccountTab.PEOPLE_SHARING -> Icons.Rounded.Group
+                        AccountTab.CONNECTED_APPS -> Icons.Rounded.Apps
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = containerColor,
+                        border = if (isSelected) null else BorderStroke(1.dp, semantic.cardBorder),
+                        modifier = Modifier
+                            .minimumInteractiveComponentSize()
+                            .clip(RoundedCornerShape(50))
+                            .clickable(role = Role.Tab) { onSelectTab(tab) }
+                            .testTag("tab_${tab.name.lowercase()}"),
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = null,
+                                tint = contentColor,
+                                modifier = Modifier.size(16.dp),
+                            )
                             Text(
                                 text = stringResource(tab.titleRes),
-                                style = MaterialTheme.typography.titleSmall.copy(
+                                style = MaterialTheme.typography.labelLarge.copy(
                                     fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
                                 ),
-                                color = if (isSelected) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                },
+                                color = contentColor,
                                 maxLines = 1,
                             )
-                        },
+                        }
+                    }
+                }
+            }
+            HorizontalDivider(color = semantic.cardBorder)
+        }
+    }
+}
+
+@Composable
+fun AccountsBottomBar(
+    selectedTab: AccountTab,
+    isOthersSelected: Boolean,
+    onSelectTab: (AccountTab) -> Unit,
+    onSelectOthers: () -> Unit,
+) {
+    val semantic = LocalAccountColors.current
+    val itemColors = NavigationBarItemDefaults.colors(
+        selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        selectedTextColor = MaterialTheme.colorScheme.primary,
+        indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+
+    Column {
+        HorizontalDivider(color = semantic.cardBorder)
+        NavigationBar(
+            containerColor = semantic.canvasBackground,
+            tonalElevation = 0.dp,
+            windowInsets = NavigationBarDefaults.windowInsets,
+        ) {
+            NavigationBarItem(
+                selected = !isOthersSelected && selectedTab == AccountTab.HOME,
+                onClick = { onSelectTab(AccountTab.HOME) },
+                icon = { Icon(Icons.Rounded.Home, contentDescription = null) },
+                label = { Text("Home", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis) },
+                colors = itemColors,
+                modifier = Modifier.testTag("bottom_tab_home"),
+            )
+            NavigationBarItem(
+                selected = !isOthersSelected && selectedTab == AccountTab.PERSONAL_INFO,
+                onClick = { onSelectTab(AccountTab.PERSONAL_INFO) },
+                icon = { Icon(Icons.Rounded.Person, contentDescription = null) },
+                label = { Text("Personal", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis) },
+                colors = itemColors,
+                modifier = Modifier.testTag("bottom_tab_personal"),
+            )
+            NavigationBarItem(
+                selected = !isOthersSelected && selectedTab == AccountTab.SECURITY,
+                onClick = { onSelectTab(AccountTab.SECURITY) },
+                icon = { Icon(Icons.Rounded.Lock, contentDescription = null) },
+                label = { Text("Security", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis) },
+                colors = itemColors,
+                modifier = Modifier.testTag("bottom_tab_security"),
+            )
+            NavigationBarItem(
+                selected = !isOthersSelected && selectedTab == AccountTab.DATA_PRIVACY,
+                onClick = { onSelectTab(AccountTab.DATA_PRIVACY) },
+                icon = { Icon(Icons.Rounded.PrivacyTip, contentDescription = null) },
+                label = { Text("Privacy", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis) },
+                colors = itemColors,
+                modifier = Modifier.testTag("bottom_tab_data"),
+            )
+            NavigationBarItem(
+                selected = isOthersSelected,
+                onClick = onSelectOthers,
+                icon = { Icon(Icons.Rounded.GridView, contentDescription = null) },
+                label = {
+                    Text(
+                        text = stringResource(R.string.gothwad_tab_others),
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
+                colors = itemColors,
+                modifier = Modifier.testTag("bottom_tab_others"),
+            )
+        }
+    }
+}
+
+@Composable
+fun AccountsSidebarContent(
+    activeAccount: GothwadAccount?,
+    selectedTab: AccountTab,
+    isSettingsSelected: Boolean,
+    isHelpSelected: Boolean,
+    isRefreshing: Boolean,
+    onSelectTab: (AccountTab) -> Unit,
+    onOpenSettings: () -> Unit,
+    onOpenHelp: () -> Unit,
+    onRefreshClick: () -> Unit,
+) {
+    val semantic = LocalAccountColors.current
+    val navInsets = WindowInsets.safeDrawing.only(
+        WindowInsetsSides.Vertical + WindowInsetsSides.Start,
+    )
+    val itemColors = NavigationDrawerItemDefaults.colors(
+        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+        selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        selectedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        unselectedContainerColor = semantic.canvasBackground,
+        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        unselectedTextColor = MaterialTheme.colorScheme.onSurface,
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxHeight()
+            .windowInsetsPadding(navInsets)
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 12.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            GothwadBrandBadge(size = 26.dp)
+            Spacer(modifier = Modifier.width(10.dp))
+            Text(
+                text = stringResource(R.string.gothwad_account_brand),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f),
+            )
+            if (activeAccount != null) {
+                IconButton(
+                    onClick = onRefreshClick,
+                    enabled = !isRefreshing,
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Refresh,
+                        contentDescription = stringResource(R.string.gothwad_refresh_profile),
+                        tint = if (isRefreshing) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
-            HorizontalDivider(color = LocalAccountColors.current.cardBorder)
         }
+
+        if (activeAccount != null) {
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                border = BorderStroke(1.dp, semantic.cardBorder),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp, vertical = 6.dp),
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    AccountAvatar(
+                        displayName = activeAccount.displayName(),
+                        initials = activeAccount.initials(),
+                        avatarUrl = activeAccount.avatarUrl,
+                        size = 40.dp,
+                        showBrandRing = true,
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = activeAccount.displayName(),
+                            style = MaterialTheme.typography.titleSmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = activeAccount.displayEmail(),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+        }
+
+        if (activeAccount != null) {
+            AccountTab.entries.forEach { tab ->
+                val selected = !isSettingsSelected && !isHelpSelected && selectedTab == tab
+                NavigationDrawerItem(
+                    label = { Text(stringResource(tab.titleRes), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    selected = selected,
+                    onClick = { onSelectTab(tab) },
+                    icon = { Icon(accountTabIcon(tab), contentDescription = null) },
+                    colors = itemColors,
+                    shape = RoundedCornerShape(50),
+                    modifier = Modifier.testTag("sidebar_tab_${tab.name.lowercase()}"),
+                )
+            }
+            HorizontalDivider(
+                color = semantic.cardBorder,
+                modifier = Modifier.padding(vertical = 8.dp, horizontal = 8.dp),
+            )
+        }
+
+        NavigationDrawerItem(
+            label = { Text(stringResource(R.string.gothwad_settings_title)) },
+            selected = isSettingsSelected,
+            onClick = onOpenSettings,
+            icon = { Icon(Icons.Rounded.Settings, contentDescription = null) },
+            colors = itemColors,
+            shape = RoundedCornerShape(50),
+            modifier = Modifier.testTag("sidebar_settings_item"),
+        )
+        NavigationDrawerItem(
+            label = { Text(stringResource(R.string.gothwad_help_title)) },
+            selected = isHelpSelected,
+            onClick = onOpenHelp,
+            icon = { Icon(Icons.AutoMirrored.Rounded.HelpOutline, contentDescription = null) },
+            colors = itemColors,
+            shape = RoundedCornerShape(50),
+            modifier = Modifier.testTag("sidebar_help_item"),
+        )
     }
 }
 
@@ -358,7 +711,7 @@ fun AccountSectionCard(
     val semantic = LocalAccountColors.current
     Surface(
         shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surface,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
         border = BorderStroke(1.dp, semantic.cardBorder),
         modifier = modifier.fillMaxWidth(),
     ) {
@@ -543,6 +896,7 @@ fun GothwadQuotaSummary(
     usedBytes: Long?,
     limitBytes: Long?,
 ) {
+    val semantic = LocalAccountColors.current
     val knownUsed = usedBytes != null && usedBytes >= 0L
     val knownLimit = limitBytes != null && limitBytes > 0L
     val fraction = if (knownUsed && knownLimit) {
@@ -550,14 +904,48 @@ fun GothwadQuotaSummary(
     } else {
         0f
     }
+    val percent = (fraction * 100f).toInt()
+    val barColor = when {
+        fraction >= 0.9f -> semantic.criticalRed
+        fraction >= 0.75f -> semantic.warningAmber
+        else -> MaterialTheme.colorScheme.primary
+    }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (knownUsed && knownLimit) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "${Formatter.formatShortFileSize(context, usedBytes!!)} of ${Formatter.formatShortFileSize(context, limitBytes!!)}",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = barColor.copy(alpha = 0.14f),
+                ) {
+                    Text(
+                        text = "$percent% used",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = barColor,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                    )
+                }
+            }
+        }
         LinearProgressIndicator(
             progress = { fraction },
+            color = barColor,
+            trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            strokeCap = StrokeCap.Round,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(8.dp)
-                .clip(RoundedCornerShape(4.dp)),
+                .height(10.dp)
+                .clip(RoundedCornerShape(5.dp)),
         )
         Row(
             modifier = Modifier.fillMaxWidth(),

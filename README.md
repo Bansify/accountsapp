@@ -40,6 +40,7 @@ python3 tools/check_docs.py && python3 tools/check_android_scaffold.py
 - [Security model (STRIDE)](docs/SECURITY.md)
 - [Peer Directory IPC protocol](docs/BROKER_PROTOCOL.md)
 - [Public API](docs/PUBLIC_API.md)
+- [Theme & color system](docs/THEME_SYSTEM.md)
 - [Host integration & testing](docs/INTEGRATION.md)
 - [Accounts backend PR plan](docs/SERVER_CHANGES.md)
 - [Releases & JitPack publishing](docs/RELEASES.md)

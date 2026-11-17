@@ -4,9 +4,9 @@
     <string name="gothwad_sign_in">Gothwad से साइन इन करें</string>
     <string name="gothwad_sign_in_browser">ब्राउज़र से साइन इन करें</string>
     <string name="gothwad_continue_as">%1$s के रूप में जारी रखें</string>
-    <string name="gothwad_auth_description">मौजूदा Gothwad Accounts वेबसाइट पर साइन इन करें या खाता बनाएँ। आपका पासवर्ड ब्राउज़र में ही रहता है।</string>
+    <string name="gothwad_auth_description">सीधे इस ऐप में अपने Gothwad खाते से साइन इन करें या नया खाता बनाएँ।</string>
     <string name="gothwad_discovered_on_device">इस डिवाइस पर मिले खाते</string>
-    <string name="gothwad_discovered_helper">इस डिवाइस के सत्यापित Gothwad ऐप्स केवल खाता पहचान साझा करते हैं। चुनने पर यह ऐप अलग से अनुमति लेगा।</string>
+    <string name="gothwad_discovered_helper">इस डिवाइस के सत्यापित Gothwad ऐप्स खाता पहचान साझा करते हैं। चुनने पर यह ऐप बिना ब्राउज़र खोले साइन इन हो जाएगा।</string>
     <string name="gothwad_choose_account">खाता चुनें</string>
     <string name="gothwad_active">सक्रिय खाता</string>
     <string name="gothwad_switch">यह खाता इस्तेमाल करें</string>
@@ -57,4 +57,16 @@
     <string name="gothwad_search_empty">कोई मेल खाती सेटिंग नहीं मिली</string>
     <string name="gothwad_no_name_fallback">Gothwad उपयोगकर्ता</string>
     <string name="gothwad_sign_in_again">दोबारा साइन इन करें</string>
+    <string name="gothwad_settings_title">सेटिंग्स</string>
+    <string name="gothwad_cd_settings">ऐप सेटिंग्स</string>
+    <string name="gothwad_cd_menu">नेविगेशन मेनू खोलें</string>
+    <string name="gothwad_tab_others">अन्य</string>
+    <string name="gothwad_theme_section">रूप और थीम</string>
+    <string name="gothwad_theme_system">सिस्टम के अनुसार</string>
+    <string name="gothwad_theme_light">लाइट</string>
+    <string name="gothwad_theme_dark">डार्क</string>
+    <string name="gothwad_nav_section">नेविगेशन लेआउट</string>
+    <string name="gothwad_nav_header_pills">हेडर पिल्स</string>
+    <string name="gothwad_nav_left_sidebar">बायाँ साइडबार</string>
+    <string name="gothwad_nav_bottom_bar">निचला बार</string>
 </resources>

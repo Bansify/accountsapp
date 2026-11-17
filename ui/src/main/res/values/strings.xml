@@ -57,4 +57,16 @@
     <string name="gothwad_search_empty">No matching settings found</string>
     <string name="gothwad_no_name_fallback">Gothwad User</string>
     <string name="gothwad_sign_in_again">Sign in again</string>
+    <string name="gothwad_settings_title">Settings</string>
+    <string name="gothwad_cd_settings">App settings</string>
+    <string name="gothwad_cd_menu">Open navigation menu</string>
+    <string name="gothwad_tab_others">Others</string>
+    <string name="gothwad_theme_section">Appearance &amp; theme</string>
+    <string name="gothwad_theme_system">Follow system</string>
+    <string name="gothwad_theme_light">Light</string>
+    <string name="gothwad_theme_dark">Dark</string>
+    <string name="gothwad_nav_section">Navigation layout</string>
+    <string name="gothwad_nav_header_pills">Header pills</string>
+    <string name="gothwad_nav_left_sidebar">Left sidebar</string>
+    <string name="gothwad_nav_bottom_bar">Bottom bar</string>
 </resources>

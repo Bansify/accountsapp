@@ -21,6 +21,8 @@ import com.gothwad.accounts.ui.model.AccountSubScreen
 import com.gothwad.accounts.ui.model.AccountTab
 import com.gothwad.accounts.ui.model.ActiveManagementDialog
 import com.gothwad.accounts.ui.model.NativeAuthStep
+import com.gothwad.accounts.ui.model.NavigationLayoutMode
+import com.gothwad.accounts.ui.model.ThemePreference
 import com.gothwad.accounts.ui.state.AccountDashboardViewModel
 import com.gothwad.accounts.ui.state.AccountSessionController
 import kotlinx.coroutines.Dispatchers
@@ -454,5 +456,34 @@ class AccountDashboardViewModelTest {
         vm.deleteAccount("Pass123!", null)
         advanceUntilIdle()
         assertEquals(AccountState.SignedOut, vm.uiState.value.accountState)
+    }
+
+    @Test
+    fun themePreferencesAndAdaptiveNavigationLayoutUpdateCleanly() = runTest {
+        val controller = FakeController()
+        val vm = AccountDashboardViewModel(controller)
+
+        vm.setThemePreference(ThemePreference.DARK)
+        assertEquals(ThemePreference.DARK, vm.uiState.value.themePreference)
+
+        vm.setNavigationLayout(NavigationLayoutMode.BOTTOM_BAR)
+        assertEquals(NavigationLayoutMode.BOTTOM_BAR, vm.uiState.value.navigationLayout)
+
+        vm.openOthersHub()
+        assertTrue(vm.uiState.value.showOthersHub)
+
+        vm.selectTab(AccountTab.CONNECTED_APPS)
+        assertFalse(vm.uiState.value.showOthersHub)
+        assertEquals(AccountTab.CONNECTED_APPS, vm.uiState.value.selectedTab)
+
+        // Back from Others child tab returns to OthersHub in BOTTOM_BAR layout
+        assertTrue(vm.navigateBack())
+        assertTrue(vm.uiState.value.showOthersHub)
+
+        vm.openSubScreen(AccountSubScreen.AppSettings)
+        vm.openSubScreen(AccountSubScreen.AppSettings) // deduplicated
+        assertEquals(listOf(AccountSubScreen.AppSettings), vm.uiState.value.subScreenStack)
+        assertTrue(vm.navigateBack())
+        assertNull(vm.uiState.value.currentSubScreen)
     }
 }

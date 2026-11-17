@@ -29,6 +29,19 @@ enum class AccountTab(
 sealed interface AccountSubScreen {
     data object SearchAccount : AccountSubScreen
     data object HelpLegal : AccountSubScreen
+    data object AppSettings : AccountSubScreen
+}
+
+enum class ThemePreference {
+    SYSTEM,
+    LIGHT,
+    DARK,
+}
+
+enum class NavigationLayoutMode {
+    HEADER_PILLS,
+    LEFT_SIDEBAR,
+    BOTTOM_BAR,
 }
 
 enum class NativeAuthStep {
@@ -123,6 +136,9 @@ data class AccountDashboardUiState(
     val mfaSetup: MfaEnrollmentSetup? = null,
     val mfaRecoveryCodes: List<String> = emptyList(),
     val isExportingData: Boolean = false,
+    val themePreference: ThemePreference = ThemePreference.SYSTEM,
+    val navigationLayout: NavigationLayoutMode = NavigationLayoutMode.HEADER_PILLS,
+    val showOthersHub: Boolean = false,
 ) {
     val showEditProfileDialog: Boolean
         get() = activeManagementDialog is ActiveManagementDialog.EditBasicProfile

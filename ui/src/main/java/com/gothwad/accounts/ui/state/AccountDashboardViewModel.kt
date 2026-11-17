@@ -25,8 +25,10 @@ import com.gothwad.accounts.ui.model.AccountTab
 import com.gothwad.accounts.ui.model.ActiveManagementDialog
 import com.gothwad.accounts.ui.model.NativeAuthDialogState
 import com.gothwad.accounts.ui.model.NativeAuthStep
+import com.gothwad.accounts.ui.model.NavigationLayoutMode
 import com.gothwad.accounts.ui.model.SearchableSetting
 import com.gothwad.accounts.ui.model.SignOutDialogTarget
+import com.gothwad.accounts.ui.model.ThemePreference
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -329,21 +331,62 @@ class AccountDashboardViewModel(
     }
 
     fun selectTab(tab: AccountTab) {
-        mutableUiState.update { it.copy(selectedTab = tab, subScreenStack = emptyList()) }
+        mutableUiState.update {
+            it.copy(
+                selectedTab = tab,
+                subScreenStack = emptyList(),
+                showOthersHub = false,
+            )
+        }
+    }
+
+    fun openOthersHub() {
+        mutableUiState.update {
+            it.copy(
+                showOthersHub = true,
+                subScreenStack = emptyList(),
+            )
+        }
+    }
+
+    fun setThemePreference(preference: ThemePreference) {
+        mutableUiState.update { it.copy(themePreference = preference) }
+    }
+
+    fun setNavigationLayout(mode: NavigationLayoutMode) {
+        mutableUiState.update { current ->
+            current.copy(
+                navigationLayout = mode,
+                showOthersHub = if (mode == NavigationLayoutMode.BOTTOM_BAR) current.showOthersHub else false,
+            )
+        }
     }
 
     fun openSubScreen(subScreen: AccountSubScreen) {
-        mutableUiState.update { it.copy(subScreenStack = it.subScreenStack + subScreen) }
+        mutableUiState.update { current ->
+            if (current.subScreenStack.lastOrNull() == subScreen) {
+                current
+            } else {
+                current.copy(subScreenStack = current.subScreenStack + subScreen)
+            }
+        }
     }
 
     fun navigateBack(): Boolean {
         var handled = false
         mutableUiState.update { state ->
-            if (state.subScreenStack.isNotEmpty()) {
-                handled = true
-                state.copy(subScreenStack = state.subScreenStack.dropLast(1), searchQuery = "")
-            } else {
-                state
+            when {
+                state.subScreenStack.isNotEmpty() -> {
+                    handled = true
+                    state.copy(subScreenStack = state.subScreenStack.dropLast(1), searchQuery = "")
+                }
+                state.navigationLayout == NavigationLayoutMode.BOTTOM_BAR &&
+                    !state.showOthersHub &&
+                    (state.selectedTab == AccountTab.PEOPLE_SHARING || state.selectedTab == AccountTab.CONNECTED_APPS) -> {
+                    handled = true
+                    state.copy(showOthersHub = true)
+                }
+                else -> state
             }
         }
         return handled
