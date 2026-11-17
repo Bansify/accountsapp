@@ -168,13 +168,13 @@ fun SignedOutAccountScreen(
         modifier = Modifier
             .fillMaxSize()
             .testTag("signed_out_screen"),
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
             Surface(
-                shape = RoundedCornerShape(28.dp),
+                shape = RoundedCornerShape(18.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerLow,
                 border = BorderStroke(1.dp, semantic.cardBorder),
                 modifier = Modifier
@@ -194,15 +194,15 @@ fun SignedOutAccountScreen(
                                     ),
                                 ),
                             )
-                            .padding(20.dp),
+                            .padding(16.dp),
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
                             Column(
                                 modifier = Modifier.weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
                             ) {
                                 Text(
                                     text = stringResource(R.string.gothwad_accounts),
@@ -212,7 +212,7 @@ fun SignedOutAccountScreen(
                                 )
                                 Text(
                                     text = "One secure identity for Mail, Drive, Meet, Notes & Kiwi Store.",
-                                    style = MaterialTheme.typography.bodyMedium,
+                                    style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
@@ -221,24 +221,24 @@ fun SignedOutAccountScreen(
                                 contentDescription = "Gothwad Account security illustration",
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier
-                                    .size(76.dp)
-                                    .clip(RoundedCornerShape(18.dp)),
+                                    .size(60.dp)
+                                    .clip(RoundedCornerShape(14.dp)),
                             )
                         }
                     }
 
                     Column(
-                        modifier = Modifier.padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         Text(
                             text = stringResource(R.string.gothwad_auth_description),
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
                             SignedOutFeatureChip(Icons.Rounded.Fingerprint, "Passkeys & 2FA")
                             SignedOutFeatureChip(Icons.Rounded.VerifiedUser, "Encrypted tokens")
@@ -250,11 +250,11 @@ fun SignedOutAccountScreen(
                             shape = RoundedCornerShape(50),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(48.dp)
+                                .height(42.dp)
                                 .testTag("signed_out_sign_in_button"),
                         ) {
-                            Icon(Icons.Rounded.AccountCircle, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Icon(Icons.Rounded.AccountCircle, contentDescription = null, modifier = Modifier.size(17.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(stringResource(R.string.gothwad_sign_in))
                         }
                         OutlinedButton(
@@ -263,7 +263,7 @@ fun SignedOutAccountScreen(
                             shape = RoundedCornerShape(50),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(46.dp)
+                                .height(40.dp)
                                 .testTag("signed_out_browser_sign_in_button"),
                         ) {
                             Text(stringResource(R.string.gothwad_sign_in_browser))
@@ -314,7 +314,7 @@ fun SignedOutAccountScreen(
                                 .clickable(enabled = !isPeerSilentSigningIn, role = Role.Button) {
                                     onContinueAsPeer(peer)
                                 }
-                                .padding(horizontal = 20.dp, vertical = 14.dp)
+                                .padding(horizontal = 16.dp, vertical = 10.dp)
                                 .testTag("discovered_peer_${peer.userId}"),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
@@ -322,10 +322,10 @@ fun SignedOutAccountScreen(
                                 displayName = peer.displayName(),
                                 initials = peer.initials(),
                                 avatarUrl = peer.avatarUrl,
-                                size = 42.dp,
+                                size = 38.dp,
                                 showBrandRing = true,
                             )
-                            Spacer(modifier = Modifier.width(14.dp))
+                            Spacer(modifier = Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = stringResource(R.string.gothwad_continue_as, peer.displayName()),

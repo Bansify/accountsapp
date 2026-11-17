@@ -464,7 +464,7 @@ fun GothwadAccountsScreen(
                     Surface(
                         color = semantic.canvasBackground,
                         modifier = Modifier
-                            .width(264.dp)
+                            .width(244.dp)
                             .fillMaxHeight(),
                     ) {
                         AccountsSidebarContent(
@@ -488,7 +488,7 @@ fun GothwadAccountsScreen(
                     drawerContent = {
                         ModalDrawerSheet(
                             drawerContainerColor = semantic.canvasBackground,
-                            modifier = Modifier.width(288.dp),
+                            modifier = Modifier.width(264.dp),
                         ) {
                             AccountsSidebarContent(
                                 activeAccount = activeAccount,

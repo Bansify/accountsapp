@@ -74,16 +74,16 @@ fun SearchAccountScreen(
         modifier = Modifier
             .fillMaxSize()
             .testTag("search_account_screen"),
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         item {
             OutlinedTextField(
                 value = query,
                 onValueChange = onQueryChange,
-                placeholder = { Text(stringResource(R.string.gothwad_search_hint)) },
-                leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
+                placeholder = { Text(stringResource(R.string.gothwad_search_hint), style = MaterialTheme.typography.bodyMedium) },
+                leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null, modifier = Modifier.size(19.dp)) },
                 trailingIcon = {
                     if (query.isNotEmpty()) {
                         IconButton(onClick = { onQueryChange("") }) {
@@ -92,7 +92,7 @@ fun SearchAccountScreen(
                     }
                 },
                 singleLine = true,
-                shape = RoundedCornerShape(28.dp),
+                shape = RoundedCornerShape(22.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
                     unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -136,7 +136,7 @@ fun SearchAccountScreen(
         if (filtered.isEmpty()) {
             item {
                 Surface(
-                    shape = RoundedCornerShape(24.dp),
+                    shape = RoundedCornerShape(16.dp),
                     color = MaterialTheme.colorScheme.surfaceContainerLow,
                     border = BorderStroke(1.dp, semantic.cardBorder),
                     modifier = Modifier
@@ -144,19 +144,19 @@ fun SearchAccountScreen(
                         .widthIn(max = 600.dp),
                 ) {
                     Column(
-                        modifier = Modifier.padding(28.dp),
+                        modifier = Modifier.padding(20.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.Search,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(32.dp),
+                            modifier = Modifier.size(28.dp),
                         )
                         Text(
                             text = stringResource(R.string.gothwad_search_empty),
-                            style = MaterialTheme.typography.titleMedium,
+                            style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.onSurface,
                         )
                         Text(
@@ -201,9 +201,9 @@ fun HelpLegalScreen(
         modifier = Modifier
             .fillMaxSize()
             .testTag("help_legal_screen"),
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
             AccountSectionCard(

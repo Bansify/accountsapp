@@ -92,29 +92,29 @@ fun PeopleSharingTabScreen(
         // Shared identity card
         item {
             Surface(
-                shape = RoundedCornerShape(24.dp),
+                shape = RoundedCornerShape(16.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerLow,
                 border = BorderStroke(1.dp, semantic.cardBorder),
                 modifier = Modifier
                     .fillMaxWidth()
                     .widthIn(max = 600.dp),
             ) {
-                Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
                         text = "How others see you",
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.titleMedium,
                     )
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         AccountAvatar(
                             displayName = account.displayName(),
                             initials = account.initials(),
                             avatarUrl = account.avatarUrl,
-                            size = 48.dp,
+                            size = 40.dp,
                             showBrandRing = true,
                         )
-                        Spacer(modifier = Modifier.width(14.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(account.displayName(), style = MaterialTheme.typography.titleMedium)
+                            Text(account.displayName(), style = MaterialTheme.typography.titleSmall)
                             Text(
                                 account.displayEmail(),
                                 style = MaterialTheme.typography.bodySmall,

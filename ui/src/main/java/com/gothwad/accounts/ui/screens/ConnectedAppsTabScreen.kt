@@ -76,9 +76,9 @@ fun ConnectedAppsTabScreen(
         modifier = Modifier
             .fillMaxSize()
             .testTag("connected_apps_tab_screen"),
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
             TabIntroHeader(
@@ -101,26 +101,26 @@ fun ConnectedAppsTabScreen(
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 20.dp, vertical = 14.dp),
+                                .padding(horizontal = 16.dp, vertical = 10.dp),
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Box(
                                     modifier = Modifier
-                                        .size(40.dp)
+                                        .size(34.dp)
                                         .clip(CircleShape)
                                         .background(MaterialTheme.colorScheme.primaryContainer),
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     Text(
                                         text = grant.name.take(1).uppercase(),
-                                        style = MaterialTheme.typography.titleMedium,
+                                        style = MaterialTheme.typography.titleSmall,
                                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                                         fontWeight = FontWeight.SemiBold,
                                     )
                                 }
-                                Spacer(modifier = Modifier.width(14.dp))
+                                Spacer(modifier = Modifier.width(12.dp))
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(grant.name, style = MaterialTheme.typography.titleMedium)
+                                    Text(grant.name, style = MaterialTheme.typography.titleSmall)
                                     grant.grantedAt?.let {
                                         Text(
                                             text = "Granted $it",

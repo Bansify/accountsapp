@@ -1,8 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item
-        android:width="66dp"
-        android:height="66dp"
-        android:drawable="@drawable/img_launcher_accounts"
-        android:gravity="center" />
-</layer-list>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 24x24 grid scaled by 2.7 into centered 54x54 safe region [27..81] -->
+    <group
+        android:translateX="21.6"
+        android:translateY="21.6"
+        android:scaleX="2.7"
+        android:scaleY="2.7">
+        <!-- Outer circle ring (r=8..10) + bottom shoulder dome (nonZero safe CW/CCW winding) -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M12,2C17.52,2 22,6.48 22,12C22,17.52 17.52,22 12,22C6.48,22 2,17.52 2,12C2,6.48 6.48,2 12,2ZM18.147,17.12A8,8 0 1 0 5.853,17.12C7.55,15.8 9.68,15 12,15C14.32,15 16.45,15.8 18.147,17.12Z" />
+        <!-- Inner head circle (cx=12, cy=9.5, r=3.5) -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M12,6C13.93,6 15.5,7.57 15.5,9.5C15.5,11.43 13.93,13 12,13C10.07,13 8.5,11.43 8.5,9.5C8.5,7.57 10.07,6 12,6Z" />
+    </group>
+</vector>
