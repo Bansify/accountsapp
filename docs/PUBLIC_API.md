@@ -59,9 +59,22 @@ val lastDisconnect by GothwadAccounts.lastDisconnectOutcome.collectAsStateWithLi
 ## 3. Lifecycle & first-party mobile management actions (`core`)
 
 ```kotlin
+// Direct native authentication (zero browser required):
+GothwadAccounts.checkIdentifier(identifier)
+GothwadAccounts.checkUsername(username)
+GothwadAccounts.signInNative(identifier, password)        // Returns Authenticated or MfaRequired
+GothwadAccounts.verifyNativeMfa(challenge, code)
+GothwadAccounts.signUpNative(input)
+GothwadAccounts.forgotPasswordNative(username)
+GothwadAccounts.resetPasswordNative(token, newPassword)
+
+// Zero-browser cross-app silent peer SSO (`issue_peer_code` + PKCE /oauth/token):
+GothwadAccounts.signInSilentlyWithPeer(peer)
+
+// Secondary Chrome Custom Tabs OAuth 2.0 + S256 PKCE browser fallback:
+GothwadAccounts.signInWithBrowser(activity, chooseAccount = true, loginHint = peer.email ?: peer.username)
 GothwadAccounts.signIn(activity)
-GothwadAccounts.signIn(activity, chooseAccount = true)
-GothwadAccounts.signIn(activity, loginHint = peer.email ?: peer.username)
+
 GothwadAccounts.switchTo(userId)
 GothwadAccounts.signOut(userId, revokeOnServer = false)      // Local installation sign-out only (default)
 GothwadAccounts.disconnectFromServer(userId)                 // Explicit POST /oauth/revoke + local clear -> DisconnectOutcome
@@ -75,11 +88,25 @@ GothwadAccounts.installedVerifiedPeers()
 
 // First-party `gothwad-accounts-android` management APIs (`account.read` / `account.profile.write`):
 GothwadAccounts.listWebSessions()
+GothwadAccounts.revokeWebSession(sessionId)
 GothwadAccounts.revokeOtherWebSessions()
 GothwadAccounts.listActivity()
 GothwadAccounts.listAuthorizations()
 GothwadAccounts.revokeAuthorization(appId)
 GothwadAccounts.updateBasicProfile(firstName, lastName, dateOfBirth, gender)
+GothwadAccounts.uploadAvatar(imageDataOrBase64, mime = "image/jpeg")
+GothwadAccounts.removeAvatar()
+GothwadAccounts.updatePhoneNumber(phoneNumber, currentPassword, mfaCode = null)
+GothwadAccounts.requestRecoveryEmailChange(recoveryEmail, currentPassword, mfaCode = null)
+GothwadAccounts.verifyRecoveryEmailChange(token)
+GothwadAccounts.changePassword(currentPassword, newPassword, mfaCode = null)
+GothwadAccounts.getMfaStatus()
+GothwadAccounts.beginMfaEnrollment(currentPassword)
+GothwadAccounts.confirmMfaEnrollment(currentPassword, enrollmentId, code)
+GothwadAccounts.regenerateMfaRecoveryCodes(currentPassword, code)
+GothwadAccounts.disableMfa(currentPassword, code)
+GothwadAccounts.exportAccountDataJson()
+GothwadAccounts.deleteAccount(password, mfaCode = null)
 GothwadAccounts.fetchTrustedApps(pinnedPublicKey, expectedKeyId)
 ```
 

@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.Devices
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Fingerprint
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Logout
@@ -25,6 +26,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -50,8 +52,13 @@ fun SecurityTabScreen(
     localAccounts: List<GothwadAccount>,
     installedVerifiedPeers: List<String>,
     canManageNatively: Boolean = false,
+    canWriteNatively: Boolean = canManageNatively,
     webSessions: List<WebSessionInfo> = emptyList(),
     activityFeed: List<AccountActivityEntry> = emptyList(),
+    onEditPasswordClick: () -> Unit = {},
+    onManageTwoFactorClick: () -> Unit = {},
+    onEditRecoveryEmailClick: () -> Unit = {},
+    onRevokeWebSession: (String) -> Unit = {},
     onRevokeOtherWebSessions: () -> Unit = {},
     onManageSecurityOnWeb: () -> Unit,
     onRequestSignOutOrRemove: (GothwadAccount) -> Unit,
@@ -71,11 +78,15 @@ fun SecurityTabScreen(
             )
         }
 
-        // How you sign in (exact parity with /me#security)
+        // How you sign in
         item {
             AccountSectionCard(
                 title = "How you sign in to Gothwad",
-                subtitle = "Credentials stay in your browser session on accounts.gothwadtech.com and are never stored in native apps.",
+                subtitle = if (canManageNatively && canWriteNatively) {
+                    "Manage password, 2-Step Verification, and recovery email directly in this app."
+                } else {
+                    "Manage sign-in credentials on accounts.gothwadtech.com."
+                },
             ) {
                 AccountSettingRow(
                     label = "Password",
@@ -85,13 +96,13 @@ fun SecurityTabScreen(
                         null -> "Add or update password"
                     },
                     supportingText = account.passwordChangedAt?.let { "Last changed $it" }
-                        ?: "Protected with PBKDF2-SHA256 / server session",
+                        ?: "Protected with PBKDF2-SHA256",
                     icon = Icons.Rounded.Password,
                     statusBadge = account.hasPassword?.let { set ->
                         { StatusPill(if (set) "Set" else "Not set", if (set) StatusTone.VERIFIED else StatusTone.WARNING) }
                     },
-                    trailingIcon = Icons.AutoMirrored.Rounded.OpenInNew,
-                    onClick = onManageSecurityOnWeb,
+                    trailingIcon = if (canManageNatively && canWriteNatively) Icons.Rounded.Edit else Icons.AutoMirrored.Rounded.OpenInNew,
+                    onClick = if (canManageNatively && canWriteNatively) onEditPasswordClick else onManageSecurityOnWeb,
                 )
                 SectionDivider()
                 AccountSettingRow(
@@ -101,13 +112,17 @@ fun SecurityTabScreen(
                         false -> "Not enabled yet"
                         null -> "Authenticator app (TOTP) & backup codes"
                     },
-                    supportingText = "Configure or manage TOTP recovery codes on Accounts web",
+                    supportingText = if (canManageNatively && canWriteNatively) {
+                        "Set up, regenerate backup codes, or disable authenticator verification"
+                    } else {
+                        "Configure or manage TOTP recovery codes on Accounts web"
+                    },
                     icon = Icons.Rounded.PhonelinkLock,
                     statusBadge = account.mfaEnabled?.let { enabled ->
                         { StatusPill(if (enabled) "On" else "Off", if (enabled) StatusTone.VERIFIED else StatusTone.WARNING) }
                     },
-                    trailingIcon = Icons.AutoMirrored.Rounded.OpenInNew,
-                    onClick = onManageSecurityOnWeb,
+                    trailingIcon = if (canManageNatively && canWriteNatively) Icons.Rounded.Edit else Icons.AutoMirrored.Rounded.OpenInNew,
+                    onClick = if (canManageNatively && canWriteNatively) onManageTwoFactorClick else onManageSecurityOnWeb,
                 )
                 SectionDivider()
                 AccountSettingRow(
@@ -115,7 +130,7 @@ fun SecurityTabScreen(
                     value = account.passkeyCount?.let { count ->
                         if (count > 0) "$count passkey(s) enrolled" else "No passkeys enrolled"
                     } ?: "Biometric & hardware security keys (WebAuthn)",
-                    supportingText = "Enroll or remove passkeys for passwordless login",
+                    supportingText = "Enroll or remove browser WebAuthn passkeys on Accounts web",
                     icon = Icons.Rounded.Fingerprint,
                     statusBadge = account.passkeyCount?.let { count ->
                         { StatusPill("$count", if (count > 0) StatusTone.VERIFIED else StatusTone.NEUTRAL) }
@@ -126,58 +141,72 @@ fun SecurityTabScreen(
                 SectionDivider()
                 AccountSettingRow(
                     label = "Recovery email",
-                    value = account.recoveryEmail?.takeIf { it.isNotBlank() } ?: "Manage verified backup email",
+                    value = account.recoveryEmail?.takeIf { it.isNotBlank() } ?: "Not set",
                     icon = Icons.Rounded.MarkEmailRead,
                     statusBadge = account.recoveryEmailVerified?.let { verified ->
                         { StatusPill(if (verified) "Verified" else "Unverified", if (verified) StatusTone.VERIFIED else StatusTone.WARNING) }
                     },
-                    trailingIcon = Icons.AutoMirrored.Rounded.OpenInNew,
-                    onClick = onManageSecurityOnWeb,
+                    trailingIcon = if (canManageNatively && canWriteNatively) Icons.Rounded.Edit else Icons.AutoMirrored.Rounded.OpenInNew,
+                    onClick = if (canManageNatively && canWriteNatively) onEditRecoveryEmailClick else onManageSecurityOnWeb,
                 )
             }
         }
 
-        // Devices & sessions (separating browser sessions vs this app vs this device)
+        // Devices & sessions
         item {
             AccountSectionCard(
                 title = "Your devices & sessions",
                 subtitle = "Each Gothwad app holds its own hardware-backed OAuth tokens on this phone.",
             ) {
                 AccountSettingRow(
-                    label = "Web & browser sessions",
+                    label = "Active account sessions",
                     value = when {
-                        webSessions.isNotEmpty() -> "${webSessions.size} active web session(s)"
-                        account.activeSessionsCount != null -> "${account.activeSessionsCount} active web session(s)"
-                        else -> "Review active sessions & sign out other browsers"
+                        webSessions.isNotEmpty() -> "${webSessions.size} active session(s)"
+                        account.activeSessionsCount != null -> "${account.activeSessionsCount} active session(s)"
+                        else -> "No active web sessions found"
                     },
-                    supportingText = "Opens Security & devices on accounts.gothwadtech.com",
+                    supportingText = if (canManageNatively) {
+                        "Sign out individual sessions below or clear all other sessions"
+                    } else {
+                        "Opens Security & devices on accounts.gothwadtech.com"
+                    },
                     icon = Icons.Rounded.Devices,
-                    trailingIcon = Icons.AutoMirrored.Rounded.OpenInNew,
-                    onClick = onManageSecurityOnWeb,
+                    trailingIcon = if (canManageNatively) null else Icons.AutoMirrored.Rounded.OpenInNew,
+                    onClick = if (canManageNatively) null else onManageSecurityOnWeb,
                 )
                 if (canManageNatively && webSessions.isNotEmpty()) {
-                    webSessions.take(5).forEach { ws ->
+                    webSessions.take(8).forEach { ws ->
                         SectionDivider()
                         val label = listOfNotNull(ws.browser, ws.os).joinToString(" · ")
                             .ifBlank { ws.deviceName ?: "Browser session" }
                         AccountSettingRow(
-                            label = if (ws.current) "Current browser session" else "Web session",
+                            label = if (ws.current) "Current session" else "Other session",
                             value = label,
                             supportingText = listOfNotNull(ws.ipAddress, ws.lastActive).joinToString(" · "),
                             icon = Icons.Rounded.Devices,
+                            trailingIcon = null,
                             statusBadge = if (ws.current) {
                                 { StatusPill("Current", StatusTone.VERIFIED) }
+                            } else if (canWriteNatively) {
+                                {
+                                    TextButton(
+                                        onClick = { onRevokeWebSession(ws.id) },
+                                        modifier = Modifier.testTag("revoke_session_${ws.id}"),
+                                    ) {
+                                        Text("Sign out", color = MaterialTheme.colorScheme.error)
+                                    }
+                                }
                             } else null,
                         )
                     }
-                    if (webSessions.count { !it.current } > 0 || webSessions.size > 1) {
+                    if (canWriteNatively && (webSessions.count { !it.current } > 0 || webSessions.size > 1)) {
                         Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)) {
                             OutlinedButton(
                                 onClick = onRevokeOtherWebSessions,
                                 shape = RoundedCornerShape(50),
                                 modifier = Modifier.fillMaxWidth(),
                             ) {
-                                Text("Sign out all other web sessions")
+                                Text("Sign out all other sessions")
                             }
                         }
                     }
@@ -196,6 +225,7 @@ fun SecurityTabScreen(
                         installedVerifiedPeers.joinToString(", ")
                     },
                     icon = Icons.Rounded.Smartphone,
+                    trailingIcon = null,
                     statusBadge = {
                         StatusPill(
                             label = "${localAccounts.size} local",
@@ -234,13 +264,14 @@ fun SecurityTabScreen(
         item {
             AccountSectionCard(title = "Activity & app permissions") {
                 if (canManageNatively && activityFeed.isNotEmpty()) {
-                    activityFeed.take(5).forEachIndexed { idx, entry ->
+                    activityFeed.take(8).forEachIndexed { idx, entry ->
                         if (idx > 0) SectionDivider()
                         AccountSettingRow(
                             label = entry.title,
                             value = entry.detail ?: entry.type,
                             supportingText = listOfNotNull(entry.ipAddress, entry.createdAt).joinToString(" · "),
                             icon = Icons.Rounded.History,
+                            trailingIcon = null,
                         )
                     }
                     SectionDivider()

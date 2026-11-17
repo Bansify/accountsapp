@@ -12,13 +12,15 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 /**
- * Distributed, mutually certificate-verified cross-app directory provider.
+ * Distributed, mutually certificate-verified cross-app directory and zero-browser PKCE code
+ * issuer provider.
  *
  * Security properties:
  * - Captures `Binder.getCallingUid()` synchronously before any work or storage access.
  * - Rejects ALL queries immediately when [BrokerPolicy.Disabled] is configured.
  * - Verifies all packages sharing the calling UID against [BrokerTrustPolicy] before reading state.
- * - Never holds or returns OAuth access tokens or refresh tokens; exposes identity metadata only.
+ * - Never returns raw OAuth access tokens or refresh tokens across IPC; exposes only public
+ *   identity metadata or short-lived PKCE authorization codes bound to the target first-party client.
  */
 class AccountDirectoryProvider : ContentProvider() {
 
@@ -31,15 +33,70 @@ class AccountDirectoryProvider : ContentProvider() {
         val callingUid = Binder.getCallingUid()
         val ctx = context ?: throw SecurityException("Provider context unavailable")
 
-        val policy = GothwadAccounts.currentBrokerPolicy() as? BrokerPolicy.PeerDiscovery
+        if (arg != null && arg.toByteArray().size > BrokerIpcContract.MAX_ARG_BYTES) {
+            throw IllegalArgumentException("IPC argument exceeds bounds")
+        }
+
+        val brokerPolicy = GothwadAccounts.currentBrokerPolicy()
+
+        if (method == BrokerIpcContract.METHOD_ISSUE_PEER_CODE) {
+            val peerPolicy = brokerPolicy as? BrokerPolicy.PeerDiscovery
+            if (peerPolicy == null || !TrustVerifier.isTrustedUid(ctx, callingUid, peerPolicy.trustPolicy)) {
+                return Bundle().apply {
+                    putBoolean(BrokerIpcContract.KEY_OK, false)
+                    putString(BrokerIpcContract.KEY_ERROR, "untrusted_caller")
+                }
+            }
+            val userId = extras?.getString(BrokerIpcContract.KEY_USER_ID)?.trim().orEmpty()
+            val username = extras?.getString(BrokerIpcContract.KEY_USERNAME)?.trim().orEmpty()
+            val email = extras?.getString(BrokerIpcContract.KEY_EMAIL)?.trim().orEmpty()
+            val targetClientId = extras?.getString(BrokerIpcContract.KEY_TARGET_CLIENT_ID)?.trim().orEmpty()
+            val redirectUri = extras?.getString(BrokerIpcContract.KEY_REDIRECT_URI)?.trim().orEmpty()
+            val scope = extras?.getString(BrokerIpcContract.KEY_SCOPE)?.trim().orEmpty()
+            val codeChallenge = extras?.getString(BrokerIpcContract.KEY_CODE_CHALLENGE)?.trim().orEmpty()
+            val codeChallengeMethod = extras?.getString(BrokerIpcContract.KEY_CODE_CHALLENGE_METHOD)?.trim().orEmpty()
+                .ifBlank { "S256" }
+
+            if (targetClientId.isBlank() || redirectUri.isBlank() || codeChallenge.isBlank()) {
+                return Bundle().apply {
+                    putBoolean(BrokerIpcContract.KEY_OK, false)
+                    putString(BrokerIpcContract.KEY_ERROR, "invalid_request")
+                }
+            }
+
+            val result = GothwadAccounts.issuePeerCodeForCallerBlocking(
+                userId = userId.ifBlank { null },
+                username = username.ifBlank { null },
+                email = email.ifBlank { null },
+                targetClientId = targetClientId,
+                redirectUri = redirectUri,
+                scope = scope,
+                codeChallenge = codeChallenge,
+                codeChallengeMethod = codeChallengeMethod,
+            )
+            return result.fold(
+                onSuccess = { peerCode ->
+                    Bundle().apply {
+                        putBoolean(BrokerIpcContract.KEY_OK, true)
+                        putString(BrokerIpcContract.KEY_CODE, peerCode.code)
+                        putString(BrokerIpcContract.KEY_REDIRECT_URI, peerCode.redirectUri)
+                        putString(BrokerIpcContract.KEY_SCOPE, peerCode.scope)
+                    }
+                },
+                onFailure = { err ->
+                    Bundle().apply {
+                        putBoolean(BrokerIpcContract.KEY_OK, false)
+                        putString(BrokerIpcContract.KEY_ERROR, err.message ?: "peer_code_failed")
+                    }
+                },
+            )
+        }
+
+        val policy = brokerPolicy as? BrokerPolicy.PeerDiscovery
             ?: throw SecurityException("Gothwad peer broker is disabled")
 
         val verified = TrustVerifier.verifyBinderCaller(ctx, callingUid, policy.trustPolicy)
             ?: throw SecurityException("Untrusted caller UID: $callingUid")
-
-        if (arg != null && arg.toByteArray().size > BrokerIpcContract.MAX_ARG_BYTES) {
-            throw IllegalArgumentException("IPC argument exceeds bounds")
-        }
 
         return when (method) {
             BrokerIpcContract.METHOD_LIST_ACCOUNTS -> {

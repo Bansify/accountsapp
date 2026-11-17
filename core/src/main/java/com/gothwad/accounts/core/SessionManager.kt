@@ -104,6 +104,80 @@ internal class SessionManager(
         return account
     }
 
+    suspend fun completeNativeAuth(auth: MobileAuthSignInOutcome.Authenticated): GothwadAccount {
+        val epoch = mutex.withLock {
+            check(!corrupted) { "Account storage is corrupted" }
+            generation++
+            generation
+        }
+        val account = runCatching { oauth.userInfo(auth.accessToken) }
+            .getOrElse {
+                auth.user?.toGothwadAccount()
+                    ?: throw IOException("Could not load authenticated account profile", it)
+            }
+        persistAuthenticatedSession(
+            account = account,
+            accessToken = auth.accessToken,
+            refreshToken = auth.refreshToken,
+            expiresInSeconds = auth.expiresIn,
+            expectedEpoch = epoch,
+        )
+        return account
+    }
+
+    suspend fun completePeerCodeExchange(code: String, verifier: String): GothwadAccount {
+        val epoch = mutex.withLock {
+            check(!corrupted) { "Account storage is corrupted" }
+            generation++
+            generation
+        }
+        val tokens = oauth.exchange(code, verifier)
+        val account = oauth.userInfo(tokens.accessToken)
+        persistAuthenticatedSession(
+            account = account,
+            accessToken = tokens.accessToken,
+            refreshToken = tokens.refreshToken,
+            expiresInSeconds = tokens.expiresIn,
+            expectedEpoch = epoch,
+        )
+        return account
+    }
+
+    private suspend fun persistAuthenticatedSession(
+        account: GothwadAccount,
+        accessToken: String,
+        refreshToken: String?,
+        expiresInSeconds: Long,
+        expectedEpoch: Long,
+    ) = mutex.withLock {
+        if (generation != expectedEpoch) throw IOException("Login superseded")
+        val now = clock()
+        val previous = data.credentials.find { it.account.userId == account.userId }
+        val addedAt = previous?.addedAt?.takeIf { it > 0L } ?: now
+        val credential = Credential(
+            account = account,
+            accessToken = accessToken,
+            refreshToken = refreshToken,
+            expiresAt = now + expiresInSeconds * 1000,
+            addedAt = addedAt,
+            lastSeenAt = now,
+        )
+        val nextTombstones = data.deviceRemovalTombstones.toMutableMap().apply {
+            val existingTombstone = this[account.userId]
+            if (existingTombstone != null && now > existingTombstone) {
+                remove(account.userId)
+            }
+        }
+        save(
+            data.copy(
+                credentials = data.credentials.filterNot { it.account.userId == account.userId } + credential,
+                activeUserId = account.userId,
+                pending = null,
+                deviceRemovalTombstones = nextTombstones,
+            ),
+        )
+    }
+
     suspend fun switchTo(userId: String) = mutex.withLock {
         check(!corrupted) { "Account storage is corrupted" }
         require(data.credentials.any { it.account.userId == userId })
@@ -242,8 +316,43 @@ internal class SessionManager(
         }
     }
 
+    suspend fun activeUserId(): String? = mutex.withLock {
+        if (corrupted) null else data.activeUserId
+    }
+
     suspend fun accessToken(): String? {
         val userId = mutex.withLock { data.activeUserId } ?: return null
+        return accessTokenForResolvedUserId(userId, requireActive = true)
+    }
+
+    /**
+     * Resolves a local credential matching [userId], [username], or [email] (or active user if all blank)
+     * and returns `(resolvedUserId, validAccessToken)`, silently refreshing via [oauth.refresh] when needed.
+     */
+    suspend fun accessTokenForUser(
+        userId: String? = null,
+        username: String? = null,
+        email: String? = null,
+    ): Pair<String, String>? {
+        val resolvedUserId = mutex.withLock {
+            if (corrupted) return@withLock null
+            val wantedId = userId?.trim().orEmpty()
+            val wantedUsername = username?.trim()?.lowercase().orEmpty()
+            val wantedEmail = email?.trim()?.lowercase().orEmpty()
+            val matched = when {
+                wantedId.isNotEmpty() -> data.credentials.find { it.account.userId == wantedId }
+                wantedUsername.isNotEmpty() -> data.credentials.find { it.account.username?.lowercase() == wantedUsername }
+                wantedEmail.isNotEmpty() -> data.credentials.find { it.account.email?.lowercase() == wantedEmail }
+                else -> data.credentials.find { it.account.userId == data.activeUserId } ?: data.credentials.firstOrNull()
+            }
+            matched?.account?.userId
+        } ?: return null
+
+        val token = accessTokenForResolvedUserId(resolvedUserId, requireActive = false) ?: return null
+        return resolvedUserId to token
+    }
+
+    private suspend fun accessTokenForResolvedUserId(userId: String, requireActive: Boolean): String? {
         return refreshLocks.getOrPut(userId) { Mutex() }.withLock {
             val original = mutex.withLock { data.credentials.find { it.account.userId == userId } } ?: return@withLock null
             if (original.expiresAt - clock() > 60_000) return@withLock original.accessToken
@@ -271,7 +380,7 @@ internal class SessionManager(
                     expiresAt = clock() + tokens.expiresIn * 1000,
                 )
                 save(data.copy(credentials = data.credentials.map { if (it.account.userId == userId) rotated else it }))
-                if (data.activeUserId == userId) rotated.accessToken else null
+                if (!requireActive || data.activeUserId == userId) rotated.accessToken else null
             }
         }
     }

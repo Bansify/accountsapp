@@ -52,10 +52,108 @@ data class TrustedAppsManifest(
     val jws: String? = null,
 )
 
+@Serializable
+data class IdentifierCheckResult(
+    val exists: Boolean,
+    val kind: String? = null,
+    val error: String? = null,
+    val isThirdParty: Boolean = false,
+)
+
+@Serializable
+data class UsernameCheckResult(
+    val available: Boolean,
+    val valid: Boolean,
+    val username: String? = null,
+    val email: String? = null,
+    val error: String? = null,
+)
+
+@Serializable
+data class MobileAuthUser(
+    val id: String,
+    val username: String? = null,
+    val email: String? = null,
+    @SerialName("first_name") val firstName: String? = null,
+    @SerialName("last_name") val lastName: String? = null,
+    @SerialName("avatar_url") val avatarUrl: String? = null,
+) {
+    fun toGothwadAccount(): GothwadAccount {
+        val fullName = listOfNotNull(
+            firstName?.trim()?.takeIf { it.isNotEmpty() },
+            lastName?.trim()?.takeIf { it.isNotEmpty() },
+        ).joinToString(" ").takeIf { it.isNotEmpty() }
+        return GothwadAccount(
+            userId = id,
+            username = username,
+            name = fullName,
+            firstName = firstName,
+            lastName = lastName,
+            email = email,
+            avatarUrl = avatarUrl,
+        )
+    }
+}
+
+sealed interface MobileAuthSignInOutcome {
+    data class Authenticated(
+        val accessToken: String,
+        val refreshToken: String?,
+        val expiresIn: Long,
+        val scope: String,
+        val clientId: String,
+        val sessionId: String,
+        val user: MobileAuthUser? = null,
+    ) : MobileAuthSignInOutcome
+
+    data class MfaRequired(
+        val challenge: String,
+        val expiresIn: Long,
+        val message: String,
+    ) : MobileAuthSignInOutcome
+}
+
+data class NativeSignUpInput(
+    val firstName: String,
+    val lastName: String,
+    val username: String,
+    val password: String,
+    val recoveryEmail: String,
+    val phoneNumber: String = "",
+    val dateOfBirth: String = "",
+    val gender: String = "",
+)
+
+@Serializable
+data class PeerAuthCodeResult(
+    val code: String,
+    @SerialName("client_id") val clientId: String,
+    @SerialName("redirect_uri") val redirectUri: String,
+    val scope: String,
+    @SerialName("expires_in") val expiresIn: Long = 180L,
+)
+
+@Serializable
+data class MfaStatusInfo(
+    val enabled: Boolean,
+    @SerialName("enrollment_available") val enrollmentAvailable: Boolean = true,
+    @SerialName("recovery_codes_remaining") val recoveryCodesRemaining: Int = 0,
+)
+
+@Serializable
+data class MfaEnrollmentSetup(
+    @SerialName("enrollment_id") val enrollmentId: String,
+    val secret: String,
+    @SerialName("otpauth_uri") val otpauthUri: String,
+)
+
 object ProfileValidation {
     val ALLOWED_GENDERS: List<String> = listOf("Male", "Female", "Other", "Rather not say")
     private val CONTROL_OR_ANGLE = Regex("[\\u0000-\\u001f\\u007f<>]")
     private val DATE_FORMAT = Regex("^\\d{4}-\\d{2}-\\d{2}$")
+    private val USERNAME_FORMAT = Regex("^[a-zA-Z0-9]{3,24}$")
+    private val PHONE_FORMAT = Regex("^\\+?[0-9 ()-]{7,24}$")
+    private val EMAIL_FORMAT = Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")
 
     fun isValidFirstName(value: String): Boolean {
         val trimmed = value.trim()
@@ -65,6 +163,22 @@ object ProfileValidation {
     fun isValidLastName(value: String): Boolean {
         val trimmed = value.trim()
         return trimmed.length <= 100 && !CONTROL_OR_ANGLE.containsMatchIn(trimmed)
+    }
+
+    fun isValidUsername(value: String): Boolean =
+        USERNAME_FORMAT.matches(value.trim())
+
+    fun isValidPassword(value: String): Boolean =
+        value.length in 8..128
+
+    fun isValidEmail(value: String): Boolean {
+        val trimmed = value.trim()
+        return trimmed.length <= 254 && EMAIL_FORMAT.matches(trimmed)
+    }
+
+    fun isValidPhoneNumber(value: String): Boolean {
+        val trimmed = value.trim()
+        return trimmed.isEmpty() || (trimmed.length <= 32 && PHONE_FORMAT.matches(trimmed))
     }
 
     fun isValidDateOfBirth(value: String, todayIso: String): Boolean {

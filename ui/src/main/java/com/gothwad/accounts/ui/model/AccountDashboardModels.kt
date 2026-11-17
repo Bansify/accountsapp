@@ -8,6 +8,8 @@ import com.gothwad.accounts.core.AuthFailure
 import com.gothwad.accounts.core.ConnectedAppGrant
 import com.gothwad.accounts.core.DiscoveredAccount
 import com.gothwad.accounts.core.GothwadAccount
+import com.gothwad.accounts.core.MfaEnrollmentSetup
+import com.gothwad.accounts.core.MfaStatusInfo
 import com.gothwad.accounts.core.WebSessionInfo
 import com.gothwad.accounts.ui.R
 
@@ -27,6 +29,40 @@ enum class AccountTab(
 sealed interface AccountSubScreen {
     data object SearchAccount : AccountSubScreen
     data object HelpLegal : AccountSubScreen
+}
+
+enum class NativeAuthStep {
+    IDENTIFIER,
+    PASSWORD,
+    MFA,
+    SIGN_UP,
+    FORGOT_PASSWORD,
+    RESET_PASSWORD,
+}
+
+@Immutable
+data class NativeAuthDialogState(
+    val visible: Boolean = false,
+    val step: NativeAuthStep = NativeAuthStep.IDENTIFIER,
+    val identifier: String = "",
+    val mfaChallenge: String = "",
+    val mfaPrompt: String = "",
+    val usernameAvailable: Boolean? = null,
+    val usernameStatusMessage: String? = null,
+    val isBusy: Boolean = false,
+    val errorMessage: String? = null,
+    val infoMessage: String? = null,
+)
+
+sealed interface ActiveManagementDialog {
+    data object EditBasicProfile : ActiveManagementDialog
+    data object Avatar : ActiveManagementDialog
+    data object Phone : ActiveManagementDialog
+    data object RecoveryEmail : ActiveManagementDialog
+    data object Password : ActiveManagementDialog
+    data object TwoFactor : ActiveManagementDialog
+    data object DeleteAccount : ActiveManagementDialog
+    data class ExportData(val jsonContent: String) : ActiveManagementDialog
 }
 
 @Immutable
@@ -62,6 +98,7 @@ data class AccountDashboardUiState(
     val accountState: AccountState = AccountState.Initializing,
     val discoveredAccounts: List<DiscoveredAccount> = emptyList(),
     val isRefreshing: Boolean = false,
+    val isPeerSilentSigningIn: Boolean = false,
     val authError: AuthFailure? = null,
     val installedVerifiedPeers: List<String> = emptyList(),
     val selectedTab: AccountTab = AccountTab.HOME,
@@ -75,9 +112,21 @@ data class AccountDashboardUiState(
     val webSessions: List<WebSessionInfo> = emptyList(),
     val activityFeed: List<AccountActivityEntry> = emptyList(),
     val authorizations: List<ConnectedAppGrant> = emptyList(),
-    val showEditProfileDialog: Boolean = false,
     val isSavingProfile: Boolean = false,
+    val nativeAuth: NativeAuthDialogState = NativeAuthDialogState(),
+    val activeManagementDialog: ActiveManagementDialog? = null,
+    val isManagementBusy: Boolean = false,
+    val managementError: String? = null,
+    val managementRequiresMfaPrompt: Boolean = false,
+    val recoveryEmailPendingVerification: Boolean = false,
+    val mfaStatus: MfaStatusInfo? = null,
+    val mfaSetup: MfaEnrollmentSetup? = null,
+    val mfaRecoveryCodes: List<String> = emptyList(),
+    val isExportingData: Boolean = false,
 ) {
+    val showEditProfileDialog: Boolean
+        get() = activeManagementDialog is ActiveManagementDialog.EditBasicProfile
+
     val activeAccount: GothwadAccount?
         get() = (accountState as? AccountState.SignedIn)?.account
 

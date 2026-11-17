@@ -9,6 +9,7 @@ import androidx.browser.customtabs.CustomTabsIntent
 import com.gothwad.accounts.core.broker.AndroidPeerDirectoryTransport
 import com.gothwad.accounts.core.broker.DirectorySnapshot
 import com.gothwad.accounts.core.broker.PeerBrokerClient
+import com.gothwad.accounts.core.broker.PeerDirectoryTransport
 import java.io.IOException
 import java.security.PublicKey
 import kotlinx.coroutines.CancellationException
@@ -34,6 +35,8 @@ object GothwadAccounts {
     private lateinit var peerBroker: PeerBrokerClient
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var ready: kotlinx.coroutines.Deferred<Unit>? = null
+    @Volatile
+    private var locallySignedOutInProcess = false
 
     private val mutableError = MutableStateFlow<AuthFailure?>(null)
     val error: StateFlow<AuthFailure?> = mutableError.asStateFlow()
@@ -61,14 +64,17 @@ object GothwadAccounts {
         store: TokenStore,
         oauth: OAuthService = OAuthClient(config),
         mobile: MobileAccountClient = MobileAccountClient(config),
+        transport: PeerDirectoryTransport = AndroidPeerDirectoryTransport(application),
     ) {
         ready = null
-        initInternal(application, config, store, oauth, mobile)
+        locallySignedOutInProcess = false
+        initInternal(application, config, store, oauth, mobile, transport)
     }
 
     @Synchronized
     internal fun resetForTesting() {
         ready = null
+        locallySignedOutInProcess = false
         mutableError.value = null
         mutableDiscoveredAccounts.value = emptyList()
         mutableIsRefreshing.value = false
@@ -81,6 +87,7 @@ object GothwadAccounts {
         store: TokenStore,
         oauth: OAuthService = OAuthClient(config),
         mobile: MobileAccountClient = MobileAccountClient(config),
+        transport: PeerDirectoryTransport = AndroidPeerDirectoryTransport(application),
     ) {
         if (ready != null) {
             require(this.config == config) { "GothwadAccounts.init called twice with different GothwadConfig" }
@@ -95,12 +102,22 @@ object GothwadAccounts {
         )
         this.peerBroker = PeerBrokerClient(
             localPackage = application.packageName,
-            transport = AndroidPeerDirectoryTransport(application),
+            transport = transport,
         )
         ready = scope.async {
             try {
                 session.load()
                 syncDiscoveredAccountsInternal()
+                if (
+                    session.currentLocalAccounts().isEmpty() &&
+                    !locallySignedOutInProcess &&
+                    config.brokerPolicy is BrokerPolicy.PeerDiscovery
+                ) {
+                    val peer = mutableDiscoveredAccounts.value.firstOrNull { !it.isAuthorizedLocally }
+                    if (peer != null) {
+                        runCatching { signInSilentlyWithPeerInternal(peer) }
+                    }
+                }
             } catch (error: Exception) {
                 mutableError.value = AuthFailure.StorageUnavailable
                 throw error
@@ -146,6 +163,13 @@ object GothwadAccounts {
         mutableLastDisconnectOutcome.value = null
     }
 
+    /** Secondary Browser / Chrome Custom Tabs OAuth 2.0 + S256 PKCE sign-in fallback. */
+    fun signInWithBrowser(
+        activity: Activity,
+        chooseAccount: Boolean = false,
+        loginHint: String? = null,
+    ) = signIn(activity, chooseAccount, loginHint)
+
     fun signIn(
         activity: Activity,
         chooseAccount: Boolean = false,
@@ -178,6 +202,111 @@ object GothwadAccounts {
         }
     }
 
+    // -------------------------------------------------------------------------
+    // Direct Native Authentication (`/api/mobile/auth/*`)
+    // -------------------------------------------------------------------------
+
+    suspend fun checkIdentifier(identifier: String): Result<IdentifierCheckResult> = withContext(Dispatchers.IO) {
+        runCatching {
+            readyOrThrow()
+            mobileClient.checkIdentifier(identifier)
+        }
+    }
+
+    suspend fun checkUsername(username: String): Result<UsernameCheckResult> = withContext(Dispatchers.IO) {
+        runCatching {
+            readyOrThrow()
+            mobileClient.checkUsername(username)
+        }
+    }
+
+    suspend fun signInNative(identifier: String, password: String): Result<MobileAuthSignInOutcome> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                readyOrThrow()
+                val outcome = mobileClient.nativeSignIn(identifier, password)
+                if (outcome is MobileAuthSignInOutcome.Authenticated) {
+                    session.completeNativeAuth(outcome)
+                    locallySignedOutInProcess = false
+                    mutableError.value = null
+                    syncDiscoveredAccountsInternal()
+                }
+                outcome
+            }
+        }
+
+    suspend fun verifyNativeMfa(challenge: String, code: String): Result<GothwadAccount> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                readyOrThrow()
+                val auth = mobileClient.nativeVerifyMfa(challenge, code)
+                val account = session.completeNativeAuth(auth)
+                locallySignedOutInProcess = false
+                mutableError.value = null
+                syncDiscoveredAccountsInternal()
+                account
+            }
+        }
+
+    suspend fun signUpNative(input: NativeSignUpInput): Result<GothwadAccount> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                readyOrThrow()
+                val auth = mobileClient.nativeSignUp(input)
+                val account = session.completeNativeAuth(auth)
+                locallySignedOutInProcess = false
+                mutableError.value = null
+                syncDiscoveredAccountsInternal()
+                account
+            }
+        }
+
+    suspend fun forgotPasswordNative(username: String): Result<String> = withContext(Dispatchers.IO) {
+        runCatching {
+            readyOrThrow()
+            mobileClient.forgotPassword(username)
+        }
+    }
+
+    suspend fun resetPasswordNative(token: String, newPassword: String): Result<String> = withContext(Dispatchers.IO) {
+        runCatching {
+            readyOrThrow()
+            mobileClient.resetPassword(token, newPassword)
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Zero-Browser Cross-App Silent Peer SSO (`POST /api/mobile/auth/peer-code`)
+    // -------------------------------------------------------------------------
+
+    suspend fun signInSilentlyWithPeer(peer: DiscoveredAccount): Result<GothwadAccount> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                readyOrThrow()
+                signInSilentlyWithPeerInternal(peer)
+            }
+        }
+
+    private suspend fun signInSilentlyWithPeerInternal(peer: DiscoveredAccount): GothwadAccount {
+        val verifier = Pkce.random()
+        val challenge = Pkce.challenge(verifier)
+        val scopeString = config.scopes.map { it.wireValue }.sorted().joinToString(" ")
+        val peerCode = peerBroker.requestPeerAuthCode(
+            peer = peer,
+            policy = config.brokerPolicy,
+            targetClientId = config.clientId,
+            redirectUri = config.redirectUri,
+            scope = scopeString,
+            codeChallenge = challenge,
+            codeChallengeMethod = "S256",
+        ).getOrThrow()
+        val account = session.completePeerCodeExchange(peerCode.code, verifier)
+        locallySignedOutInProcess = false
+        mutableError.value = null
+        syncDiscoveredAccountsInternal()
+        return account
+    }
+
     fun switchTo(userId: String) = scope.launch {
         action {
             readyOrThrow()
@@ -194,6 +323,7 @@ object GothwadAccounts {
     fun signOut(userId: String, revokeOnServer: Boolean = false) = scope.launch {
         action {
             readyOrThrow()
+            locallySignedOutInProcess = true
             val outcome = session.signOut(userId, revokeOnServer = revokeOnServer)
             if (revokeOnServer) {
                 mutableLastDisconnectOutcome.value = outcome
@@ -209,6 +339,7 @@ object GothwadAccounts {
      */
     suspend fun disconnectFromServer(userId: String): DisconnectOutcome = withContext(Dispatchers.IO) {
         readyOrThrow()
+        locallySignedOutInProcess = true
         val outcome = session.signOut(userId, revokeOnServer = true)
         mutableLastDisconnectOutcome.value = outcome
         syncDiscoveredAccountsInternal()
@@ -226,6 +357,7 @@ object GothwadAccounts {
     fun removeFromDevice(userId: String, revokeOnServer: Boolean = false) = scope.launch {
         action {
             readyOrThrow()
+            locallySignedOutInProcess = true
             val removedAt = session.removeFromDevice(userId, revokeOnServer = revokeOnServer)
             peerBroker.broadcastDeviceRemoval(userId, removedAt, config.brokerPolicy)
             syncDiscoveredAccountsInternal()
@@ -274,6 +406,13 @@ object GothwadAccounts {
         }
     }
 
+    suspend fun revokeWebSession(sessionId: String): Result<Int> = mobileCall { token ->
+        requireAccountProfileWriteScope()
+        mobileClient.revokeSession(token, sessionId).also {
+            runCatching { session.refreshActiveProfile() }
+        }
+    }
+
     suspend fun listActivity(): Result<List<AccountActivityEntry>> = mobileCall { token ->
         requireAccountReadScope()
         mobileClient.listActivity(token)
@@ -300,6 +439,107 @@ object GothwadAccounts {
         requireAccountProfileWriteScope()
         mobileClient.patchProfile(token, firstName, lastName, dateOfBirth, gender)
         session.refreshActiveProfile()
+    }
+
+    suspend fun uploadAvatar(imageDataOrBase64: String, mime: String = "image/jpeg"): Result<GothwadAccount?> =
+        mobileCall { token ->
+            requireAccountProfileWriteScope()
+            mobileClient.uploadAvatar(token, imageDataOrBase64, mime)
+            session.refreshActiveProfile()
+        }
+
+    suspend fun removeAvatar(): Result<GothwadAccount?> = mobileCall { token ->
+        requireAccountProfileWriteScope()
+        mobileClient.deleteAvatar(token)
+        session.refreshActiveProfile()
+    }
+
+    suspend fun updatePhoneNumber(
+        phoneNumber: String,
+        currentPassword: String,
+        mfaCode: String? = null,
+    ): Result<GothwadAccount?> = mobileCall { token ->
+        requireAccountProfileWriteScope()
+        mobileClient.updatePhoneNumber(token, phoneNumber, currentPassword, mfaCode)
+        session.refreshActiveProfile()
+    }
+
+    suspend fun requestRecoveryEmailChange(
+        recoveryEmail: String,
+        currentPassword: String,
+        mfaCode: String? = null,
+    ): Result<String> = mobileCall { token ->
+        requireAccountProfileWriteScope()
+        mobileClient.requestRecoveryEmailChange(token, recoveryEmail, currentPassword, mfaCode)
+    }
+
+    suspend fun verifyRecoveryEmailChange(token: String): Result<GothwadAccount?> = mobileCall { bearer ->
+        requireAccountProfileWriteScope()
+        mobileClient.verifyRecoveryEmailChange(bearer, token)
+        session.refreshActiveProfile()
+    }
+
+    suspend fun changePassword(
+        currentPassword: String,
+        newPassword: String,
+        mfaCode: String? = null,
+    ): Result<String> = mobileCall { bearer ->
+        requireAccountProfileWriteScope()
+        val message = mobileClient.changePassword(bearer, currentPassword, newPassword, mfaCode)
+        runCatching { session.refreshActiveProfile() }
+        message
+    }
+
+    suspend fun getMfaStatus(): Result<MfaStatusInfo> = mobileCall { bearer ->
+        requireAccountReadScope()
+        mobileClient.getMfaStatus(bearer)
+    }
+
+    suspend fun beginMfaEnrollment(currentPassword: String): Result<MfaEnrollmentSetup> = mobileCall { bearer ->
+        requireAccountProfileWriteScope()
+        mobileClient.beginMfaEnrollment(bearer, currentPassword)
+    }
+
+    suspend fun confirmMfaEnrollment(
+        currentPassword: String,
+        enrollmentId: String,
+        code: String,
+    ): Result<List<String>> = mobileCall { bearer ->
+        requireAccountProfileWriteScope()
+        val codes = mobileClient.confirmMfaEnrollment(bearer, currentPassword, enrollmentId, code)
+        runCatching { session.refreshActiveProfile() }
+        codes
+    }
+
+    suspend fun regenerateMfaRecoveryCodes(currentPassword: String, code: String): Result<List<String>> =
+        mobileCall { bearer ->
+            requireAccountProfileWriteScope()
+            mobileClient.regenerateMfaRecoveryCodes(bearer, currentPassword, code)
+        }
+
+    suspend fun disableMfa(currentPassword: String, code: String): Result<Unit> = mobileCall { bearer ->
+        requireAccountProfileWriteScope()
+        mobileClient.disableMfa(bearer, currentPassword, code)
+        runCatching { session.refreshActiveProfile() }
+        Unit
+    }
+
+    suspend fun exportAccountDataJson(): Result<String> = mobileCall { bearer ->
+        requireAccountReadScope()
+        mobileClient.exportAccountDataJson(bearer)
+    }
+
+    suspend fun deleteAccount(password: String, mfaCode: String? = null): Result<Unit> = mobileCall { bearer ->
+        requireAccountProfileWriteScope()
+        val activeUserId = session.activeUserId()
+        mobileClient.deleteAccount(bearer, password, mfaCode)
+        if (activeUserId != null) {
+            locallySignedOutInProcess = true
+            val removedAt = session.removeFromDevice(activeUserId, revokeOnServer = false)
+            peerBroker.broadcastDeviceRemoval(activeUserId, removedAt, config.brokerPolicy)
+            syncDiscoveredAccountsInternal()
+        }
+        Unit
     }
 
     suspend fun fetchTrustedApps(
@@ -335,12 +575,40 @@ object GothwadAccounts {
         }
     }
 
+    internal fun issuePeerCodeForCallerBlocking(
+        userId: String?,
+        username: String?,
+        email: String?,
+        targetClientId: String,
+        redirectUri: String,
+        scope: String,
+        codeChallenge: String,
+        codeChallengeMethod: String,
+    ): Result<PeerAuthCodeResult> = runBlocking(Dispatchers.IO) {
+        runCatching {
+            withTimeout(15_000L) {
+                readyOrThrow()
+                val (_, accessToken) = session.accessTokenForUser(userId, username, email)
+                    ?: throw IOException("account_not_signed_in")
+                mobileClient.issuePeerAuthCode(
+                    accessToken = accessToken,
+                    targetClientId = targetClientId,
+                    redirectUri = redirectUri,
+                    scope = scope,
+                    codeChallenge = codeChallenge,
+                    codeChallengeMethod = codeChallengeMethod,
+                )
+            }
+        }
+    }
+
     internal fun callback(uri: String) = scope.launch {
         mutableIsRefreshing.value = true
         try {
             action {
                 readyOrThrow()
                 session.completeLogin(uri, config.redirectUri)
+                locallySignedOutInProcess = false
                 syncDiscoveredAccountsInternal()
             }
         } finally {

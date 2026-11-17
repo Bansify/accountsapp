@@ -283,12 +283,10 @@ fun HomeTabScreen(
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                     OutlinedButton(
-                        onClick = { onManageOnWeb("data") },
+                        onClick = { onNavigateTab(AccountTab.DATA_PRIVACY) },
                         shape = RoundedCornerShape(50),
                     ) {
-                        Text(stringResource(R.string.gothwad_manage_web))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Text("View data & privacy")
                     }
                 }
             }

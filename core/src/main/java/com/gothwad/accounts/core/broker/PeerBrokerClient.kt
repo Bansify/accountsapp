@@ -7,12 +7,26 @@ import com.gothwad.accounts.core.BrokerPolicy
 import com.gothwad.accounts.core.BrokerTrustPolicy
 import com.gothwad.accounts.core.DiscoveredAccount
 import com.gothwad.accounts.core.GothwadAccount
+import com.gothwad.accounts.core.PeerAuthCodeResult
+import java.io.IOException
 import kotlinx.serialization.json.Json
 
 internal interface PeerDirectoryTransport {
     fun listInstalledCandidatePackages(policy: BrokerTrustPolicy): List<String>
     fun queryPeer(packageName: String, policy: BrokerTrustPolicy): DirectorySnapshot?
     fun notifyRemoval(packageName: String, userId: String, removedAt: Long, policy: BrokerTrustPolicy): Boolean
+    fun requestPeerAuthCode(
+        packageName: String,
+        policy: BrokerTrustPolicy,
+        userId: String?,
+        username: String?,
+        email: String?,
+        targetClientId: String,
+        redirectUri: String,
+        scope: String,
+        codeChallenge: String,
+        codeChallengeMethod: String = "S256",
+    ): Result<PeerAuthCodeResult> = Result.failure(UnsupportedOperationException("Peer auth code not supported"))
 }
 
 internal class AndroidPeerDirectoryTransport(
@@ -73,6 +87,56 @@ internal class AndroidPeerDirectoryTransport(
             val result = context.contentResolver.call(uri, BrokerIpcContract.METHOD_REMOVE_FROM_DEVICE, null, extras)
             result?.getBoolean(BrokerIpcContract.KEY_OK, false) == true
         }.getOrDefault(false)
+    }
+
+    override fun requestPeerAuthCode(
+        packageName: String,
+        policy: BrokerTrustPolicy,
+        userId: String?,
+        username: String?,
+        email: String?,
+        targetClientId: String,
+        redirectUri: String,
+        scope: String,
+        codeChallenge: String,
+        codeChallengeMethod: String,
+    ): Result<PeerAuthCodeResult> {
+        if (packageName == context.packageName) {
+            return Result.failure(IllegalArgumentException("Cannot issue peer code from local package"))
+        }
+        val authority = KnownGothwadApps.directoryAuthorityFor(packageName)
+        val info = context.packageManager.resolveContentProvider(authority, 0)
+            ?: return Result.failure(IOException("Peer directory provider unavailable"))
+        if (info.packageName != packageName || !TrustVerifier.verifyPackage(context, packageName, policy)) {
+            return Result.failure(SecurityException("Peer package verification failed"))
+        }
+        return runCatching {
+            val uri = Uri.parse("content://$authority")
+            val extras = Bundle().apply {
+                if (!userId.isNullOrBlank()) putString(BrokerIpcContract.KEY_USER_ID, userId)
+                if (!username.isNullOrBlank()) putString(BrokerIpcContract.KEY_USERNAME, username)
+                if (!email.isNullOrBlank()) putString(BrokerIpcContract.KEY_EMAIL, email)
+                putString(BrokerIpcContract.KEY_TARGET_CLIENT_ID, targetClientId)
+                putString(BrokerIpcContract.KEY_REDIRECT_URI, redirectUri)
+                putString(BrokerIpcContract.KEY_SCOPE, scope)
+                putString(BrokerIpcContract.KEY_CODE_CHALLENGE, codeChallenge)
+                putString(BrokerIpcContract.KEY_CODE_CHALLENGE_METHOD, codeChallengeMethod)
+            }
+            val response = context.contentResolver.call(uri, BrokerIpcContract.METHOD_ISSUE_PEER_CODE, null, extras)
+                ?: throw IOException("No response from peer account provider")
+            if (!response.getBoolean(BrokerIpcContract.KEY_OK, false)) {
+                val err = response.getString(BrokerIpcContract.KEY_ERROR)?.takeIf { it.isNotBlank() } ?: "peer_code_rejected"
+                throw IOException(err)
+            }
+            val code = response.getString(BrokerIpcContract.KEY_CODE)?.takeIf { it.isNotBlank() }
+                ?: throw IOException("Peer returned empty authorization code")
+            PeerAuthCodeResult(
+                code = code,
+                clientId = targetClientId,
+                redirectUri = response.getString(BrokerIpcContract.KEY_REDIRECT_URI) ?: redirectUri,
+                scope = response.getString(BrokerIpcContract.KEY_SCOPE) ?: scope,
+            )
+        }
     }
 }
 
@@ -159,6 +223,31 @@ internal class PeerBrokerClient(
             compareByDescending<DiscoveredAccount> { it.isAuthorizedLocally }
                 .thenByDescending { it.lastSeenAt }
                 .thenBy { it.email ?: it.userId },
+        )
+    }
+
+    fun requestPeerAuthCode(
+        peer: DiscoveredAccount,
+        policy: BrokerPolicy,
+        targetClientId: String,
+        redirectUri: String,
+        scope: String,
+        codeChallenge: String,
+        codeChallengeMethod: String = "S256",
+    ): Result<PeerAuthCodeResult> {
+        val discoveryPolicy = policy as? BrokerPolicy.PeerDiscovery
+            ?: return Result.failure(SecurityException("Gothwad peer broker is disabled"))
+        return transport.requestPeerAuthCode(
+            packageName = peer.sourcePackage,
+            policy = discoveryPolicy.trustPolicy,
+            userId = peer.userId,
+            username = peer.username,
+            email = peer.email,
+            targetClientId = targetClientId,
+            redirectUri = redirectUri,
+            scope = scope,
+            codeChallenge = codeChallenge,
+            codeChallengeMethod = codeChallengeMethod,
         )
     }
 

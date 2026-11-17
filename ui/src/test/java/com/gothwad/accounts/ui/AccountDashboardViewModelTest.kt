@@ -8,9 +8,19 @@ import com.gothwad.accounts.core.ConnectedAppGrant
 import com.gothwad.accounts.core.DisconnectOutcome
 import com.gothwad.accounts.core.DiscoveredAccount
 import com.gothwad.accounts.core.GothwadAccount
+import com.gothwad.accounts.core.IdentifierCheckResult
+import com.gothwad.accounts.core.MfaEnrollmentSetup
+import com.gothwad.accounts.core.MfaStatusInfo
+import com.gothwad.accounts.core.MobileApiException
+import com.gothwad.accounts.core.MobileAuthSignInOutcome
+import com.gothwad.accounts.core.MobileAuthUser
+import com.gothwad.accounts.core.NativeSignUpInput
+import com.gothwad.accounts.core.UsernameCheckResult
 import com.gothwad.accounts.core.WebSessionInfo
 import com.gothwad.accounts.ui.model.AccountSubScreen
 import com.gothwad.accounts.ui.model.AccountTab
+import com.gothwad.accounts.ui.model.ActiveManagementDialog
+import com.gothwad.accounts.ui.model.NativeAuthStep
 import com.gothwad.accounts.ui.state.AccountDashboardViewModel
 import com.gothwad.accounts.ui.state.AccountSessionController
 import kotlinx.coroutines.Dispatchers
@@ -54,6 +64,11 @@ class AccountDashboardViewModelTest {
         var clearErrorCalls = 0
         var peers = listOf("com.gothwad.mail", "com.gothwad.drive")
 
+        var failPeerSilentSso = false
+        var requireMfaOnSignIn = false
+        var requireMfaOnPhoneUpdate = false
+        var lastRevokedSessionId: String? = null
+
         override fun signIn(activity: Activity, chooseAccount: Boolean, loginHint: String?) = Unit
         override fun switchTo(userId: String) { lastSwitchedUserId = userId }
         override fun signOut(userId: String) { lastSignedOutUserId = userId }
@@ -81,8 +96,69 @@ class AccountDashboardViewModelTest {
         override fun canManageAccountNatively(): Boolean = nativeManage
         override fun canWriteProfileNatively(): Boolean = nativeWrite
 
+        override suspend fun checkIdentifier(identifier: String) =
+            Result.success(IdentifierCheckResult(exists = identifier == "arjun", kind = "username"))
+
+        override suspend fun checkUsername(username: String) =
+            Result.success(UsernameCheckResult(available = true, valid = true, username = username, email = "$username@gothwadtech.com"))
+
+        override suspend fun signInNative(identifier: String, password: String): Result<MobileAuthSignInOutcome> {
+            return if (requireMfaOnSignIn) {
+                Result.success(MobileAuthSignInOutcome.MfaRequired("chal-1", 300L, "Enter 6-digit code"))
+            } else {
+                val acc = GothwadAccount("u-1", "arjun", "Arjun", email = "arjun@gothwadtech.com")
+                state.value = AccountState.SignedIn(acc, listOf(acc))
+                Result.success(
+                    MobileAuthSignInOutcome.Authenticated(
+                        accessToken = "at-1",
+                        refreshToken = "rt-1",
+                        expiresIn = 3600L,
+                        scope = "profile",
+                        clientId = "gothwad-accounts-android",
+                        sessionId = "s-1",
+                        user = MobileAuthUser("u-1", "arjun", "arjun@gothwadtech.com", "Arjun"),
+                    ),
+                )
+            }
+        }
+
+        override suspend fun verifyNativeMfa(challenge: String, code: String): Result<GothwadAccount> {
+            val acc = GothwadAccount("u-1", "arjun", "Arjun", email = "arjun@gothwadtech.com", mfaEnabled = true)
+            state.value = AccountState.SignedIn(acc, listOf(acc))
+            return Result.success(acc)
+        }
+
+        override suspend fun signUpNative(input: NativeSignUpInput): Result<GothwadAccount> {
+            val acc = GothwadAccount("u-2", input.username, "${input.firstName} ${input.lastName}", input.firstName, input.lastName, "${input.username}@gothwadtech.com")
+            state.value = AccountState.SignedIn(acc, listOf(acc))
+            return Result.success(acc)
+        }
+
+        override suspend fun forgotPasswordNative(username: String) =
+            Result.success("Reset token sent.")
+
+        override suspend fun resetPasswordNative(token: String, newPassword: String) =
+            Result.success("Password updated.")
+
+        override suspend fun signInSilentlyWithPeer(peer: DiscoveredAccount): Result<GothwadAccount> {
+            if (failPeerSilentSso) return Result.failure(IllegalStateException("peer_code_failed"))
+            val acc = GothwadAccount(peer.userId, peer.username, peer.name, email = peer.email)
+            state.value = AccountState.SignedIn(acc, listOf(acc))
+            return Result.success(acc)
+        }
+
         override suspend fun listWebSessions(): Result<List<WebSessionInfo>> =
-            Result.success(listOf(WebSessionInfo(id = "ws-1", browser = "Chrome", os = "Android", current = true)))
+            Result.success(
+                listOf(
+                    WebSessionInfo(id = "ws-1", browser = "Chrome", os = "Android", current = true),
+                    WebSessionInfo(id = "ws-2", browser = "Firefox", os = "Linux", current = false),
+                ),
+            )
+
+        override suspend fun revokeWebSession(sessionId: String): Result<Int> {
+            lastRevokedSessionId = sessionId
+            return Result.success(1)
+        }
 
         override suspend fun listActivity(): Result<List<AccountActivityEntry>> =
             Result.success(listOf(AccountActivityEntry(id = "act-1", type = "signin", title = "Signed in")))
@@ -99,6 +175,59 @@ class AccountDashboardViewModelTest {
             val updated = GothwadAccount("u-1", "arjun", "$firstName $lastName".trim(), firstName, lastName, "arjun@gothwadtech.com", dateOfBirth = dateOfBirth, gender = gender)
             state.value = AccountState.SignedIn(updated, listOf(updated))
             return Result.success(updated)
+        }
+
+        override suspend fun uploadAvatar(imageDataOrBase64: String, mime: String): Result<GothwadAccount?> {
+            val cur = (state.value as AccountState.SignedIn).account.copy(avatarUrl = "https://accounts.gothwadtech.com/api/avatars/u-1?v=new")
+            state.value = AccountState.SignedIn(cur, listOf(cur))
+            return Result.success(cur)
+        }
+
+        override suspend fun removeAvatar(): Result<GothwadAccount?> {
+            val cur = (state.value as AccountState.SignedIn).account.copy(avatarUrl = null)
+            state.value = AccountState.SignedIn(cur, listOf(cur))
+            return Result.success(cur)
+        }
+
+        override suspend fun updatePhoneNumber(phoneNumber: String, currentPassword: String, mfaCode: String?): Result<GothwadAccount?> {
+            if (requireMfaOnPhoneUpdate && mfaCode.isNullOrBlank()) {
+                return Result.failure(MobileApiException(400, "Enter a fresh authenticator code.", "mfa_required"))
+            }
+            val cur = (state.value as AccountState.SignedIn).account.copy(phoneNumber = phoneNumber)
+            state.value = AccountState.SignedIn(cur, listOf(cur))
+            return Result.success(cur)
+        }
+
+        override suspend fun requestRecoveryEmailChange(recoveryEmail: String, currentPassword: String, mfaCode: String?) =
+            Result.success("Verification token sent.")
+
+        override suspend fun verifyRecoveryEmailChange(token: String): Result<GothwadAccount?> {
+            val cur = (state.value as AccountState.SignedIn).account.copy(recoveryEmail = "verified@example.com", recoveryEmailVerified = true)
+            state.value = AccountState.SignedIn(cur, listOf(cur))
+            return Result.success(cur)
+        }
+
+        override suspend fun changePassword(currentPassword: String, newPassword: String, mfaCode: String?) =
+            Result.success("Password saved.")
+
+        override suspend fun getMfaStatus() =
+            Result.success(MfaStatusInfo(enabled = false, enrollmentAvailable = true, recoveryCodesRemaining = 0))
+
+        override suspend fun beginMfaEnrollment(currentPassword: String) =
+            Result.success(MfaEnrollmentSetup("enr-1", "SECRET123", "otpauth://totp/Gothwad:arjun?secret=SECRET123"))
+
+        override suspend fun confirmMfaEnrollment(currentPassword: String, enrollmentId: String, code: String) =
+            Result.success(listOf("REC-1111", "REC-2222"))
+
+        override suspend fun disableMfa(currentPassword: String, code: String) =
+            Result.success(Unit)
+
+        override suspend fun exportAccountDataJson() =
+            Result.success("""{"ok":true,"export":"gothwad-accounts"}""")
+
+        override suspend fun deleteAccount(password: String, mfaCode: String?): Result<Unit> {
+            state.value = AccountState.SignedOut
+            return Result.success(Unit)
         }
     }
 
@@ -175,7 +304,7 @@ class AccountDashboardViewModelTest {
         controller.state.value = AccountState.SignedIn(account, listOf(account))
         advanceUntilIdle()
 
-        assertEquals(1, vm.uiState.value.webSessions.size)
+        assertEquals(2, vm.uiState.value.webSessions.size)
         assertEquals(1, vm.uiState.value.activityFeed.size)
         assertEquals(1, vm.uiState.value.authorizations.size)
 
@@ -206,5 +335,124 @@ class AccountDashboardViewModelTest {
         assertTrue(vm.navigateBack())
         assertNull(vm.uiState.value.currentSubScreen)
         assertFalse(vm.navigateBack())
+    }
+
+    @Test
+    fun nativeSignInMfaAndSilentPeerSsoWithFallbackWorkEndToEnd() = runTest {
+        val controller = FakeController(nativeManage = true, nativeWrite = true).apply {
+            requireMfaOnSignIn = true
+        }
+        val vm = AccountDashboardViewModel(controller)
+        controller.state.value = AccountState.SignedOut
+        advanceUntilIdle()
+
+        // 1. Native sign-in flow with MFA step
+        vm.openNativeAuthDialog()
+        assertTrue(vm.uiState.value.nativeAuth.visible)
+        assertEquals(NativeAuthStep.IDENTIFIER, vm.uiState.value.nativeAuth.step)
+
+        vm.submitNativeIdentifier("arjun")
+        advanceUntilIdle()
+        assertEquals(NativeAuthStep.PASSWORD, vm.uiState.value.nativeAuth.step)
+
+        vm.submitNativePassword("arjun", "Pass123!")
+        advanceUntilIdle()
+        assertEquals(NativeAuthStep.MFA, vm.uiState.value.nativeAuth.step)
+
+        vm.submitNativeMfa("123456")
+        advanceUntilIdle()
+        assertFalse(vm.uiState.value.nativeAuth.visible)
+        assertEquals("u-1", vm.uiState.value.activeAccount?.userId)
+
+        // 2. Peer silent SSO success & fallback
+        controller.state.value = AccountState.SignedOut
+        advanceUntilIdle()
+        val peer = DiscoveredAccount("u-3", "kiran", "Kiran", "kiran@gothwadtech.com", sourcePackage = "com.gothwad.mail")
+        vm.continueWithPeerAccount(peer)
+        advanceUntilIdle()
+        assertEquals("u-3", vm.uiState.value.activeAccount?.userId)
+        assertFalse(vm.uiState.value.nativeAuth.visible)
+
+        controller.state.value = AccountState.SignedOut
+        controller.failPeerSilentSso = true
+        advanceUntilIdle()
+        vm.continueWithPeerAccount(peer)
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.nativeAuth.visible)
+        assertEquals("kiran@gothwadtech.com", vm.uiState.value.nativeAuth.identifier)
+        assertEquals(NativeAuthStep.PASSWORD, vm.uiState.value.nativeAuth.step)
+    }
+
+    @Test
+    fun nativeManagementActionsCoverAvatarPhoneRecoveryPasswordMfaSessionsExportAndDelete() = runTest {
+        val controller = FakeController(nativeManage = true, nativeWrite = true).apply {
+            requireMfaOnPhoneUpdate = true
+        }
+        val vm = AccountDashboardViewModel(controller)
+        val account = GothwadAccount("u-1", "arjun", "Arjun", email = "arjun@gothwadtech.com")
+        controller.state.value = AccountState.SignedIn(account, listOf(account))
+        advanceUntilIdle()
+
+        // Avatar upload & remove
+        vm.uploadAvatar("data:image/jpeg;base64,/9j/4AAQ")
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.activeAccount?.avatarUrl?.contains("avatars") == true)
+        vm.removeAvatar()
+        advanceUntilIdle()
+        assertNull(vm.uiState.value.activeAccount?.avatarUrl)
+
+        // Phone update triggers mfa_required prompt then succeeds with MFA code
+        vm.openManagementDialog(ActiveManagementDialog.Phone)
+        vm.updatePhoneNumber("+919876543210", "Pass123!", null)
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.managementRequiresMfaPrompt)
+        vm.updatePhoneNumber("+919876543210", "Pass123!", "123456")
+        advanceUntilIdle()
+        assertEquals("+919876543210", vm.uiState.value.activeAccount?.phoneNumber)
+        assertNull(vm.uiState.value.activeManagementDialog)
+
+        // Recovery email 2-step flow
+        vm.openManagementDialog(ActiveManagementDialog.RecoveryEmail)
+        vm.requestRecoveryEmailChange("verified@example.com", "Pass123!", null)
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.recoveryEmailPendingVerification)
+        vm.verifyRecoveryEmailChange("a".repeat(64))
+        advanceUntilIdle()
+        assertEquals("verified@example.com", vm.uiState.value.activeAccount?.recoveryEmail)
+
+        // Password change
+        vm.changePassword("Pass123!", "NewPass123!", null)
+        advanceUntilIdle()
+        assertEquals("Password saved.", vm.uiState.value.snackbarMessage)
+
+        // 2FA setup & confirm & disable
+        vm.openManagementDialog(ActiveManagementDialog.TwoFactor)
+        advanceUntilIdle()
+        assertFalse(vm.uiState.value.mfaStatus?.enabled ?: true)
+        vm.beginMfaEnrollment("Pass123!")
+        advanceUntilIdle()
+        assertEquals("enr-1", vm.uiState.value.mfaSetup?.enrollmentId)
+        vm.confirmMfaEnrollment("Pass123!", "enr-1", "123456")
+        advanceUntilIdle()
+        assertEquals(listOf("REC-1111", "REC-2222"), vm.uiState.value.mfaRecoveryCodes)
+        vm.disableMfa("Pass123!", "123456")
+        advanceUntilIdle()
+        assertFalse(vm.uiState.value.mfaStatus?.enabled ?: true)
+
+        // Single session revoke
+        vm.revokeWebSession("ws-2")
+        advanceUntilIdle()
+        assertEquals("ws-2", controller.lastRevokedSessionId)
+
+        // Data export
+        vm.exportAccountData()
+        advanceUntilIdle()
+        val exportDialog = vm.uiState.value.activeManagementDialog as ActiveManagementDialog.ExportData
+        assertTrue(exportDialog.jsonContent.contains("gothwad-accounts"))
+
+        // Permanent account deletion
+        vm.deleteAccount("Pass123!", null)
+        advanceUntilIdle()
+        assertEquals(AccountState.SignedOut, vm.uiState.value.accountState)
     }
 }

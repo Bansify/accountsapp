@@ -138,7 +138,9 @@ fun StorageCorruptedRecoveryScreen(
 @Composable
 fun SignedOutAccountScreen(
     discoveredAccounts: List<DiscoveredAccount>,
+    isPeerSilentSigningIn: Boolean = false,
     onSignInClick: () -> Unit,
+    onBrowserSignInClick: () -> Unit = onSignInClick,
     onContinueAsPeer: (DiscoveredAccount) -> Unit,
     onRefreshPeers: () -> Unit,
     onOpenPrivacy: () -> Unit,
@@ -182,6 +184,7 @@ fun SignedOutAccountScreen(
                     Spacer(modifier = Modifier.height(4.dp))
                     Button(
                         onClick = onSignInClick,
+                        enabled = !isPeerSilentSigningIn,
                         shape = RoundedCornerShape(50),
                         modifier = Modifier
                             .fillMaxWidth()
@@ -189,6 +192,35 @@ fun SignedOutAccountScreen(
                     ) {
                         Text(stringResource(R.string.gothwad_sign_in))
                     }
+                    OutlinedButton(
+                        onClick = onBrowserSignInClick,
+                        enabled = !isPeerSilentSigningIn,
+                        shape = RoundedCornerShape(50),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("signed_out_browser_sign_in_button"),
+                    ) {
+                        Text(stringResource(R.string.gothwad_sign_in_browser))
+                    }
+                }
+            }
+        }
+
+        if (isPeerSilentSigningIn) {
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                    Text(
+                        text = "Signing in silently with your Gothwad device session…",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         }
