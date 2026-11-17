@@ -54,11 +54,20 @@ import com.gothwad.accounts.ui.components.AccountsBottomBar
 import com.gothwad.accounts.ui.components.AccountsSidebarContent
 import com.gothwad.accounts.ui.components.AccountsTabBar
 import com.gothwad.accounts.ui.components.AccountsTopAppBar
+import com.gothwad.accounts.ui.components.AvatarManagementDialog
+import com.gothwad.accounts.ui.components.DeleteAccountDialog
 import com.gothwad.accounts.ui.components.EditBasicProfileDialog
+import com.gothwad.accounts.ui.components.ExportDataDialog
 import com.gothwad.accounts.ui.components.GothwadAuthStatusBanner
+import com.gothwad.accounts.ui.components.NativeAuthDialog
+import com.gothwad.accounts.ui.components.PasswordManagementDialog
+import com.gothwad.accounts.ui.components.PhoneManagementDialog
+import com.gothwad.accounts.ui.components.RecoveryEmailDialog
 import com.gothwad.accounts.ui.components.SignOutOrRemoveDialog
+import com.gothwad.accounts.ui.components.TwoFactorManagementDialog
 import com.gothwad.accounts.ui.model.AccountSubScreen
 import com.gothwad.accounts.ui.model.AccountTab
+import com.gothwad.accounts.ui.model.ActiveManagementDialog
 import com.gothwad.accounts.ui.model.NavigationLayoutMode
 import com.gothwad.accounts.ui.model.ThemePreference
 import com.gothwad.accounts.ui.screens.AppSettingsScreen
@@ -216,11 +225,9 @@ fun GothwadAccountsScreen(
                                     accountViewModel.clearAuthError()
                                     accountViewModel.refreshProfile()
                                 },
-                                onSignInAgain = activity?.let { act ->
-                                    {
-                                        accountViewModel.clearAuthError()
-                                        accountViewModel.startSignIn(act, chooseAccount = true)
-                                    }
+                                onSignInAgain = {
+                                    accountViewModel.clearAuthError()
+                                    accountViewModel.openNativeAuthDialog()
                                 },
                                 onDismiss = accountViewModel::clearAuthError,
                                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
@@ -235,8 +242,33 @@ fun GothwadAccountsScreen(
                                     onQueryChange = accountViewModel::updateSearchQuery,
                                     onSelectItem = { item ->
                                         accountViewModel.selectTab(item.category)
-                                        item.webSection?.let { section ->
-                                            activity?.let { accountViewModel.openWebSection(it, section) }
+                                        val canManage = uiState.canManageNatively
+                                        val canWrite = uiState.canWriteProfileNatively
+                                        when {
+                                            canWrite && item.id in setOf("name", "dob", "gender") ->
+                                                accountViewModel.openManagementDialog(ActiveManagementDialog.EditBasicProfile)
+                                            canWrite && item.id == "photo" ->
+                                                accountViewModel.openManagementDialog(ActiveManagementDialog.Avatar)
+                                            canWrite && item.id == "phone" ->
+                                                accountViewModel.openManagementDialog(ActiveManagementDialog.Phone)
+                                            canWrite && item.id == "recovery" ->
+                                                accountViewModel.openManagementDialog(ActiveManagementDialog.RecoveryEmail)
+                                            canWrite && item.id == "password" ->
+                                                accountViewModel.openManagementDialog(ActiveManagementDialog.Password)
+                                            canWrite && item.id == "mfa" ->
+                                                accountViewModel.openManagementDialog(ActiveManagementDialog.TwoFactor)
+                                            canManage && item.id == "export" ->
+                                                accountViewModel.exportAccountData()
+                                            canWrite && item.id == "delete" ->
+                                                accountViewModel.openManagementDialog(ActiveManagementDialog.DeleteAccount)
+                                            !canManage -> {
+                                                item.webSection?.let { section ->
+                                                    activity?.let { accountViewModel.openWebSection(it, section) }
+                                                }
+                                            }
+                                            item.id == "passkeys" -> {
+                                                activity?.let { accountViewModel.openWebSection(it, "security") }
+                                            }
                                         }
                                     },
                                 )
@@ -284,18 +316,12 @@ fun GothwadAccountsScreen(
                                     AccountState.SignedOut -> {
                                         SignedOutAccountScreen(
                                             discoveredAccounts = uiState.discoveredAccounts,
-                                            onSignInClick = {
+                                            isPeerSilentSigningIn = uiState.isPeerSilentSigningIn,
+                                            onSignInClick = { accountViewModel.openNativeAuthDialog() },
+                                            onBrowserSignInClick = {
                                                 activity?.let { accountViewModel.startSignIn(it, chooseAccount = true) }
                                             },
-                                            onContinueAsPeer = { peer ->
-                                                activity?.let {
-                                                    accountViewModel.startSignIn(
-                                                        activity = it,
-                                                        chooseAccount = false,
-                                                        loginHint = peer.email ?: peer.username,
-                                                    )
-                                                }
-                                            },
+                                            onContinueAsPeer = accountViewModel::continueWithPeerAccount,
                                             onRefreshPeers = accountViewModel::syncPeers,
                                             onOpenPrivacy = { activity?.let { accountViewModel.openWebPath(it, "/privacy") } },
                                             onOpenTerms = { activity?.let { accountViewModel.openWebPath(it, "/terms") } },
@@ -332,7 +358,7 @@ fun GothwadAccountsScreen(
                                                         localAccountCount = accountState.all.size,
                                                         onOpenAvatarMenu = { accountViewModel.toggleAccountSwitcher(true) },
                                                         onCopyEmail = { email ->
-                                                            copyToClipboard(context, email)
+                                                            copyToClipboard(context, "Account email", email)
                                                             accountViewModel.showMessage(emailCopiedMsg)
                                                         },
                                                         onOpenSearch = { accountViewModel.openSubScreen(AccountSubScreen.SearchAccount) },
@@ -345,7 +371,18 @@ fun GothwadAccountsScreen(
                                                     AccountTab.PERSONAL_INFO -> PersonalInfoTabScreen(
                                                         account = current,
                                                         canEditBasicProfileNatively = uiState.canWriteProfileNatively,
-                                                        onEditBasicProfileClick = { accountViewModel.openEditProfileDialog(true) },
+                                                        onEditAvatarClick = {
+                                                            accountViewModel.openManagementDialog(ActiveManagementDialog.Avatar)
+                                                        },
+                                                        onEditBasicProfileClick = {
+                                                            accountViewModel.openManagementDialog(ActiveManagementDialog.EditBasicProfile)
+                                                        },
+                                                        onEditPhoneClick = {
+                                                            accountViewModel.openManagementDialog(ActiveManagementDialog.Phone)
+                                                        },
+                                                        onEditRecoveryEmailClick = {
+                                                            accountViewModel.openManagementDialog(ActiveManagementDialog.RecoveryEmail)
+                                                        },
                                                         onManagePersonalOnWeb = {
                                                             activity?.let { accountViewModel.openWebSection(it, "personal") }
                                                         },
@@ -356,8 +393,19 @@ fun GothwadAccountsScreen(
                                                         localAccounts = accountState.all,
                                                         installedVerifiedPeers = uiState.installedVerifiedPeers,
                                                         canManageNatively = uiState.canManageNatively,
+                                                        canWriteNatively = uiState.canWriteProfileNatively,
                                                         webSessions = uiState.webSessions,
                                                         activityFeed = uiState.activityFeed,
+                                                        onEditPasswordClick = {
+                                                            accountViewModel.openManagementDialog(ActiveManagementDialog.Password)
+                                                        },
+                                                        onManageTwoFactorClick = {
+                                                            accountViewModel.openManagementDialog(ActiveManagementDialog.TwoFactor)
+                                                        },
+                                                        onEditRecoveryEmailClick = {
+                                                            accountViewModel.openManagementDialog(ActiveManagementDialog.RecoveryEmail)
+                                                        },
+                                                        onRevokeWebSession = accountViewModel::revokeWebSession,
                                                         onRevokeOtherWebSessions = accountViewModel::revokeOtherWebSessions,
                                                         onManageSecurityOnWeb = {
                                                             activity?.let { accountViewModel.openWebSection(it, "security") }
@@ -368,6 +416,14 @@ fun GothwadAccountsScreen(
 
                                                     AccountTab.DATA_PRIVACY -> DataPrivacyTabScreen(
                                                         account = current,
+                                                        canManageNatively = uiState.canManageNatively,
+                                                        canWriteNatively = uiState.canWriteProfileNatively,
+                                                        isExportingData = uiState.isExportingData,
+                                                        activityFeed = uiState.activityFeed,
+                                                        onExportDataClick = accountViewModel::exportAccountData,
+                                                        onDeleteAccountClick = {
+                                                            accountViewModel.openManagementDialog(ActiveManagementDialog.DeleteAccount)
+                                                        },
                                                         onManageDataOnWeb = {
                                                             activity?.let { accountViewModel.openWebSection(it, "data") }
                                                         },
@@ -464,6 +520,22 @@ fun GothwadAccountsScreen(
             }
         }
 
+        NativeAuthDialog(
+            state = uiState.nativeAuth,
+            onDismiss = accountViewModel::dismissNativeAuthDialog,
+            onSwitchStep = accountViewModel::setNativeAuthStep,
+            onSubmitIdentifier = accountViewModel::submitNativeIdentifier,
+            onCheckUsername = accountViewModel::checkNativeUsername,
+            onSubmitPassword = accountViewModel::submitNativePassword,
+            onSubmitMfa = accountViewModel::submitNativeMfa,
+            onSubmitSignUp = accountViewModel::submitNativeSignUp,
+            onSubmitForgotPassword = accountViewModel::submitForgotPassword,
+            onSubmitResetPassword = accountViewModel::submitResetPassword,
+            onSignInWithBrowser = {
+                activity?.let { accountViewModel.startSignIn(it, chooseAccount = true) }
+            },
+        )
+
         if (uiState.showAccountSwitcher && activeAccount != null) {
             AccountSwitcherDialog(
                 activeAccount = activeAccount,
@@ -477,18 +549,8 @@ fun GothwadAccountsScreen(
                 },
                 onDismiss = { accountViewModel.toggleAccountSwitcher(false) },
                 onSwitchAccount = accountViewModel::switchAccount,
-                onContinueWithPeerAccount = { peer ->
-                    activity?.let {
-                        accountViewModel.startSignIn(
-                            activity = it,
-                            chooseAccount = false,
-                            loginHint = peer.email ?: peer.username,
-                        )
-                    }
-                },
-                onAddAnotherAccount = {
-                    activity?.let { accountViewModel.startSignIn(it, chooseAccount = true) }
-                },
+                onContinueWithPeerAccount = accountViewModel::continueWithPeerAccount,
+                onAddAnotherAccount = { accountViewModel.openNativeAuthDialog() },
                 onRequestSignOut = accountViewModel::openSignOutDialog,
                 onManageOnWeb = {
                     accountViewModel.toggleAccountSwitcher(false)
@@ -519,20 +581,99 @@ fun GothwadAccountsScreen(
             )
         }
 
-        if (uiState.showEditProfileDialog && activeAccount != null) {
-            EditBasicProfileDialog(
-                account = activeAccount,
-                isSaving = uiState.isSavingProfile,
-                onDismiss = { accountViewModel.openEditProfileDialog(false) },
-                onSave = accountViewModel::saveBasicProfile,
-            )
+        val currentDialog = uiState.activeManagementDialog
+        if (currentDialog != null && activeAccount != null) {
+            when (currentDialog) {
+                ActiveManagementDialog.EditBasicProfile -> EditBasicProfileDialog(
+                    account = activeAccount,
+                    isSaving = uiState.isSavingProfile,
+                    onDismiss = accountViewModel::dismissManagementDialog,
+                    onSave = accountViewModel::saveBasicProfile,
+                )
+
+                ActiveManagementDialog.Avatar -> AvatarManagementDialog(
+                    account = activeAccount,
+                    isBusy = uiState.isManagementBusy,
+                    errorMessage = uiState.managementError,
+                    onDismiss = accountViewModel::dismissManagementDialog,
+                    onUploadAvatar = accountViewModel::uploadAvatar,
+                    onRemoveAvatar = accountViewModel::removeAvatar,
+                )
+
+                ActiveManagementDialog.Phone -> PhoneManagementDialog(
+                    account = activeAccount,
+                    isBusy = uiState.isManagementBusy,
+                    requiresMfa = uiState.managementRequiresMfaPrompt,
+                    errorMessage = uiState.managementError,
+                    onDismiss = accountViewModel::dismissManagementDialog,
+                    onSavePhone = accountViewModel::updatePhoneNumber,
+                )
+
+                ActiveManagementDialog.RecoveryEmail -> RecoveryEmailDialog(
+                    account = activeAccount,
+                    isBusy = uiState.isManagementBusy,
+                    pendingVerification = uiState.recoveryEmailPendingVerification,
+                    requiresMfa = uiState.managementRequiresMfaPrompt,
+                    errorMessage = uiState.managementError,
+                    onDismiss = accountViewModel::dismissManagementDialog,
+                    onRequestChange = accountViewModel::requestRecoveryEmailChange,
+                    onVerifyToken = accountViewModel::verifyRecoveryEmailChange,
+                )
+
+                ActiveManagementDialog.Password -> PasswordManagementDialog(
+                    account = activeAccount,
+                    isBusy = uiState.isManagementBusy,
+                    requiresMfa = uiState.managementRequiresMfaPrompt,
+                    errorMessage = uiState.managementError,
+                    onDismiss = accountViewModel::dismissManagementDialog,
+                    onChangePassword = accountViewModel::changePassword,
+                )
+
+                ActiveManagementDialog.TwoFactor -> TwoFactorManagementDialog(
+                    account = activeAccount,
+                    mfaStatus = uiState.mfaStatus,
+                    mfaSetup = uiState.mfaSetup,
+                    recoveryCodes = uiState.mfaRecoveryCodes,
+                    isBusy = uiState.isManagementBusy,
+                    errorMessage = uiState.managementError,
+                    onCopyText = { label, value ->
+                        copyToClipboard(context, label, value)
+                        accountViewModel.showMessage("$label copied")
+                    },
+                    onShowMessage = accountViewModel::showMessage,
+                    onDismiss = accountViewModel::dismissManagementDialog,
+                    onBeginEnroll = accountViewModel::beginMfaEnrollment,
+                    onConfirmEnroll = accountViewModel::confirmMfaEnrollment,
+                    onRegenerateCodes = accountViewModel::regenerateMfaRecoveryCodes,
+                    onDisableMfa = accountViewModel::disableMfa,
+                )
+
+                ActiveManagementDialog.DeleteAccount -> DeleteAccountDialog(
+                    account = activeAccount,
+                    isBusy = uiState.isManagementBusy,
+                    requiresMfa = uiState.managementRequiresMfaPrompt,
+                    errorMessage = uiState.managementError,
+                    onDismiss = accountViewModel::dismissManagementDialog,
+                    onConfirmDelete = accountViewModel::deleteAccount,
+                )
+
+                is ActiveManagementDialog.ExportData -> ExportDataDialog(
+                    jsonContent = currentDialog.jsonContent,
+                    onCopyJson = { json ->
+                        copyToClipboard(context, "Gothwad Account Data", json)
+                        accountViewModel.showMessage("Account export JSON copied")
+                    },
+                    onShowMessage = accountViewModel::showMessage,
+                    onDismiss = accountViewModel::dismissManagementDialog,
+                )
+            }
         }
     }
 }
 
-private fun copyToClipboard(context: Context, value: String) {
+private fun copyToClipboard(context: Context, label: String, value: String) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return
-    clipboard.setPrimaryClip(ClipData.newPlainText("Gothwad Account", value))
+    clipboard.setPrimaryClip(ClipData.newPlainText(label, value))
 }
 
 private fun openExternalHttpsUrl(context: Context, url: String) {

@@ -11,10 +11,20 @@ import com.gothwad.accounts.core.DisconnectOutcome
 import com.gothwad.accounts.core.DiscoveredAccount
 import com.gothwad.accounts.core.GothwadAccount
 import com.gothwad.accounts.core.GothwadAccounts
+import com.gothwad.accounts.core.IdentifierCheckResult
+import com.gothwad.accounts.core.MfaEnrollmentSetup
+import com.gothwad.accounts.core.MfaStatusInfo
+import com.gothwad.accounts.core.MobileApiException
+import com.gothwad.accounts.core.MobileAuthSignInOutcome
+import com.gothwad.accounts.core.NativeSignUpInput
+import com.gothwad.accounts.core.UsernameCheckResult
 import com.gothwad.accounts.core.WebSessionInfo
 import com.gothwad.accounts.ui.model.AccountDashboardUiState
 import com.gothwad.accounts.ui.model.AccountSubScreen
 import com.gothwad.accounts.ui.model.AccountTab
+import com.gothwad.accounts.ui.model.ActiveManagementDialog
+import com.gothwad.accounts.ui.model.NativeAuthDialogState
+import com.gothwad.accounts.ui.model.NativeAuthStep
 import com.gothwad.accounts.ui.model.NavigationLayoutMode
 import com.gothwad.accounts.ui.model.SearchableSetting
 import com.gothwad.accounts.ui.model.SignOutDialogTarget
@@ -37,6 +47,9 @@ interface AccountSessionController {
         get() = MutableStateFlow(null)
 
     fun signIn(activity: Activity, chooseAccount: Boolean = false, loginHint: String? = null)
+    fun signInWithBrowser(activity: Activity, chooseAccount: Boolean = false, loginHint: String? = null) =
+        signIn(activity, chooseAccount, loginHint)
+
     fun switchTo(userId: String)
     fun signOut(userId: String)
     fun disconnectFromServer(userId: String) = signOut(userId)
@@ -52,8 +65,34 @@ interface AccountSessionController {
 
     fun canManageAccountNatively(): Boolean = false
     fun canWriteProfileNatively(): Boolean = false
+
+    suspend fun checkIdentifier(identifier: String): Result<IdentifierCheckResult> =
+        Result.failure(UnsupportedOperationException())
+
+    suspend fun checkUsername(username: String): Result<UsernameCheckResult> =
+        Result.failure(UnsupportedOperationException())
+
+    suspend fun signInNative(identifier: String, password: String): Result<MobileAuthSignInOutcome> =
+        Result.failure(UnsupportedOperationException())
+
+    suspend fun verifyNativeMfa(challenge: String, code: String): Result<GothwadAccount> =
+        Result.failure(UnsupportedOperationException())
+
+    suspend fun signUpNative(input: NativeSignUpInput): Result<GothwadAccount> =
+        Result.failure(UnsupportedOperationException())
+
+    suspend fun forgotPasswordNative(username: String): Result<String> =
+        Result.failure(UnsupportedOperationException())
+
+    suspend fun resetPasswordNative(token: String, newPassword: String): Result<String> =
+        Result.failure(UnsupportedOperationException())
+
+    suspend fun signInSilentlyWithPeer(peer: DiscoveredAccount): Result<GothwadAccount> =
+        Result.failure(UnsupportedOperationException())
+
     suspend fun listWebSessions(): Result<List<WebSessionInfo>> = Result.success(emptyList())
     suspend fun revokeOtherWebSessions(): Result<Int> = Result.success(0)
+    suspend fun revokeWebSession(sessionId: String): Result<Int> = Result.success(0)
     suspend fun listActivity(): Result<List<AccountActivityEntry>> = Result.success(emptyList())
     suspend fun listAuthorizations(): Result<List<ConnectedAppGrant>> = Result.success(emptyList())
     suspend fun revokeAuthorization(appId: String): Result<Unit> = Result.success(Unit)
@@ -63,6 +102,57 @@ interface AccountSessionController {
         dateOfBirth: String,
         gender: String,
     ): Result<GothwadAccount?> = Result.failure(UnsupportedOperationException())
+
+    suspend fun uploadAvatar(imageDataOrBase64: String, mime: String = "image/jpeg"): Result<GothwadAccount?> =
+        Result.failure(UnsupportedOperationException())
+
+    suspend fun removeAvatar(): Result<GothwadAccount?> =
+        Result.failure(UnsupportedOperationException())
+
+    suspend fun updatePhoneNumber(
+        phoneNumber: String,
+        currentPassword: String,
+        mfaCode: String? = null,
+    ): Result<GothwadAccount?> = Result.failure(UnsupportedOperationException())
+
+    suspend fun requestRecoveryEmailChange(
+        recoveryEmail: String,
+        currentPassword: String,
+        mfaCode: String? = null,
+    ): Result<String> = Result.failure(UnsupportedOperationException())
+
+    suspend fun verifyRecoveryEmailChange(token: String): Result<GothwadAccount?> =
+        Result.failure(UnsupportedOperationException())
+
+    suspend fun changePassword(
+        currentPassword: String,
+        newPassword: String,
+        mfaCode: String? = null,
+    ): Result<String> = Result.failure(UnsupportedOperationException())
+
+    suspend fun getMfaStatus(): Result<MfaStatusInfo> =
+        Result.failure(UnsupportedOperationException())
+
+    suspend fun beginMfaEnrollment(currentPassword: String): Result<MfaEnrollmentSetup> =
+        Result.failure(UnsupportedOperationException())
+
+    suspend fun confirmMfaEnrollment(
+        currentPassword: String,
+        enrollmentId: String,
+        code: String,
+    ): Result<List<String>> = Result.failure(UnsupportedOperationException())
+
+    suspend fun regenerateMfaRecoveryCodes(currentPassword: String, code: String): Result<List<String>> =
+        Result.failure(UnsupportedOperationException())
+
+    suspend fun disableMfa(currentPassword: String, code: String): Result<Unit> =
+        Result.failure(UnsupportedOperationException())
+
+    suspend fun exportAccountDataJson(): Result<String> =
+        Result.failure(UnsupportedOperationException())
+
+    suspend fun deleteAccount(password: String, mfaCode: String? = null): Result<Unit> =
+        Result.failure(UnsupportedOperationException())
 }
 
 object LiveGothwadAccountController : AccountSessionController {
@@ -74,6 +164,10 @@ object LiveGothwadAccountController : AccountSessionController {
 
     override fun signIn(activity: Activity, chooseAccount: Boolean, loginHint: String?) {
         GothwadAccounts.signIn(activity, chooseAccount, loginHint)
+    }
+
+    override fun signInWithBrowser(activity: Activity, chooseAccount: Boolean, loginHint: String?) {
+        GothwadAccounts.signInWithBrowser(activity, chooseAccount, loginHint)
     }
 
     override fun switchTo(userId: String) { GothwadAccounts.switchTo(userId) }
@@ -91,8 +185,26 @@ object LiveGothwadAccountController : AccountSessionController {
 
     override fun canManageAccountNatively(): Boolean = GothwadAccounts.canManageAccountNatively()
     override fun canWriteProfileNatively(): Boolean = GothwadAccounts.canWriteProfileNatively()
+
+    override suspend fun checkIdentifier(identifier: String) = GothwadAccounts.checkIdentifier(identifier)
+    override suspend fun checkUsername(username: String) = GothwadAccounts.checkUsername(username)
+    override suspend fun signInNative(identifier: String, password: String) =
+        GothwadAccounts.signInNative(identifier, password)
+
+    override suspend fun verifyNativeMfa(challenge: String, code: String) =
+        GothwadAccounts.verifyNativeMfa(challenge, code)
+
+    override suspend fun signUpNative(input: NativeSignUpInput) = GothwadAccounts.signUpNative(input)
+    override suspend fun forgotPasswordNative(username: String) = GothwadAccounts.forgotPasswordNative(username)
+    override suspend fun resetPasswordNative(token: String, newPassword: String) =
+        GothwadAccounts.resetPasswordNative(token, newPassword)
+
+    override suspend fun signInSilentlyWithPeer(peer: DiscoveredAccount) =
+        GothwadAccounts.signInSilentlyWithPeer(peer)
+
     override suspend fun listWebSessions(): Result<List<WebSessionInfo>> = GothwadAccounts.listWebSessions()
     override suspend fun revokeOtherWebSessions(): Result<Int> = GothwadAccounts.revokeOtherWebSessions()
+    override suspend fun revokeWebSession(sessionId: String): Result<Int> = GothwadAccounts.revokeWebSession(sessionId)
     override suspend fun listActivity(): Result<List<AccountActivityEntry>> = GothwadAccounts.listActivity()
     override suspend fun listAuthorizations(): Result<List<ConnectedAppGrant>> = GothwadAccounts.listAuthorizations()
     override suspend fun revokeAuthorization(appId: String): Result<Unit> = GothwadAccounts.revokeAuthorization(appId)
@@ -102,6 +214,39 @@ object LiveGothwadAccountController : AccountSessionController {
         dateOfBirth: String,
         gender: String,
     ): Result<GothwadAccount?> = GothwadAccounts.updateBasicProfile(firstName, lastName, dateOfBirth, gender)
+
+    override suspend fun uploadAvatar(imageDataOrBase64: String, mime: String) =
+        GothwadAccounts.uploadAvatar(imageDataOrBase64, mime)
+
+    override suspend fun removeAvatar() = GothwadAccounts.removeAvatar()
+    override suspend fun updatePhoneNumber(phoneNumber: String, currentPassword: String, mfaCode: String?) =
+        GothwadAccounts.updatePhoneNumber(phoneNumber, currentPassword, mfaCode)
+
+    override suspend fun requestRecoveryEmailChange(recoveryEmail: String, currentPassword: String, mfaCode: String?) =
+        GothwadAccounts.requestRecoveryEmailChange(recoveryEmail, currentPassword, mfaCode)
+
+    override suspend fun verifyRecoveryEmailChange(token: String) =
+        GothwadAccounts.verifyRecoveryEmailChange(token)
+
+    override suspend fun changePassword(currentPassword: String, newPassword: String, mfaCode: String?) =
+        GothwadAccounts.changePassword(currentPassword, newPassword, mfaCode)
+
+    override suspend fun getMfaStatus() = GothwadAccounts.getMfaStatus()
+    override suspend fun beginMfaEnrollment(currentPassword: String) =
+        GothwadAccounts.beginMfaEnrollment(currentPassword)
+
+    override suspend fun confirmMfaEnrollment(currentPassword: String, enrollmentId: String, code: String) =
+        GothwadAccounts.confirmMfaEnrollment(currentPassword, enrollmentId, code)
+
+    override suspend fun regenerateMfaRecoveryCodes(currentPassword: String, code: String) =
+        GothwadAccounts.regenerateMfaRecoveryCodes(currentPassword, code)
+
+    override suspend fun disableMfa(currentPassword: String, code: String) =
+        GothwadAccounts.disableMfa(currentPassword, code)
+
+    override suspend fun exportAccountDataJson() = GothwadAccounts.exportAccountDataJson()
+    override suspend fun deleteAccount(password: String, mfaCode: String?) =
+        GothwadAccounts.deleteAccount(password, mfaCode)
 }
 
 class AccountDashboardViewModel(
@@ -261,6 +406,309 @@ class AccountDashboardViewModel(
         mutableUiState.update { it.copy(showAccountSwitcher = false) }
     }
 
+    // -------------------------------------------------------------------------
+    // Direct Native Authentication + Cross-App Silent Peer SSO
+    // -------------------------------------------------------------------------
+
+    fun openNativeAuthDialog(
+        initialIdentifier: String = "",
+        startStep: NativeAuthStep = NativeAuthStep.IDENTIFIER,
+    ) {
+        mutableUiState.update {
+            it.copy(
+                showAccountSwitcher = false,
+                nativeAuth = NativeAuthDialogState(
+                    visible = true,
+                    step = startStep,
+                    identifier = initialIdentifier.trim(),
+                ),
+            )
+        }
+    }
+
+    fun dismissNativeAuthDialog() {
+        mutableUiState.update { it.copy(nativeAuth = NativeAuthDialogState()) }
+    }
+
+    fun setNativeAuthStep(step: NativeAuthStep) {
+        mutableUiState.update {
+            it.copy(
+                nativeAuth = it.nativeAuth.copy(
+                    step = step,
+                    errorMessage = null,
+                    infoMessage = null,
+                    usernameAvailable = null,
+                    usernameStatusMessage = null,
+                ),
+            )
+        }
+    }
+
+    fun submitNativeIdentifier(identifier: String) {
+        val clean = identifier.trim()
+        if (clean.isEmpty()) {
+            mutableUiState.update {
+                it.copy(nativeAuth = it.nativeAuth.copy(errorMessage = "Enter your username, email, or phone number."))
+            }
+            return
+        }
+        viewModelScope.launch {
+            mutableUiState.update {
+                it.copy(nativeAuth = it.nativeAuth.copy(isBusy = true, errorMessage = null, infoMessage = null, identifier = clean))
+            }
+            val result = controller.checkIdentifier(clean)
+            result.onSuccess { check ->
+                if (check.exists) {
+                    mutableUiState.update {
+                        it.copy(
+                            nativeAuth = it.nativeAuth.copy(
+                                isBusy = false,
+                                step = NativeAuthStep.PASSWORD,
+                                identifier = clean,
+                                errorMessage = null,
+                            ),
+                        )
+                    }
+                } else {
+                    mutableUiState.update {
+                        it.copy(
+                            nativeAuth = it.nativeAuth.copy(
+                                isBusy = false,
+                                errorMessage = check.error ?: "Account not found. Check spelling or create an account.",
+                            ),
+                        )
+                    }
+                }
+            }.onFailure { err ->
+                mutableUiState.update {
+                    it.copy(nativeAuth = it.nativeAuth.copy(isBusy = false, errorMessage = err.message ?: "Could not verify account."))
+                }
+            }
+        }
+    }
+
+    fun checkNativeUsername(username: String) {
+        val clean = username.trim().lowercase()
+        if (clean.isEmpty()) {
+            mutableUiState.update {
+                it.copy(nativeAuth = it.nativeAuth.copy(usernameAvailable = null, usernameStatusMessage = null))
+            }
+            return
+        }
+        viewModelScope.launch {
+            val result = controller.checkUsername(clean)
+            result.onSuccess { check ->
+                val msg = when {
+                    !check.valid -> check.error ?: "Use 3-24 letters and numbers only"
+                    check.available -> "Available: ${check.email ?: "$clean@gothwadtech.com"}"
+                    else -> check.error ?: "Username already taken"
+                }
+                mutableUiState.update {
+                    it.copy(
+                        nativeAuth = it.nativeAuth.copy(
+                            usernameAvailable = check.valid && check.available,
+                            usernameStatusMessage = msg,
+                        ),
+                    )
+                }
+            }.onFailure { err ->
+                mutableUiState.update {
+                    it.copy(
+                        nativeAuth = it.nativeAuth.copy(
+                            usernameAvailable = false,
+                            usernameStatusMessage = err.message ?: "Could not check username",
+                        ),
+                    )
+                }
+            }
+        }
+    }
+
+    fun submitNativePassword(identifier: String, password: String) {
+        val cleanId = identifier.trim()
+        if (cleanId.isEmpty() || password.isEmpty()) {
+            mutableUiState.update {
+                it.copy(nativeAuth = it.nativeAuth.copy(errorMessage = "Enter your account and password."))
+            }
+            return
+        }
+        viewModelScope.launch {
+            mutableUiState.update {
+                it.copy(nativeAuth = it.nativeAuth.copy(isBusy = true, errorMessage = null, infoMessage = null))
+            }
+            val result = controller.signInNative(cleanId, password)
+            result.onSuccess { outcome ->
+                when (outcome) {
+                    is MobileAuthSignInOutcome.Authenticated -> {
+                        mutableUiState.update {
+                            it.copy(
+                                nativeAuth = NativeAuthDialogState(),
+                                snackbarMessage = "Signed in as ${outcome.user?.email ?: cleanId}",
+                            )
+                        }
+                        refreshNativeManagementData()
+                    }
+                    is MobileAuthSignInOutcome.MfaRequired -> {
+                        mutableUiState.update {
+                            it.copy(
+                                nativeAuth = it.nativeAuth.copy(
+                                    isBusy = false,
+                                    step = NativeAuthStep.MFA,
+                                    mfaChallenge = outcome.challenge,
+                                    mfaPrompt = outcome.message,
+                                    errorMessage = null,
+                                ),
+                            )
+                        }
+                    }
+                }
+            }.onFailure { err ->
+                mutableUiState.update {
+                    it.copy(nativeAuth = it.nativeAuth.copy(isBusy = false, errorMessage = err.message ?: "Sign-in failed."))
+                }
+            }
+        }
+    }
+
+    fun submitNativeMfa(code: String) {
+        val challenge = mutableUiState.value.nativeAuth.mfaChallenge
+        val cleanCode = code.trim()
+        if (challenge.isBlank() || cleanCode.isEmpty()) {
+            mutableUiState.update {
+                it.copy(nativeAuth = it.nativeAuth.copy(errorMessage = "Enter your 6-digit authenticator or recovery code."))
+            }
+            return
+        }
+        viewModelScope.launch {
+            mutableUiState.update { it.copy(nativeAuth = it.nativeAuth.copy(isBusy = true, errorMessage = null)) }
+            val result = controller.verifyNativeMfa(challenge, cleanCode)
+            result.onSuccess { acc ->
+                mutableUiState.update {
+                    it.copy(
+                        nativeAuth = NativeAuthDialogState(),
+                        snackbarMessage = "Signed in as ${acc.email ?: acc.username ?: acc.userId}",
+                    )
+                }
+                refreshNativeManagementData()
+            }.onFailure { err ->
+                mutableUiState.update {
+                    it.copy(nativeAuth = it.nativeAuth.copy(isBusy = false, errorMessage = err.message ?: "Verification failed."))
+                }
+            }
+        }
+    }
+
+    fun submitNativeSignUp(input: NativeSignUpInput) {
+        viewModelScope.launch {
+            mutableUiState.update { it.copy(nativeAuth = it.nativeAuth.copy(isBusy = true, errorMessage = null)) }
+            val result = controller.signUpNative(input)
+            result.onSuccess { acc ->
+                mutableUiState.update {
+                    it.copy(
+                        nativeAuth = NativeAuthDialogState(),
+                        snackbarMessage = "Welcome to Gothwad, ${acc.firstName ?: acc.username ?: acc.userId}",
+                    )
+                }
+                refreshNativeManagementData()
+            }.onFailure { err ->
+                mutableUiState.update {
+                    it.copy(nativeAuth = it.nativeAuth.copy(isBusy = false, errorMessage = err.message ?: "Could not create account."))
+                }
+            }
+        }
+    }
+
+    fun submitForgotPassword(username: String) {
+        val clean = username.trim().lowercase()
+        if (clean.isEmpty()) {
+            mutableUiState.update {
+                it.copy(nativeAuth = it.nativeAuth.copy(errorMessage = "Enter your username first."))
+            }
+            return
+        }
+        viewModelScope.launch {
+            mutableUiState.update { it.copy(nativeAuth = it.nativeAuth.copy(isBusy = true, errorMessage = null)) }
+            val result = controller.forgotPasswordNative(clean)
+            result.onSuccess { message ->
+                mutableUiState.update {
+                    it.copy(
+                        nativeAuth = it.nativeAuth.copy(
+                            isBusy = false,
+                            step = NativeAuthStep.RESET_PASSWORD,
+                            identifier = clean,
+                            infoMessage = message,
+                            errorMessage = null,
+                        ),
+                    )
+                }
+            }.onFailure { err ->
+                mutableUiState.update {
+                    it.copy(nativeAuth = it.nativeAuth.copy(isBusy = false, errorMessage = err.message ?: "Reset request failed."))
+                }
+            }
+        }
+    }
+
+    fun submitResetPassword(token: String, newPassword: String) {
+        viewModelScope.launch {
+            mutableUiState.update { it.copy(nativeAuth = it.nativeAuth.copy(isBusy = true, errorMessage = null)) }
+            val result = controller.resetPasswordNative(token, newPassword)
+            result.onSuccess { message ->
+                mutableUiState.update {
+                    it.copy(
+                        nativeAuth = it.nativeAuth.copy(
+                            isBusy = false,
+                            step = NativeAuthStep.PASSWORD,
+                            infoMessage = message,
+                            errorMessage = null,
+                        ),
+                    )
+                }
+            }.onFailure { err ->
+                mutableUiState.update {
+                    it.copy(nativeAuth = it.nativeAuth.copy(isBusy = false, errorMessage = err.message ?: "Could not reset password."))
+                }
+            }
+        }
+    }
+
+    /**
+     * Attempts zero-browser silent cross-app peer SSO via `issue_peer_code` + PKCE `/oauth/token`.
+     * Falls back to prefilled native Sign-In dialog only when silent peer SSO fails.
+     */
+    fun continueWithPeerAccount(peer: DiscoveredAccount) {
+        viewModelScope.launch {
+            mutableUiState.update { it.copy(showAccountSwitcher = false, isPeerSilentSigningIn = true) }
+            val result = controller.signInSilentlyWithPeer(peer)
+            result.onSuccess { acc ->
+                mutableUiState.update {
+                    it.copy(
+                        isPeerSilentSigningIn = false,
+                        snackbarMessage = "Signed in silently as ${acc.email ?: acc.username ?: acc.userId}",
+                    )
+                }
+                refreshNativeManagementData()
+            }.onFailure {
+                val hint = peer.email ?: peer.username.orEmpty()
+                mutableUiState.update {
+                    it.copy(
+                        isPeerSilentSigningIn = false,
+                        nativeAuth = NativeAuthDialogState(
+                            visible = true,
+                            step = if (hint.isNotBlank()) NativeAuthStep.PASSWORD else NativeAuthStep.IDENTIFIER,
+                            identifier = hint,
+                            infoMessage = "Verify your password to sign in as ${peer.email ?: peer.username ?: peer.userId}.",
+                        ),
+                    )
+                }
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Local Sign-out, Device Removal & Server Disconnect
+    // -------------------------------------------------------------------------
+
     fun openSignOutDialog(account: GothwadAccount) {
         val displayName = account.name?.takeIf { it.isNotBlank() }
             ?: account.username?.takeIf { it.isNotBlank() }
@@ -295,8 +743,47 @@ class AccountDashboardViewModel(
         mutableUiState.update { it.copy(signOutTarget = null, showAccountSwitcher = false) }
     }
 
+    // -------------------------------------------------------------------------
+    // Native Account & Security Management Dialogs (`/api/mobile/*`)
+    // -------------------------------------------------------------------------
+
     fun openEditProfileDialog(show: Boolean) {
-        mutableUiState.update { it.copy(showEditProfileDialog = show) }
+        if (show) {
+            openManagementDialog(ActiveManagementDialog.EditBasicProfile)
+        } else {
+            dismissManagementDialog()
+        }
+    }
+
+    fun openManagementDialog(dialog: ActiveManagementDialog) {
+        mutableUiState.update {
+            it.copy(
+                activeManagementDialog = dialog,
+                isManagementBusy = false,
+                managementError = null,
+                managementRequiresMfaPrompt = it.activeAccount?.mfaEnabled == true,
+                recoveryEmailPendingVerification = false,
+                mfaSetup = null,
+                mfaRecoveryCodes = emptyList(),
+            )
+        }
+        if (dialog is ActiveManagementDialog.TwoFactor) {
+            loadMfaStatus()
+        }
+    }
+
+    fun dismissManagementDialog() {
+        mutableUiState.update {
+            it.copy(
+                activeManagementDialog = null,
+                isManagementBusy = false,
+                managementError = null,
+                managementRequiresMfaPrompt = false,
+                recoveryEmailPendingVerification = false,
+                mfaSetup = null,
+                mfaRecoveryCodes = emptyList(),
+            )
+        }
     }
 
     fun saveBasicProfile(
@@ -311,13 +798,278 @@ class AccountDashboardViewModel(
             mutableUiState.update { current ->
                 current.copy(
                     isSavingProfile = false,
-                    showEditProfileDialog = result.isFailure,
+                    activeManagementDialog = if (result.isFailure) ActiveManagementDialog.EditBasicProfile else null,
                     snackbarMessage = if (result.isSuccess) {
                         "Personal info updated"
                     } else {
                         "Could not update personal info: ${result.exceptionOrNull()?.message ?: "try again"}"
                     },
                 )
+            }
+        }
+    }
+
+    fun uploadAvatar(imageDataOrBase64: String, mime: String = "image/jpeg") {
+        viewModelScope.launch {
+            mutableUiState.update { it.copy(isManagementBusy = true, managementError = null) }
+            val result = controller.uploadAvatar(imageDataOrBase64, mime)
+            result.onSuccess {
+                mutableUiState.update {
+                    it.copy(
+                        isManagementBusy = false,
+                        activeManagementDialog = null,
+                        snackbarMessage = "Profile photo updated",
+                    )
+                }
+            }.onFailure { err ->
+                mutableUiState.update {
+                    it.copy(isManagementBusy = false, managementError = err.message ?: "Failed to upload photo")
+                }
+            }
+        }
+    }
+
+    fun removeAvatar() {
+        viewModelScope.launch {
+            mutableUiState.update { it.copy(isManagementBusy = true, managementError = null) }
+            val result = controller.removeAvatar()
+            result.onSuccess {
+                mutableUiState.update {
+                    it.copy(
+                        isManagementBusy = false,
+                        activeManagementDialog = null,
+                        snackbarMessage = "Profile photo removed",
+                    )
+                }
+            }.onFailure { err ->
+                mutableUiState.update {
+                    it.copy(isManagementBusy = false, managementError = err.message ?: "Failed to remove photo")
+                }
+            }
+        }
+    }
+
+    fun updatePhoneNumber(phoneNumber: String, currentPassword: String, mfaCode: String?) {
+        viewModelScope.launch {
+            mutableUiState.update { it.copy(isManagementBusy = true, managementError = null) }
+            val result = controller.updatePhoneNumber(phoneNumber, currentPassword, mfaCode)
+            result.onSuccess {
+                mutableUiState.update {
+                    it.copy(
+                        isManagementBusy = false,
+                        activeManagementDialog = null,
+                        managementRequiresMfaPrompt = false,
+                        snackbarMessage = if (phoneNumber.isBlank()) "Phone number removed" else "Phone number updated",
+                    )
+                }
+            }.onFailure { err ->
+                handleManagementFailure(err, "Could not update phone number")
+            }
+        }
+    }
+
+    fun requestRecoveryEmailChange(recoveryEmail: String, currentPassword: String, mfaCode: String?) {
+        viewModelScope.launch {
+            mutableUiState.update { it.copy(isManagementBusy = true, managementError = null) }
+            val result = controller.requestRecoveryEmailChange(recoveryEmail, currentPassword, mfaCode)
+            result.onSuccess { msg ->
+                mutableUiState.update {
+                    it.copy(
+                        isManagementBusy = false,
+                        recoveryEmailPendingVerification = true,
+                        managementError = null,
+                        snackbarMessage = msg,
+                    )
+                }
+            }.onFailure { err ->
+                handleManagementFailure(err, "Could not request recovery email change")
+            }
+        }
+    }
+
+    fun verifyRecoveryEmailChange(token: String) {
+        viewModelScope.launch {
+            mutableUiState.update { it.copy(isManagementBusy = true, managementError = null) }
+            val result = controller.verifyRecoveryEmailChange(token)
+            result.onSuccess {
+                mutableUiState.update {
+                    it.copy(
+                        isManagementBusy = false,
+                        activeManagementDialog = null,
+                        recoveryEmailPendingVerification = false,
+                        snackbarMessage = "Recovery email verified",
+                    )
+                }
+            }.onFailure { err ->
+                mutableUiState.update {
+                    it.copy(isManagementBusy = false, managementError = err.message ?: "Verification token invalid or expired")
+                }
+            }
+        }
+    }
+
+    fun changePassword(currentPassword: String, newPassword: String, mfaCode: String?) {
+        viewModelScope.launch {
+            mutableUiState.update { it.copy(isManagementBusy = true, managementError = null) }
+            val result = controller.changePassword(currentPassword, newPassword, mfaCode)
+            result.onSuccess { message ->
+                mutableUiState.update {
+                    it.copy(
+                        isManagementBusy = false,
+                        activeManagementDialog = null,
+                        managementRequiresMfaPrompt = false,
+                        snackbarMessage = message,
+                    )
+                }
+                refreshNativeManagementData()
+            }.onFailure { err ->
+                handleManagementFailure(err, "Could not update password")
+            }
+        }
+    }
+
+    fun loadMfaStatus() {
+        viewModelScope.launch {
+            val result = controller.getMfaStatus()
+            result.onSuccess { status ->
+                mutableUiState.update { it.copy(mfaStatus = status) }
+            }
+        }
+    }
+
+    fun beginMfaEnrollment(currentPassword: String) {
+        viewModelScope.launch {
+            mutableUiState.update { it.copy(isManagementBusy = true, managementError = null) }
+            val result = controller.beginMfaEnrollment(currentPassword)
+            result.onSuccess { setup ->
+                mutableUiState.update {
+                    it.copy(isManagementBusy = false, mfaSetup = setup, managementError = null)
+                }
+            }.onFailure { err ->
+                mutableUiState.update {
+                    it.copy(isManagementBusy = false, managementError = err.message ?: "Could not start 2FA enrollment")
+                }
+            }
+        }
+    }
+
+    fun confirmMfaEnrollment(currentPassword: String, enrollmentId: String, code: String) {
+        viewModelScope.launch {
+            mutableUiState.update { it.copy(isManagementBusy = true, managementError = null) }
+            val result = controller.confirmMfaEnrollment(currentPassword, enrollmentId, code)
+            result.onSuccess { codes ->
+                mutableUiState.update {
+                    it.copy(
+                        isManagementBusy = false,
+                        mfaSetup = null,
+                        mfaRecoveryCodes = codes,
+                        mfaStatus = MfaStatusInfo(enabled = true, enrollmentAvailable = true, recoveryCodesRemaining = codes.size),
+                        snackbarMessage = "2-Step Verification enabled",
+                    )
+                }
+            }.onFailure { err ->
+                mutableUiState.update {
+                    it.copy(isManagementBusy = false, managementError = err.message ?: "Invalid verification code")
+                }
+            }
+        }
+    }
+
+    fun regenerateMfaRecoveryCodes(currentPassword: String, code: String) {
+        viewModelScope.launch {
+            mutableUiState.update { it.copy(isManagementBusy = true, managementError = null) }
+            val result = controller.regenerateMfaRecoveryCodes(currentPassword, code)
+            result.onSuccess { codes ->
+                mutableUiState.update {
+                    it.copy(
+                        isManagementBusy = false,
+                        mfaRecoveryCodes = codes,
+                        mfaStatus = MfaStatusInfo(enabled = true, enrollmentAvailable = true, recoveryCodesRemaining = codes.size),
+                        snackbarMessage = "New recovery codes generated",
+                    )
+                }
+            }.onFailure { err ->
+                mutableUiState.update {
+                    it.copy(isManagementBusy = false, managementError = err.message ?: "Could not regenerate recovery codes")
+                }
+            }
+        }
+    }
+
+    fun disableMfa(currentPassword: String, code: String) {
+        viewModelScope.launch {
+            mutableUiState.update { it.copy(isManagementBusy = true, managementError = null) }
+            val result = controller.disableMfa(currentPassword, code)
+            result.onSuccess {
+                mutableUiState.update {
+                    it.copy(
+                        isManagementBusy = false,
+                        mfaSetup = null,
+                        mfaRecoveryCodes = emptyList(),
+                        mfaStatus = MfaStatusInfo(enabled = false, enrollmentAvailable = true, recoveryCodesRemaining = 0),
+                        activeManagementDialog = null,
+                        snackbarMessage = "2-Step Verification disabled",
+                    )
+                }
+            }.onFailure { err ->
+                mutableUiState.update {
+                    it.copy(isManagementBusy = false, managementError = err.message ?: "Could not disable 2-Step Verification")
+                }
+            }
+        }
+    }
+
+    fun exportAccountData() {
+        viewModelScope.launch {
+            mutableUiState.update { it.copy(isExportingData = true) }
+            val result = controller.exportAccountDataJson()
+            result.onSuccess { jsonText ->
+                mutableUiState.update {
+                    it.copy(
+                        isExportingData = false,
+                        activeManagementDialog = ActiveManagementDialog.ExportData(jsonText),
+                    )
+                }
+            }.onFailure { err ->
+                mutableUiState.update {
+                    it.copy(
+                        isExportingData = false,
+                        snackbarMessage = "Export failed: ${err.message ?: "try again"}",
+                    )
+                }
+            }
+        }
+    }
+
+    fun deleteAccount(password: String, mfaCode: String?) {
+        viewModelScope.launch {
+            mutableUiState.update { it.copy(isManagementBusy = true, managementError = null) }
+            val result = controller.deleteAccount(password, mfaCode)
+            result.onSuccess {
+                mutableUiState.update {
+                    it.copy(
+                        isManagementBusy = false,
+                        activeManagementDialog = null,
+                        managementRequiresMfaPrompt = false,
+                        snackbarMessage = "Gothwad Account permanently deleted",
+                    )
+                }
+            }.onFailure { err ->
+                handleManagementFailure(err, "Could not delete account")
+            }
+        }
+    }
+
+    fun revokeWebSession(sessionId: String) {
+        viewModelScope.launch {
+            val result = controller.revokeWebSession(sessionId)
+            result.onSuccess {
+                mutableUiState.update { it.copy(snackbarMessage = "Session signed out") }
+                refreshNativeManagementData()
+            }.onFailure { err ->
+                mutableUiState.update {
+                    it.copy(snackbarMessage = "Could not sign out session: ${err.message ?: "error"}")
+                }
             }
         }
     }
@@ -329,12 +1081,9 @@ class AccountDashboardViewModel(
                 mutableUiState.update { it.copy(snackbarMessage = "Signed out $count other web session(s)") }
                 refreshNativeManagementData()
             }.onFailure { err ->
-                val msg = if (err.message?.contains("reauthentication_required") == true) {
-                    "Recent browser login required to sign out other sessions — opening Security on web"
-                } else {
-                    "Could not sign out other web sessions (${err.message ?: "error"})"
+                mutableUiState.update {
+                    it.copy(snackbarMessage = "Could not sign out other web sessions: ${err.message ?: "error"}")
                 }
-                mutableUiState.update { it.copy(snackbarMessage = msg) }
             }
         }
     }
@@ -354,8 +1103,8 @@ class AccountDashboardViewModel(
     }
 
     fun startSignIn(activity: Activity, chooseAccount: Boolean = false, loginHint: String? = null) {
-        mutableUiState.update { it.copy(showAccountSwitcher = false) }
-        controller.signIn(activity, chooseAccount, loginHint)
+        mutableUiState.update { it.copy(showAccountSwitcher = false, nativeAuth = NativeAuthDialogState()) }
+        controller.signInWithBrowser(activity, chooseAccount, loginHint)
     }
 
     fun openWebSection(activity: Activity, section: String? = null) {
@@ -370,6 +1119,18 @@ class AccountDashboardViewModel(
         controller.refreshProfile()
         if (controller.canManageAccountNatively()) {
             refreshNativeManagementData()
+        }
+    }
+
+    private fun handleManagementFailure(err: Throwable, fallback: String) {
+        val needsMfa = (err as? MobileApiException)?.errorCode == "mfa_required" ||
+            err.message?.contains("authenticator", ignoreCase = true) == true
+        mutableUiState.update {
+            it.copy(
+                isManagementBusy = false,
+                managementRequiresMfaPrompt = it.managementRequiresMfaPrompt || needsMfa,
+                managementError = err.message ?: fallback,
+            )
         }
     }
 

@@ -11,6 +11,12 @@ import java.security.MessageDigest
 
 internal object TrustVerifier {
 
+    fun isTrustedUid(
+        context: Context,
+        callingUid: Int,
+        policy: BrokerTrustPolicy,
+    ): Boolean = verifyBinderCaller(context, callingUid, policy) != null
+
     fun verifyBinderCaller(
         context: Context,
         callingUid: Int,

@@ -56,7 +56,10 @@ import com.gothwad.accounts.ui.components.initials
 fun PersonalInfoTabScreen(
     account: GothwadAccount,
     canEditBasicProfileNatively: Boolean = false,
+    onEditAvatarClick: () -> Unit = {},
     onEditBasicProfileClick: () -> Unit = {},
+    onEditPhoneClick: () -> Unit = {},
+    onEditRecoveryEmailClick: () -> Unit = {},
     onManagePersonalOnWeb: () -> Unit,
 ) {
     val semantic = LocalAccountColors.current
@@ -99,7 +102,7 @@ fun PersonalInfoTabScreen(
                         avatarUrl = account.avatarUrl,
                         size = 64.dp,
                         showBrandRing = true,
-                        onClick = onManagePersonalOnWeb,
+                        onClick = if (canEditBasicProfileNatively) onEditAvatarClick else onManagePersonalOnWeb,
                     )
                     Spacer(modifier = Modifier.width(16.dp))
                     Column(
@@ -142,7 +145,7 @@ fun PersonalInfoTabScreen(
             AccountSectionCard(
                 title = "Basic info",
                 subtitle = if (canEditBasicProfileNatively) {
-                    "Edit name, date of birth, or gender right here, or manage photos & contact info on web."
+                    "Manage your photo, name, birthday, and gender right inside this app."
                 } else {
                     "Changes saved on accounts.gothwadtech.com sync automatically to this app."
                 },
@@ -151,10 +154,14 @@ fun PersonalInfoTabScreen(
                 AccountSettingRow(
                     label = "Profile photo",
                     value = if (account.avatarUrl != null) "Photo set" else "Initials avatar",
-                    supportingText = "Update or remove your profile photo on Accounts web",
+                    supportingText = if (canEditBasicProfileNatively) {
+                        "Upload a photo from your device or remove your existing photo"
+                    } else {
+                        "Update or remove your profile photo on Accounts web"
+                    },
                     icon = Icons.Rounded.PhotoCamera,
-                    trailingIcon = Icons.AutoMirrored.Rounded.OpenInNew,
-                    onClick = onManagePersonalOnWeb,
+                    trailingIcon = if (canEditBasicProfileNatively) Icons.Rounded.Edit else Icons.AutoMirrored.Rounded.OpenInNew,
+                    onClick = if (canEditBasicProfileNatively) onEditAvatarClick else onManagePersonalOnWeb,
                 )
                 SectionDivider()
                 AccountSettingRow(
@@ -169,8 +176,6 @@ fun PersonalInfoTabScreen(
                     label = "Username",
                     value = account.username?.let { "@$it" } ?: "Not set",
                     icon = Icons.Rounded.Badge,
-                    trailingIcon = Icons.AutoMirrored.Rounded.OpenInNew,
-                    onClick = onManagePersonalOnWeb,
                 )
                 SectionDivider()
                 AccountSettingRow(
@@ -210,7 +215,7 @@ fun PersonalInfoTabScreen(
                 SectionDivider()
                 AccountSettingRow(
                     label = "Phone number",
-                    value = account.phoneNumber?.takeIf { it.isNotBlank() } ?: "View or update on Accounts web",
+                    value = account.phoneNumber?.takeIf { it.isNotBlank() } ?: "Not set",
                     supportingText = "Used as a sign-in identifier when set",
                     icon = Icons.Rounded.Phone,
                     statusBadge = account.phoneNumberVerified?.takeIf { !account.phoneNumber.isNullOrBlank() }?.let { verified ->
@@ -221,13 +226,13 @@ fun PersonalInfoTabScreen(
                             )
                         }
                     },
-                    trailingIcon = Icons.AutoMirrored.Rounded.OpenInNew,
-                    onClick = onManagePersonalOnWeb,
+                    trailingIcon = if (canEditBasicProfileNatively) Icons.Rounded.Edit else Icons.AutoMirrored.Rounded.OpenInNew,
+                    onClick = if (canEditBasicProfileNatively) onEditPhoneClick else onManagePersonalOnWeb,
                 )
                 SectionDivider()
                 AccountSettingRow(
                     label = "Recovery email",
-                    value = account.recoveryEmail?.takeIf { it.isNotBlank() } ?: "View or verify on Accounts web",
+                    value = account.recoveryEmail?.takeIf { it.isNotBlank() } ?: "Not set",
                     supportingText = "Used for password resets and security alerts",
                     icon = Icons.Rounded.MarkEmailRead,
                     statusBadge = account.recoveryEmailVerified?.let { verified ->
@@ -238,8 +243,8 @@ fun PersonalInfoTabScreen(
                             )
                         }
                     },
-                    trailingIcon = Icons.AutoMirrored.Rounded.OpenInNew,
-                    onClick = onManagePersonalOnWeb,
+                    trailingIcon = if (canEditBasicProfileNatively) Icons.Rounded.Edit else Icons.AutoMirrored.Rounded.OpenInNew,
+                    onClick = if (canEditBasicProfileNatively) onEditRecoveryEmailClick else onManagePersonalOnWeb,
                 )
             }
         }
@@ -257,15 +262,17 @@ fun PersonalInfoTabScreen(
                     supportingText = "Your name and avatar are shared only with Gothwad services and apps you authorize via OAuth.",
                     icon = Icons.Rounded.Visibility,
                 )
-                Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)) {
-                    OutlinedButton(
-                        onClick = onManagePersonalOnWeb,
-                        shape = RoundedCornerShape(50),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(stringResource(R.string.gothwad_manage_web))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
+                if (!canEditBasicProfileNatively) {
+                    Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)) {
+                        OutlinedButton(
+                            onClick = onManagePersonalOnWeb,
+                            shape = RoundedCornerShape(50),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(stringResource(R.string.gothwad_manage_web))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
+                        }
                     }
                 }
             }

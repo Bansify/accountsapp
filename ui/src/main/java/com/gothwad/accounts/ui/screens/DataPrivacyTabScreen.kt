@@ -37,6 +37,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.gothwad.accounts.core.AccountActivityEntry
 import com.gothwad.accounts.core.GothwadAccount
 import com.gothwad.accounts.ui.LocalAccountColors
 import com.gothwad.accounts.ui.R
@@ -51,6 +52,12 @@ import com.gothwad.accounts.ui.components.TabIntroHeader
 @Composable
 fun DataPrivacyTabScreen(
     account: GothwadAccount,
+    canManageNatively: Boolean = false,
+    canWriteNatively: Boolean = canManageNatively,
+    isExportingData: Boolean = false,
+    activityFeed: List<AccountActivityEntry> = emptyList(),
+    onExportDataClick: () -> Unit = {},
+    onDeleteAccountClick: () -> Unit = {},
     onManageDataOnWeb: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -67,7 +74,7 @@ fun DataPrivacyTabScreen(
         item {
             TabIntroHeader(
                 title = stringResource(R.string.gothwad_tab_data),
-                subtitle = "Download a copy of your account data, view shared storage usage, or permanently delete your account on web.",
+                subtitle = "Download a copy of your account data, view shared storage usage, or permanently delete your account.",
                 modifier = Modifier.widthIn(max = 600.dp),
             )
         }
@@ -99,7 +106,7 @@ fun DataPrivacyTabScreen(
                                 style = MaterialTheme.typography.titleLarge,
                             )
                             Text(
-                                text = "Export your account snapshot or review account lifecycle actions on accounts.gothwadtech.com.",
+                                text = "Export your account snapshot or review account lifecycle actions.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -116,7 +123,7 @@ fun DataPrivacyTabScreen(
                     }
                     HorizontalDivider(color = semantic.cardBorder)
                     TextButton(
-                        onClick = onManageDataOnWeb,
+                        onClick = if (canManageNatively && !isExportingData) onExportDataClick else onManageDataOnWeb,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 12.dp, vertical = 2.dp),
@@ -125,9 +132,17 @@ fun DataPrivacyTabScreen(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text(stringResource(R.string.gothwad_open_on_web))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Text(
+                                if (canManageNatively) {
+                                    if (isExportingData) "Preparing export…" else "Export account data JSON"
+                                } else {
+                                    stringResource(R.string.gothwad_open_on_web)
+                                },
+                            )
+                            if (!canManageNatively) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
+                            }
                         }
                     }
                 }
@@ -164,14 +179,16 @@ fun DataPrivacyTabScreen(
                             .clip(RoundedCornerShape(14.dp)),
                     )
                 }
-                Spacer(modifier = Modifier.height(4.dp))
-                SectionDivider()
-                AccountSettingRow(
-                    label = "Manage storage on Accounts web",
-                    value = "Open storage & data summary",
-                    trailingIcon = Icons.AutoMirrored.Rounded.OpenInNew,
-                    onClick = onManageDataOnWeb,
-                )
+                if (!canManageNatively) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    SectionDivider()
+                    AccountSettingRow(
+                        label = "Manage storage on Accounts web",
+                        value = "Open storage & data summary",
+                        trailingIcon = Icons.AutoMirrored.Rounded.OpenInNew,
+                        onClick = onManageDataOnWeb,
+                    )
+                }
             }
         }
 
@@ -179,25 +196,42 @@ fun DataPrivacyTabScreen(
         item {
             AccountSectionCard(
                 title = "Data from Gothwad Accounts",
-                subtitle = "Export actions and security event logs on accounts.gothwadtech.com.",
+                subtitle = if (canManageNatively) {
+                    "Export actions and recent account activity events."
+                } else {
+                    "Export actions and security event logs on accounts.gothwadtech.com."
+                },
                 modifier = Modifier.widthIn(max = 600.dp),
             ) {
                 AccountSettingRow(
                     label = "Export your account data",
-                    value = "Download Accounts JSON snapshot",
-                    supportingText = "Exports your profile, linked sign-in methods, and security log",
+                    value = if (isExportingData) "Preparing JSON archive…" else "Download Accounts JSON snapshot",
+                    supportingText = "Exports your profile, sessions, connected apps, and security log",
                     icon = Icons.Rounded.Download,
-                    trailingIcon = Icons.AutoMirrored.Rounded.OpenInNew,
-                    onClick = onManageDataOnWeb,
+                    trailingIcon = if (canManageNatively) null else Icons.AutoMirrored.Rounded.OpenInNew,
+                    onClick = if (canManageNatively && !isExportingData) onExportDataClick else onManageDataOnWeb,
                 )
-                SectionDivider()
-                AccountSettingRow(
-                    label = "Account activity log",
-                    value = "View login & account events on web",
-                    icon = Icons.Rounded.History,
-                    trailingIcon = Icons.AutoMirrored.Rounded.OpenInNew,
-                    onClick = onManageDataOnWeb,
-                )
+                if (canManageNatively && activityFeed.isNotEmpty()) {
+                    activityFeed.take(5).forEach { entry ->
+                        SectionDivider()
+                        AccountSettingRow(
+                            label = entry.title,
+                            value = entry.detail ?: entry.type,
+                            supportingText = listOfNotNull(entry.ipAddress, entry.createdAt).joinToString(" · "),
+                            icon = Icons.Rounded.History,
+                            trailingIcon = null,
+                        )
+                    }
+                } else {
+                    SectionDivider()
+                    AccountSettingRow(
+                        label = "Account activity log",
+                        value = if (canManageNatively) "No recent account events" else "View login & account events on web",
+                        icon = Icons.Rounded.History,
+                        trailingIcon = if (canManageNatively) null else Icons.AutoMirrored.Rounded.OpenInNew,
+                        onClick = if (canManageNatively) null else onManageDataOnWeb,
+                    )
+                }
             }
         }
 
@@ -215,11 +249,11 @@ fun DataPrivacyTabScreen(
                     AccountSettingRow(
                         label = "Account deletion",
                         value = "Delete your Gothwad Account",
-                        supportingText = "Deleting your account on Accounts removes core identity access; sibling products manage product data separately",
+                        supportingText = "Deleting your account removes core identity access, sessions, and app authorizations",
                         icon = Icons.Rounded.DeleteForever,
                         statusBadge = { StatusPill("Irreversible", StatusTone.CRITICAL) },
-                        trailingIcon = Icons.AutoMirrored.Rounded.OpenInNew,
-                        onClick = onManageDataOnWeb,
+                        trailingIcon = if (canManageNatively && canWriteNatively) null else Icons.AutoMirrored.Rounded.OpenInNew,
+                        onClick = if (canManageNatively && canWriteNatively) onDeleteAccountClick else onManageDataOnWeb,
                     )
                 }
             }

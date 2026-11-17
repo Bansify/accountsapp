@@ -155,7 +155,9 @@ fun StorageCorruptedRecoveryScreen(
 @Composable
 fun SignedOutAccountScreen(
     discoveredAccounts: List<DiscoveredAccount>,
+    isPeerSilentSigningIn: Boolean = false,
     onSignInClick: () -> Unit,
+    onBrowserSignInClick: () -> Unit = onSignInClick,
     onContinueAsPeer: (DiscoveredAccount) -> Unit,
     onRefreshPeers: () -> Unit,
     onOpenPrivacy: () -> Unit,
@@ -227,7 +229,7 @@ fun SignedOutAccountScreen(
 
                     Column(
                         modifier = Modifier.padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         Text(
                             text = stringResource(R.string.gothwad_auth_description),
@@ -244,6 +246,7 @@ fun SignedOutAccountScreen(
                         }
                         Button(
                             onClick = onSignInClick,
+                            enabled = !isPeerSilentSigningIn,
                             shape = RoundedCornerShape(50),
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -254,7 +257,38 @@ fun SignedOutAccountScreen(
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(stringResource(R.string.gothwad_sign_in))
                         }
+                        OutlinedButton(
+                            onClick = onBrowserSignInClick,
+                            enabled = !isPeerSilentSigningIn,
+                            shape = RoundedCornerShape(50),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(46.dp)
+                                .testTag("signed_out_browser_sign_in_button"),
+                        ) {
+                            Text(stringResource(R.string.gothwad_sign_in_browser))
+                        }
                     }
+                }
+            }
+        }
+
+        if (isPeerSilentSigningIn) {
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .widthIn(max = 600.dp)
+                        .padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                    Text(
+                        text = "Signing in silently with your Gothwad device session…",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         }
@@ -277,7 +311,9 @@ fun SignedOutAccountScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .minimumInteractiveComponentSize()
-                                .clickable(role = Role.Button) { onContinueAsPeer(peer) }
+                                .clickable(enabled = !isPeerSilentSigningIn, role = Role.Button) {
+                                    onContinueAsPeer(peer)
+                                }
                                 .padding(horizontal = 20.dp, vertical = 14.dp)
                                 .testTag("discovered_peer_${peer.userId}"),
                             verticalAlignment = Alignment.CenterVertically,

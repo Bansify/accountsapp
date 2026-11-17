@@ -23,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.lifecycleScope
 import com.gothwad.accounts.core.AccountState
 import com.gothwad.accounts.core.GothwadAccounts
 import com.gothwad.accounts.ui.components.GothwadAccountAvatarButton
@@ -30,6 +31,7 @@ import com.gothwad.accounts.ui.components.GothwadAccountSettingsCard
 import com.gothwad.accounts.ui.components.GothwadAccountSwitcherSheet
 import com.gothwad.accounts.ui.components.GothwadAuthStatusBanner
 import com.gothwad.accounts.ui.openAccountManagement
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
@@ -121,11 +123,16 @@ class MainActivity : ComponentActivity() {
                         },
                         onContinueWithPeerAccount = { peer ->
                             showSwitcher = false
-                            GothwadAccounts.signIn(
-                                this@MainActivity,
-                                chooseAccount = false,
-                                loginHint = peer.email ?: peer.username,
-                            )
+                            lifecycleScope.launch {
+                                val res = GothwadAccounts.signInSilentlyWithPeer(peer)
+                                if (res.isFailure) {
+                                    GothwadAccounts.signIn(
+                                        this@MainActivity,
+                                        chooseAccount = false,
+                                        loginHint = peer.email ?: peer.username,
+                                    )
+                                }
+                            }
                         },
                         onAddAnotherAccount = {
                             showSwitcher = false

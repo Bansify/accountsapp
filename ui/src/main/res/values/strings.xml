@@ -1,11 +1,12 @@
 <resources>
     <string name="gothwad_accounts">Gothwad Accounts</string>
     <string name="gothwad_account_brand">Gothwad Account</string>
-    <string name="gothwad_sign_in">Sign in with Gothwad</string>
+    <string name="gothwad_sign_in">Sign in to Gothwad</string>
+    <string name="gothwad_sign_in_browser">Sign in with Browser</string>
     <string name="gothwad_continue_as">Continue as %1$s</string>
-    <string name="gothwad_auth_description">Sign in or create an account on the existing Gothwad Accounts website. Your password stays in the browser.</string>
+    <string name="gothwad_auth_description">Sign in or create your Gothwad Account directly in this app — no browser required.</string>
     <string name="gothwad_discovered_on_device">Accounts found on this device</string>
-    <string name="gothwad_discovered_helper">Verified Gothwad apps on this device share account identity only. Tapping an account authorizes this app separately.</string>
+    <string name="gothwad_discovered_helper">Verified Gothwad apps on this device share account identity. Tapping an account authorizes this app silently without opening a browser.</string>
     <string name="gothwad_choose_account">Choose an account</string>
     <string name="gothwad_active">Active account</string>
     <string name="gothwad_switch">Switch to this account</string>
