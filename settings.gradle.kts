@@ -3,5 +3,5 @@ dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories { google(); mavenCentral() }
 }
-rootProject.name = "GothwadAccounts"
+rootProject.name = "BansifyAccounts"
 include(":core", ":ui", ":app", ":sample")
