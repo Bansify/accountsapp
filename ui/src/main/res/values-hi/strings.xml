@@ -1,6 +1,6 @@
 <resources>
-    <string name="gothwad_accounts">Gothwad Accounts</string>
-    <string name="gothwad_account_brand">Gothwad खाता</string>
+    <string name="gothwad_accounts">Bansify Accounts</string>
+    <string name="gothwad_account_brand">Bansify खाता</string>
     <string name="gothwad_sign_in">Gothwad से साइन इन करें</string>
     <string name="gothwad_sign_in_browser">ब्राउज़र से साइन इन करें</string>
     <string name="gothwad_continue_as">%1$s के रूप में जारी रखें</string>

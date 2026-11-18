@@ -1,6 +1,6 @@
 <resources>
-    <string name="gothwad_accounts">Gothwad Accounts</string>
-    <string name="gothwad_account_brand">Gothwad Account</string>
+    <string name="gothwad_accounts">Bansify Accounts</string>
+    <string name="gothwad_account_brand">Bansify Account</string>
     <string name="gothwad_sign_in">Sign in to Gothwad</string>
     <string name="gothwad_sign_in_browser">Sign in with Browser</string>
     <string name="gothwad_continue_as">Continue as %1$s</string>
