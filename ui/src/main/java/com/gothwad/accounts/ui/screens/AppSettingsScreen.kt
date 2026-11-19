@@ -87,7 +87,7 @@ fun AppSettingsScreen(
         item {
             TabIntroHeader(
                 title = stringResource(R.string.gothwad_settings_title),
-                subtitle = "Choose your theme palette and how you switch sections across Gothwad Accounts.",
+                subtitle = "Choose your theme palette and how you switch sections across Bansify Accounts.",
                 modifier = Modifier.widthIn(max = 600.dp),
             )
         }
@@ -182,7 +182,7 @@ fun AppSettingsScreen(
                 AccountSettingRow(
                     label = stringResource(R.string.gothwad_help_title),
                     value = "Privacy, Terms & legal",
-                    supportingText = "View Gothwad Privacy Policy, Terms of Service, and web help",
+                    supportingText = "View Bansify Privacy Policy, Terms of Service, and web help",
                     icon = Icons.AutoMirrored.Rounded.HelpOutline,
                     testTag = "settings_help_legal_row",
                     onClick = onOpenHelpLegal,
@@ -224,7 +224,7 @@ fun OthersHubScreen(
         item {
             TabIntroHeader(
                 title = stringResource(R.string.gothwad_tab_others),
-                subtitle = "People & sharing, connected Gothwad apps, and appearance settings.",
+                subtitle = "People & sharing, connected Bansify apps, and appearance settings.",
                 modifier = Modifier.widthIn(max = 600.dp),
             )
         }
@@ -238,7 +238,7 @@ fun OthersHubScreen(
                 AccountSettingRow(
                     label = "Directory & shared identity",
                     value = stringResource(R.string.gothwad_tab_people),
-                    supportingText = "Gothwad Contacts status and how others see your profile",
+                    supportingText = "Bansify Contacts status and how others see your profile",
                     icon = Icons.Rounded.Group,
                     testTag = "others_people_sharing_row",
                     onClick = { onOpenTab(AccountTab.PEOPLE_SHARING) },
@@ -273,7 +273,7 @@ fun OthersHubScreen(
                 AccountSettingRow(
                     label = stringResource(R.string.gothwad_help_title),
                     value = "Privacy, Terms & about",
-                    supportingText = "Open Gothwad Privacy Policy, Terms of Service & device details",
+                    supportingText = "Open Bansify Privacy Policy, Terms of Service & device details",
                     icon = Icons.AutoMirrored.Rounded.HelpOutline,
                     testTag = "others_help_row",
                     onClick = onOpenHelpLegal,

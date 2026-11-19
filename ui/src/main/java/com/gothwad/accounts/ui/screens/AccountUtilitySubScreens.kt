@@ -213,8 +213,8 @@ fun HelpLegalScreen(
             ) {
                 AccountSettingRow(
                     label = stringResource(R.string.gothwad_privacy),
-                    value = "Gothwad Privacy Policy",
-                    supportingText = "accounts.gothwadtech.com/privacy",
+                    value = "Bansify Privacy Policy",
+                    supportingText = "accounts.bansify.com/privacy",
                     icon = Icons.Rounded.PrivacyTip,
                     trailingIcon = Icons.AutoMirrored.Rounded.OpenInNew,
                     onClick = onOpenPrivacy,
@@ -222,8 +222,8 @@ fun HelpLegalScreen(
                 SectionDivider()
                 AccountSettingRow(
                     label = stringResource(R.string.gothwad_terms),
-                    value = "Gothwad Terms of Service",
-                    supportingText = "accounts.gothwadtech.com/terms",
+                    value = "Bansify Terms of Service",
+                    supportingText = "accounts.bansify.com/terms",
                     icon = Icons.Rounded.Gavel,
                     trailingIcon = Icons.AutoMirrored.Rounded.OpenInNew,
                     onClick = onOpenTerms,
@@ -231,7 +231,7 @@ fun HelpLegalScreen(
                 SectionDivider()
                 AccountSettingRow(
                     label = "Account management",
-                    value = "Open Gothwad Accounts on web",
+                    value = "Open Bansify Accounts on web",
                     icon = Icons.Rounded.Description,
                     trailingIcon = Icons.AutoMirrored.Rounded.OpenInNew,
                     onClick = onOpenAccountsHelpWeb,

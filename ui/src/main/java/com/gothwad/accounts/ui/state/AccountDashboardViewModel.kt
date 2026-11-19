@@ -293,7 +293,7 @@ class AccountDashboardViewModel(
 
                 val outcomeMsg = when (disconnectOutcome) {
                     DisconnectOutcome.RevokedOnServer ->
-                        "Disconnected this app grant on Gothwad server and signed out locally."
+                        "Disconnected this app grant on Bansify server and signed out locally."
                     DisconnectOutcome.OfflineRemovedLocally ->
                         "Offline: signed out locally only. Server grant could not be confirmed revoked."
                     DisconnectOutcome.AlreadyInvalidOnServer ->
@@ -500,7 +500,7 @@ class AccountDashboardViewModel(
             result.onSuccess { check ->
                 val msg = when {
                     !check.valid -> check.error ?: "Use 3-24 letters and numbers only"
-                    check.available -> "Available: ${check.email ?: "$clean@gothwadtech.com"}"
+                    check.available -> "Available: ${check.email ?: "$clean@bansify.com"}"
                     else -> check.error ?: "Username already taken"
                 }
                 mutableUiState.update {
@@ -606,7 +606,7 @@ class AccountDashboardViewModel(
                 mutableUiState.update {
                     it.copy(
                         nativeAuth = NativeAuthDialogState(),
-                        snackbarMessage = "Welcome to Gothwad, ${acc.firstName ?: acc.username ?: acc.userId}",
+                        snackbarMessage = "Welcome to Bansify, ${acc.firstName ?: acc.username ?: acc.userId}",
                     )
                 }
                 refreshNativeManagementData()
@@ -714,7 +714,7 @@ class AccountDashboardViewModel(
             ?: account.username?.takeIf { it.isNotBlank() }
             ?: account.userId
         val email = account.email?.takeIf { it.isNotBlank() }
-            ?: account.username?.let { "$it@gothwadtech.com" }
+            ?: account.username?.let { "$it@bansify.com" }
             ?: account.userId
         mutableUiState.update {
             it.copy(
@@ -1051,7 +1051,7 @@ class AccountDashboardViewModel(
                         isManagementBusy = false,
                         activeManagementDialog = null,
                         managementRequiresMfaPrompt = false,
-                        snackbarMessage = "Gothwad Account permanently deleted",
+                        snackbarMessage = "Bansify Account permanently deleted",
                     )
                 }
             }.onFailure { err ->
@@ -1181,7 +1181,7 @@ class AccountDashboardViewModel(
         SearchableSetting("gender", "Gender", "Personal info · Optional details", "optional male female gender", AccountTab.PERSONAL_INFO, webSection = "personal"),
         SearchableSetting("phone", "Phone number", "Personal info · Sign-in identifier", "mobile telephone number", AccountTab.PERSONAL_INFO, webSection = "personal"),
         SearchableSetting("recovery", "Recovery email", "Personal info · Account recovery", "backup email address verify recovery", AccountTab.PERSONAL_INFO, webSection = "personal"),
-        SearchableSetting("email", "Account email address", "Personal info · Fixed identifier", "gothwad email username mailbox address", AccountTab.PERSONAL_INFO),
+        SearchableSetting("email", "Account email address", "Personal info · Fixed identifier", "bansify email username mailbox address", AccountTab.PERSONAL_INFO),
         SearchableSetting("visibility", "Profile visibility", "Personal info · Sharing information", "public private privacy sharing visibility", AccountTab.PERSONAL_INFO),
         SearchableSetting("password", "Add or change password", "Security · Sign-in methods", "password reset update login", AccountTab.SECURITY, webSection = "security"),
         SearchableSetting("mfa", "2-Step Verification", "Security · Authenticator", "2fa mfa two factor two step authenticator otp totp verification", AccountTab.SECURITY, webSection = "security"),
@@ -1191,8 +1191,8 @@ class AccountDashboardViewModel(
         SearchableSetting("storage", "Storage", "Data & privacy · Shared quota", "space quota drive mail usage", AccountTab.DATA_PRIVACY, webSection = "data"),
         SearchableSetting("export", "Export your data", "Data & privacy · Account data", "download export backup account data json", AccountTab.DATA_PRIVACY, webSection = "data"),
         SearchableSetting("delete", "Delete your account", "Data & privacy · Account data", "remove close erase delete account", AccountTab.DATA_PRIVACY, webSection = "data"),
-        SearchableSetting("contacts", "Gothwad Contacts", "People & sharing", "people contacts address book", AccountTab.PEOPLE_SHARING),
-        SearchableSetting("services", "Gothwad Services", "Connected apps", "services products applications mail drive store", AccountTab.CONNECTED_APPS),
+        SearchableSetting("contacts", "Bansify Contacts", "People & sharing", "people contacts address book", AccountTab.PEOPLE_SHARING),
+        SearchableSetting("services", "Bansify Services", "Connected apps", "services products applications mail drive store", AccountTab.CONNECTED_APPS),
         SearchableSetting("disconnect", "Disconnect an app", "Connected apps · Permissions", "revoke permission disconnect third party app oauth", AccountTab.CONNECTED_APPS, webSection = "apps"),
     )
 }

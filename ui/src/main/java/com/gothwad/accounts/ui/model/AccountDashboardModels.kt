@@ -13,7 +13,7 @@ import com.gothwad.accounts.core.MfaStatusInfo
 import com.gothwad.accounts.core.WebSessionInfo
 import com.gothwad.accounts.ui.R
 
-/** Matches exact 6 sections on accounts.gothwadtech.com/me. */
+/** Matches exact 6 sections on accounts.bansify.com/me. */
 enum class AccountTab(
     @StringRes val titleRes: Int,
     val webSection: String,
@@ -162,18 +162,18 @@ data class AccountDashboardUiState(
 /** Exact ecosystem service & product catalog matching accounts/web/js/gothwad-apps.js. */
 object GothwadEcosystemCatalog {
     val coreServices: List<GothwadCatalogEntry> = listOf(
-        GothwadCatalogEntry("gothwad-meet", "Gothwad Meet", "Video meetings for your Gothwad Account", "https://meet.gothwadtech.com", isCoreService = true),
-        GothwadCatalogEntry("gothwad-mail", "Gothwad Mail", "Account address at gothwadtech.com; mailbox availability is managed by Mail", "https://mail.gothwadtech.com", isCoreService = true),
-        GothwadCatalogEntry("kiwi-store", "Kiwi Store", "Apps and add-ons for Kiwi Store", "https://kiwistore.gothwadtech.com", isCoreService = true),
-        GothwadCatalogEntry("gothwad-drive", "Gothwad Drive", "Files and folders on your account", "https://drive.gothwadtech.com", isCoreService = true),
-        GothwadCatalogEntry("gothwad-notes", "Gothwad Notes", "Notes and lists, synced", "https://notes.gothwadtech.com", isCoreService = true),
-        GothwadCatalogEntry("gothwad-calendar", "Gothwad Calendar", "Events and reminders", "https://calender.gothwadtech.com", isCoreService = true),
-        GothwadCatalogEntry("gothwad-contacts", "Gothwad Contacts", "People and addresses", "https://contacts.gothwadtech.com", isCoreService = true, inDevelopment = true),
+        GothwadCatalogEntry("gothwad-meet", "Bansify Meet", "Video meetings for your Bansify Account", "https://meet.bansify.com", isCoreService = true),
+        GothwadCatalogEntry("gothwad-mail", "Bansify Mail", "Account address at bansify.com; mailbox availability is managed by Mail", "https://mail.bansify.com", isCoreService = true),
+        GothwadCatalogEntry("kiwi-store", "Kiwi Store", "Apps and add-ons for Kiwi Store", "https://kiwistore.bansify.com", isCoreService = true),
+        GothwadCatalogEntry("gothwad-drive", "Bansify Drive", "Files and folders on your account", "https://drive.bansify.com", isCoreService = true),
+        GothwadCatalogEntry("gothwad-notes", "Bansify Notes", "Notes and lists, synced", "https://notes.bansify.com", isCoreService = true),
+        GothwadCatalogEntry("gothwad-calendar", "Bansify Calendar", "Events and reminders", "https://calendar.bansify.com", isCoreService = true),
+        GothwadCatalogEntry("gothwad-contacts", "Bansify Contacts", "People and addresses", "https://contacts.bansify.com", isCoreService = true, inDevelopment = true),
     )
 
     val optionalProducts: List<GothwadCatalogEntry> = listOf(
-        GothwadCatalogEntry("gothwad-tube", "Gothwad Tube (PlusTube)", "Video — PlusTube", "https://tube.gothwadtech.com", isCoreService = false),
-        GothwadCatalogEntry("gothwad-chat", "GrixChat (Gothwad Chat)", "Messaging", "https://grixchat.gothwadtech.com", isCoreService = false),
-        GothwadCatalogEntry("gothwad-indogram", "Indogram", "Messaging & communities", "https://indogram.gothwadtech.com", isCoreService = false),
+        GothwadCatalogEntry("gothwad-tube", "Bansify Tube (PlusTube)", "Video — PlusTube", "https://tube.bansify.com", isCoreService = false),
+        GothwadCatalogEntry("gothwad-chat", "GrixChat (Bansify Chat)", "Messaging", "https://grixchat.bansify.com", isCoreService = false),
+        GothwadCatalogEntry("gothwad-indogram", "Indogram", "Messaging & communities", "https://indogram.bansify.com", isCoreService = false),
     )
 }

@@ -660,7 +660,7 @@ fun GothwadAccountsScreen(
                 is ActiveManagementDialog.ExportData -> ExportDataDialog(
                     jsonContent = currentDialog.jsonContent,
                     onCopyJson = { json ->
-                        copyToClipboard(context, "Gothwad Account Data", json)
+                        copyToClipboard(context, "Bansify Account Data", json)
                         accountViewModel.showMessage("Account export JSON copied")
                     },
                     onShowMessage = accountViewModel::showMessage,

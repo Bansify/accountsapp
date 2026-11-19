@@ -106,7 +106,7 @@ fun GothwadAccount.displayName(): String =
 
 fun GothwadAccount.displayEmail(): String =
     email?.takeIf { it.isNotBlank() }
-        ?: username?.takeIf { it.isNotBlank() }?.let { "$it@gothwadtech.com" }
+        ?: username?.takeIf { it.isNotBlank() }?.let { "$it@bansify.com" }
         ?: userId
 
 fun GothwadAccount.initials(): String {
@@ -125,7 +125,7 @@ fun DiscoveredAccount.displayName(): String =
 
 fun DiscoveredAccount.displayEmail(): String =
     email?.takeIf { it.isNotBlank() }
-        ?: username?.takeIf { it.isNotBlank() }?.let { "$it@gothwadtech.com" }
+        ?: username?.takeIf { it.isNotBlank() }?.let { "$it@bansify.com" }
         ?: userId
 
 fun DiscoveredAccount.initials(): String {

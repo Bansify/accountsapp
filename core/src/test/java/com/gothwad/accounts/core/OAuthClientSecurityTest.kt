@@ -77,8 +77,8 @@ class OAuthClientSecurityTest {
                       "name": "Arjun Sharma",
                       "given_name": "Arjun",
                       "family_name": "Sharma",
-                      "email": "arjun@gothwadtech.com",
-                      "picture": "https://accounts.gothwadtech.com/api/avatars/user-123?v=abc",
+                      "email": "arjun@bansify.com",
+                      "picture": "https://accounts.bansify.com/api/avatars/user-123?v=abc",
                       "created_at": "2026-01-01T00:00:00Z",
                       "updated_at": "2026-11-16T00:00:00Z",
                       "date_of_birth": "1998-05-14",
@@ -112,8 +112,8 @@ class OAuthClientSecurityTest {
         assertEquals("Sharma", account.lastName)
         assertEquals("1998-05-14", account.dateOfBirth)
         assertEquals("Male", account.gender)
-        assertEquals("arjun@gothwadtech.com", account.email)
-        assertEquals("https://accounts.gothwadtech.com/api/avatars/user-123?v=abc", account.avatarUrl)
+        assertEquals("arjun@bansify.com", account.email)
+        assertEquals("https://accounts.bansify.com/api/avatars/user-123?v=abc", account.avatarUrl)
         assertEquals("2026-01-01T00:00:00Z", account.createdAt)
         assertEquals("+919876543210", account.phoneNumber)
         assertEquals(true, account.phoneNumberVerified)
@@ -207,9 +207,9 @@ class OAuthClientSecurityTest {
         }
         val prodConfig = GothwadConfig(
             clientId = "gothwad-tube",
-            redirectUri = "https://tube.gothwadtech.com/oauth/callback",
+            redirectUri = "https://tube.bansify.com/oauth/callback",
             allowCustomSchemeRedirect = false,
         )
-        assertEquals("https://tube.gothwadtech.com/oauth/callback", prodConfig.redirectUri)
+        assertEquals("https://tube.bansify.com/oauth/callback", prodConfig.redirectUri)
     }
 }

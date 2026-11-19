@@ -65,7 +65,7 @@ fun PeopleSharingTabScreen(
         item {
             TabIntroHeader(
                 title = stringResource(R.string.gothwad_tab_people),
-                subtitle = "Contacts and product sharing status for your Gothwad Account.",
+                subtitle = "Contacts and product sharing status for your Bansify Account.",
                 modifier = Modifier.widthIn(max = 600.dp),
             )
         }
@@ -73,13 +73,13 @@ fun PeopleSharingTabScreen(
         // Honest Coming Soon Contacts card matching accounts/web/me#people
         item {
             AccountSectionCard(
-                title = "Gothwad Contacts",
-                subtitle = "Centralized people and address book across Gothwad products.",
+                title = "Bansify Contacts",
+                subtitle = "Centralized people and address book across Bansify products.",
                 modifier = Modifier.widthIn(max = 600.dp),
             ) {
                 AccountSettingRow(
                     label = "Contacts directory",
-                    value = "Gothwad Contacts",
+                    value = "Bansify Contacts",
                     supportingText = "Currently in development — contact lists are not yet stored on Accounts.",
                     icon = Icons.Rounded.Contacts,
                     statusBadge = { StatusPill("Coming soon", StatusTone.NEUTRAL) },
@@ -148,7 +148,7 @@ fun PeopleSharingTabScreen(
         item {
             AccountSectionCard(
                 title = "Sharing summary",
-                subtitle = "Identity shared when you use connected Gothwad services",
+                subtitle = "Identity shared when you use connected Bansify services",
                 modifier = Modifier.widthIn(max = 600.dp),
             ) {
                 AccountSettingRow(
@@ -158,8 +158,8 @@ fun PeopleSharingTabScreen(
                 )
                 SectionDivider()
                 AccountSettingRow(
-                    label = "Included Gothwad services",
-                    value = "${GothwadEcosystemCatalog.coreServices.size} core services in Gothwad catalog",
+                    label = "Included Bansify services",
+                    value = "${GothwadEcosystemCatalog.coreServices.size} core services in Bansify catalog",
                     supportingText = "View services and revocable OAuth app permissions",
                     icon = Icons.Rounded.Apps,
                     onClick = { onNavigateTab(AccountTab.CONNECTED_APPS) },

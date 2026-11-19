@@ -97,10 +97,10 @@ fun NativeAuthDialog(
     var resetPasswordVisible by remember { mutableStateOf(false) }
 
     val title = when (state.step) {
-        NativeAuthStep.IDENTIFIER -> "Sign in to Gothwad"
+        NativeAuthStep.IDENTIFIER -> "Sign in to Bansify"
         NativeAuthStep.PASSWORD -> "Welcome back"
         NativeAuthStep.MFA -> "2-Step Verification"
-        NativeAuthStep.SIGN_UP -> "Create Gothwad Account"
+        NativeAuthStep.SIGN_UP -> "Create Bansify Account"
         NativeAuthStep.FORGOT_PASSWORD -> "Recover your password"
         NativeAuthStep.RESET_PASSWORD -> "Set a new password"
     }
@@ -184,7 +184,7 @@ fun NativeAuthDialog(
                 when (state.step) {
                     NativeAuthStep.IDENTIFIER -> {
                         Text(
-                            text = "Enter your Gothwad username, @gothwadtech.com email, or registered phone number.",
+                            text = "Enter your Bansify username, @bansify.com email, or registered phone number.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -529,7 +529,7 @@ fun NativeAuthDialog(
 
                     NativeAuthStep.FORGOT_PASSWORD -> {
                         Text(
-                            text = "Enter your Gothwad username to request a password reset token via your verified recovery email.",
+                            text = "Enter your Bansify username to request a password reset token via your verified recovery email.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

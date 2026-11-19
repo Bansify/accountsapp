@@ -17,7 +17,7 @@ class AccountsApplication : Application() {
                 redirectUri = if (BuildConfig.DEBUG) {
                     "$packageName:/oauth/callback"
                 } else {
-                    "https://accounts.gothwadtech.com/oauth/callback"
+                    "https://accounts.bansify.com/oauth/callback"
                 },
                 allowCustomSchemeRedirect = BuildConfig.DEBUG,
                 scopes = setOf(
