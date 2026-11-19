@@ -21,7 +21,7 @@ permissions:
 
 jobs:
   release:
-    name: Build, Sign & Publish Gothwad Accounts APK
+    name: Build, Sign & Publish Bansify Accounts APK
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
@@ -107,7 +107,7 @@ jobs:
           UNSIGNED_AAB=$(find app/build/outputs/bundle/release/ -name "*.aab" | head -n 1)
 
           if [ -n "$DEBUG_APK" ]; then
-            cp "$DEBUG_APK" "release_out/GothwadAccounts-v${V_NAME}-Debug.apk"
+            cp "$DEBUG_APK" "release_out/BansifyAccounts-v${V_NAME}-Debug.apk"
           fi
 
           if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASS" ]; then
@@ -115,7 +115,7 @@ jobs:
             exit 1
           fi
 
-          KS_PATH="/tmp/gothwad_accounts_release.jks"
+          KS_PATH="/tmp/bansify_accounts_release.jks"
           echo "$KEYSTORE_BASE64" | tr -d '\r\n ' | base64 -d > "$KS_PATH"
 
           DETECTED_ALIAS=$(keytool -list -v -keystore "$KS_PATH" -storepass "$KEYSTORE_PASS" 2>/dev/null | grep -i "Alias name:" | head -n 1 | sed 's/.*Alias name: //I' | tr -d '\r' | xargs || true)
@@ -141,7 +141,7 @@ jobs:
               cp "$UNSIGNED_APK" "$UNALIGNED_TEMP"
             fi
 
-            RELEASE_APK="release_out/GothwadAccounts-v${V_NAME}-Release.apk"
+            RELEASE_APK="release_out/BansifyAccounts-v${V_NAME}-Release.apk"
             "$APKSIGNER" sign \
               --ks "$KS_PATH" \
               --ks-key-alias "$ACTUAL_ALIAS" \
@@ -156,7 +156,7 @@ jobs:
             CERT_COLON=$(keytool -list -v -keystore "$KS_PATH" -alias "$ACTUAL_ALIAS" -storepass "$KEYSTORE_PASS" 2>/dev/null | grep -i "SHA256:" | head -n 1 | sed 's/.*SHA256: //I' | tr -d '\r' | xargs || true)
             CERT_HEX=$(echo "$CERT_COLON" | tr -d ':' | tr '[:upper:]' '[:lower:]')
             {
-              echo "### Gothwad Accounts v${V_NAME} Release Signing Identity"
+              echo "### Bansify Accounts v${V_NAME} Release Signing Identity"
               echo "- Package: \`com.gothwad.accounts\`"
               echo "- App Link SHA-256 (\`assetlinks.json\`): \`${CERT_COLON}\`"
               echo "- D1 \`ecosystem_apps\` SHA-256 (lowercase hex): \`${CERT_HEX}\`"
@@ -164,7 +164,7 @@ jobs:
           fi
 
           if [ -n "$UNSIGNED_AAB" ]; then
-            RELEASE_AAB="release_out/GothwadAccounts-v${V_NAME}-PlayStore.aab"
+            RELEASE_AAB="release_out/BansifyAccounts-v${V_NAME}-PlayStore.aab"
             cp "$UNSIGNED_AAB" "$RELEASE_AAB"
             jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
               -keystore "$KS_PATH" \
@@ -175,12 +175,12 @@ jobs:
           fi
 
           rm -f "$KS_PATH"
-          (cd release_out && sha256sum GothwadAccounts-* > SHA256SUMS.txt)
+          (cd release_out && sha256sum BansifyAccounts-* > SHA256SUMS.txt)
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Gothwad-Accounts-v${{ steps.versioning.outputs.v_name }}-Build${{ steps.versioning.outputs.v_code }}
+          name: Bansify-Accounts-v${{ steps.versioning.outputs.v_name }}-Build${{ steps.versioning.outputs.v_code }}
           path: release_out/
 
       - name: Publish GitHub Release
@@ -194,7 +194,7 @@ jobs:
           prerelease: false
           generate_release_notes: true
           files: |
-            release_out/GothwadAccounts-v${{ steps.versioning.outputs.v_name }}-Release.apk
-            release_out/GothwadAccounts-v${{ steps.versioning.outputs.v_name }}-Debug.apk
-            release_out/GothwadAccounts-v${{ steps.versioning.outputs.v_name }}-PlayStore.aab
+            release_out/BansifyAccounts-v${{ steps.versioning.outputs.v_name }}-Release.apk
+            release_out/BansifyAccounts-v${{ steps.versioning.outputs.v_name }}-Debug.apk
+            release_out/BansifyAccounts-v${{ steps.versioning.outputs.v_name }}-PlayStore.aab
             release_out/SHA256SUMS.txt

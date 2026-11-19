@@ -713,7 +713,7 @@ fun ExportDataDialog(
                     )
                 }
                 Button(
-                    onClick = { saveLauncher.launch("gothwad-account-export.json") },
+                    onClick = { saveLauncher.launch("bansify-account-export.json") },
                     shape = RoundedCornerShape(50),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
@@ -735,7 +735,7 @@ fun ExportDataDialog(
                         onClick = {
                             val shareIntent = Intent(Intent.ACTION_SEND).apply {
                                 type = "application/json"
-                                putExtra(Intent.EXTRA_SUBJECT, "Gothwad Account Data Export")
+                                putExtra(Intent.EXTRA_SUBJECT, "Bansify Account Data Export")
                                 putExtra(Intent.EXTRA_TEXT, jsonContent)
                             }
                             runCatching {
@@ -776,7 +776,7 @@ fun DeleteAccountDialog(
         onDismissRequest = { if (!isBusy) onDismiss() },
         title = {
             Text(
-                "Delete Gothwad Account",
+                "Delete Bansify Account",
                 color = MaterialTheme.colorScheme.error,
                 fontWeight = FontWeight.SemiBold,
             )

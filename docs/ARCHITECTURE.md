@@ -1,21 +1,21 @@
-# Gothwad Multi-App Account Architecture Proposal
+# Bansify Multi-App Account Architecture Proposal
 
 **Status**: Architecture & SDK Implementation Baseline (`accountsapp` branch `arena/926fcc7f-accountsapp`)
-**Backend Source of Truth**: `GothwadTech/accounts` (`100% Cloudflare Worker + D1 + R2`, zero Supabase)
+**Backend Source of Truth**: `Bansify/accounts` (`100% Cloudflare Worker + D1 + R2`, zero Supabase)
 **Target Ecosystem**: `accountsapp` (`com.gothwad.accounts`), `mailapp` (`com.gothwad.mail`), `drive` (`com.gothwad.drive`), `storeapp` (`com.gothwad.store`), `tubeapp` (`com.gothwad.tube`), and side-by-side verification hosts (`sample:alpha`, `sample:beta`).
 
 ---
 
 ## 1. Design Goals & Non-Negotiable Principles
 
-1. **Zero Mandatory Hub App / Zero Play Services**: Every Gothwad app must install first, last, or alone and remain fully functional without Google Play Services, without a preinstalled system component, and without requiring `com.gothwad.accounts` ("Accounts") to be installed.
+1. **Zero Mandatory Hub App / Zero Play Services**: Every Bansify app must install first, last, or alone and remain fully functional without Google Play Services, without a preinstalled system component, and without requiring `com.gothwad.accounts` ("Accounts") to be installed.
 2. **Three Strictly Separated State Axes**:
-   - **Device-Available Accounts (`DiscoveredAccount`)**: Identity-only directory of accounts signed in on installed, cryptographically verified Gothwad apps on this device (`userId`, `username`, `name`, `email`, `avatarUrl`, `addedAt`, `lastSeenAt`). Contains **zero tokens**.
+   - **Device-Available Accounts (`DiscoveredAccount`)**: Identity-only directory of accounts signed in on installed, cryptographically verified Bansify apps on this device (`userId`, `username`, `name`, `email`, `avatarUrl`, `addedAt`, `lastSeenAt`). Contains **zero tokens**.
    - **App-Local Active Account (`activeUserId`)**: Strictly private to each app's encrypted store. Selecting Account B in `mailapp` **never** switches an already-open `drive` or `storeapp` from Account A to Account B.
    - **Service-Scoped OAuth Grants & Tokens (`Credential`)**: Every app owns its own client-scoped `access_token` (`aud == client_id`) and rotating `refresh_token` (`offline_access`) stored in its own Android Keystore-backed Tink AEAD file inside `noBackupFilesDir`. Refresh tokens are **never** shared or exported across apps.
 3. **Existing Accounts Web UI Parity — No Unimplemented Demo Bloat**:
-   - Sign-in, signup, Google sign-in linking, passwordless sign-in, passkey registration, TOTP 2-Step Verification, and account recovery reuse `accounts.gothwadtech.com` over **Custom Tabs + Authorization Code + PKCE (`S256`)** — never an embedded third-party WebView, never collecting Google passwords, and never copying browser cookies.
-   - Native Compose UI in `:ui` mirrors only the six real sections present on `accounts.gothwadtech.com/me`: **Home**, **Personal info**, **Security**, **Data & privacy**, **People & sharing**, and **Connected apps** (removing unimplemented demo tabs like Payments & Subscriptions, Timeline/YouTube History, Password Manager, and hardcoded demo users).
+   - Sign-in, signup, Google sign-in linking, passwordless sign-in, passkey registration, TOTP 2-Step Verification, and account recovery reuse `accounts.bansify.com` over **Custom Tabs + Authorization Code + PKCE (`S256`)** — never an embedded third-party WebView, never collecting Google passwords, and never copying browser cookies.
+   - Native Compose UI in `:ui` mirrors only the six real sections present on `accounts.bansify.com/me`: **Home**, **Personal info**, **Security**, **Data & privacy**, **People & sharing**, and **Connected apps** (removing unimplemented demo tabs like Payments & Subscriptions, Timeline/YouTube History, Password Manager, and hardcoded demo users).
 
 ---
 
@@ -38,7 +38,7 @@ Android's `android.accounts.AccountManager` is structurally incompatible with in
 |                        Android Device (No Play Services)                    |
 |                                                                             |
 |  +-----------------------+    +-----------------------+    +--------------+ |
-|  | Gothwad Mail          |    | Gothwad Drive         |    | Kiwi Store   | |
+|  | Bansify Mail          |    | Bansify Drive         |    | Kiwi Store   | |
 |  | com.gothwad.mail      |    | com.gothwad.drive     |    | com.gothwad  | |
 |  |                       |    |                       |    | .store       | |
 |  | Vault (Keystore AEAD) |    | Vault (Keystore AEAD) |    | Vault (AEAD) | |
@@ -56,7 +56,7 @@ Android's `android.accounts.AccountManager` is structurally incompatible with in
 +----------------------------|------------------------------------------------+
                              v
 +-----------------------------------------------------------------------------+
-|            accounts.gothwadtech.com (Cloudflare Worker + D1 + R2)           |
+|            accounts.bansify.com (Cloudflare Worker + D1 + R2)             |
 |  - /oauth/authorize, /oauth/token (PKCE S256, rotating refresh tokens)      |
 |  - /oauth/userinfo (oauth_credential_bindings live DB check)                |
 |  - /auth/* (cookie-authenticated web session management & MFA/Passkeys)     |
@@ -73,25 +73,25 @@ Android's `android.accounts.AccountManager` is structurally incompatible with in
 
 ---
 
-## 4. Module Boundaries in `GothwadTech/accountsapp`
+## 4. Module Boundaries in `Bansify/accountsapp`
 
 | Module | Package / App ID | Responsibility |
 | --- | --- | --- |
 | `:core` | `com.gothwad.accounts.core` | Headless SDK (zero Compose): `GothwadConfig`, `GothwadAccounts`, `SessionManager`, `EncryptedTokenStore`, `OAuthClient`, `CallbackValidator`, `Pkce`, `AccountDirectoryProvider`, `CallerVerifier`, `TrustRegistry`, `PeerBrokerClient`, OkHttp `authInterceptor`. |
 | `:ui` | `com.gothwad.accounts.ui` | Shared M3 Compose account management experience (`GothwadAccountsScreen`, 6 web-aligned tabs) + embeddable host widgets (`GothwadAccountAvatarButton`, `GothwadAccountSwitcherSheet`, `GothwadAccountSettingsCard`, `GothwadAuthStatusBanner`) + EN/HI strings. |
-| `:app` | `com.gothwad.accounts` | Optional standalone Gothwad Accounts Android app hosting `GothwadAccountsScreen` cleanly. |
+| `:app` | `com.gothwad.accounts` | Optional standalone Bansify Accounts Android app hosting `GothwadAccountsScreen` cleanly. |
 | `:sample` | `com.gothwad.accounts.sample.{alpha,beta}` | Side-by-side multi-app verification hosts testing independent active accounts, embedded toolbar widgets, and peer discovery. |
 
 ---
 
 ## 5. Cross-Repo Audit & Required Backend-Contract Boundaries
 
-Based on direct inspection of `GothwadTech/accounts`, `mail`, `mailapp`, `drive`, `store`, `storeapp`, and `tubeapp` (no external repo was modified or deployed):
+Based on direct inspection of `Bansify/accounts`, `mail`, `mailapp`, `drive`, `store`, `storeapp`, and `tubeapp` (no external repo was modified or deployed):
 
 1. **`accounts` (`cloudflare-worker` + D1)**:
    - Public OAuth PKCE (`/oauth/authorize`, `/oauth/token`, `/oauth/userinfo`) is live and validates `oauth_credential_bindings` against active password hashes and grants.
    - `ecosystem_apps` currently seeds `kiwi-store` with app redirects, while `gothwad-mail`, `gothwad-drive`, and `gothwad-tube` have `redirect_uris = '[]'`, and `gothwad-accounts-android` / sample clients require registration (see [SERVER_CHANGES.md](SERVER_CHANGES.md)).
-   - `/oauth/authorizations`, `/oauth/revoke`, and `/auth/*` management routes (`update-profile`, `sessions`, `activity`, `mfa`, `passkeys`, `google`, `export`, `delete-account`) require `token_use === 'session'` cookies today; therefore `:ui` routes sensitive mutations cleanly to `accounts.gothwadtech.com/me` in Custom Tabs until scoped native management endpoints are approved and added to `accounts`.
+   - `/oauth/authorizations`, `/oauth/revoke`, and `/auth/*` management routes (`update-profile`, `sessions`, `activity`, `mfa`, `passkeys`, `google`, `export`, `delete-account`) require `token_use === 'session'` cookies today; therefore `:ui` routes sensitive mutations cleanly to `accounts.bansify.com/me` in Custom Tabs until scoped native management endpoints are approved and added to `accounts`.
 2. **Sibling Resource Workers (`mail`, `drive`, `store`)**:
    - Resource servers **must** validate both OAuth `aud == <expected_service_client_id>` and required service scopes (`mail`, `drive` / `drive.read`, etc.), never treating `/oauth/userinfo` identity success alone as cross-service authorization.
    - `drive/worker/src/auth.ts` must accept scoped OAuth Bearer tokens alongside web cookie sessions; `mail/worker/src/session.ts` and `store/worker/src/auth.ts` must verify client audience and scope.

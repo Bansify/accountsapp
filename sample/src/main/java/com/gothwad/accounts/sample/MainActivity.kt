@@ -107,7 +107,7 @@ class MainActivity : ComponentActivity() {
                             onClick = { GothwadAccounts.openAccountManagement(this@MainActivity) },
                             modifier = Modifier.fillMaxWidth(),
                         ) {
-                            Text("Open Full Gothwad Account UI")
+                            Text("Open Full Bansify Account UI")
                         }
                     }
                 }

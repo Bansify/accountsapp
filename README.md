@@ -1,14 +1,14 @@
-# Gothwad Accounts (Android)
+# Bansify Accounts (Android)
 
-Optional standalone **Gothwad Accounts** app (`com.gothwad.accounts`) and shared Android Account SDK (`:core` + `:ui`) for the Gothwad ecosystem (`Mail`, `Drive`, `Kiwi Store`, `PlusTube`, `Notes`, `Calendar`). Minimum Android API: 26.
+Optional standalone **Bansify Accounts** app (`com.gothwad.accounts`) and shared Android Account SDK (`:core` + `:ui`) for the Bansify ecosystem (`Mail`, `Drive`, `Kiwi Store`, `PlusTube`, `Notes`, `Calendar`). Minimum Android API: 26.
 
 ## Overview
 
-- **Zero mandatory central app**: Installing standalone `com.gothwad.accounts` is optional. Every Gothwad app works independently on day one, in any install order, and keeps functioning if any other Gothwad app is uninstalled.
+- **Zero mandatory central app**: Installing standalone `com.gothwad.accounts` is optional. Every Bansify app works independently on day one, in any install order, and keeps functioning if any other Bansify app is uninstalled.
 - **Per-app hardware-backed credentials**: Each app holds its own OAuth client-scoped tokens (`EncryptedTokenStore` backed by Tink + AndroidKeyStore under `noBackupFilesDir`, strictly fail-closed). Refresh tokens are never shared across apps.
-- **Distributed cross-app discovery**: With `BrokerPolicy.PeerDiscovery`, verified sibling Gothwad apps exchange zero-token account directory snapshots (`AccountDirectoryProvider`) verified via `Binder.getCallingUid()` + `PackageManager` signing-certificate fingerprints so users see `"Continue as <name>"` across apps without duplicating sign-in friction.
+- **Distributed cross-app discovery**: With `BrokerPolicy.PeerDiscovery`, verified sibling Bansify apps exchange zero-token account directory snapshots (`AccountDirectoryProvider`) verified via `Binder.getCallingUid()` + `PackageManager` signing-certificate fingerprints so users see `"Continue as <name>"` across apps without duplicating sign-in friction.
 - **FOSS / untrusted builds**: Setting `BrokerPolicy.Disabled` disables all cross-app IPC and falls back cleanly to Custom Tabs PKCE browser login.
-- **Authentic web sign-in & shared M3 management UI**: Login/signup/passkeys/2FA/password updates happen inside existing `accounts.gothwadtech.com` web flows via Custom Tabs PKCE (`S256`). Native `:ui` provides the full 6-section account dashboard matching `accounts.gothwadtech.com/me` plus embeddable toolbar avatar buttons, switcher sheets, settings cards, and error recovery banners in English and Hindi.
+- **Authentic web sign-in & shared M3 management UI**: Login/signup/passkeys/2FA/password updates happen inside existing `accounts.bansify.com` web flows via Custom Tabs PKCE (`S256`). Native `:ui` provides the full 6-section account dashboard matching `accounts.bansify.com/me` plus embeddable toolbar avatar buttons, switcher sheets, settings cards, and error recovery banners in English and Hindi.
 
 ## Modules
 

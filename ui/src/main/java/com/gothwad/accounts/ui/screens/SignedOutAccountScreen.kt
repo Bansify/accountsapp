@@ -218,7 +218,7 @@ fun SignedOutAccountScreen(
                             }
                             Image(
                                 painter = painterResource(id = R.drawable.img_security_shield),
-                                contentDescription = "Gothwad Account security illustration",
+                                contentDescription = "Bansify Account security illustration",
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier
                                     .size(60.dp)
@@ -285,7 +285,7 @@ fun SignedOutAccountScreen(
                 ) {
                     CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                     Text(
-                        text = "Signing in silently with your Gothwad device session…",
+                        text = "Signing in silently with your Bansify device session…",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

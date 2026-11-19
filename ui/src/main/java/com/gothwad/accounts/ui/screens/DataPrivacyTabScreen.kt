@@ -195,11 +195,11 @@ fun DataPrivacyTabScreen(
         // Export & Recent activity
         item {
             AccountSectionCard(
-                title = "Data from Gothwad Accounts",
+                title = "Data from Bansify Accounts",
                 subtitle = if (canManageNatively) {
                     "Export actions and recent account activity events."
                 } else {
-                    "Export actions and security event logs on accounts.gothwadtech.com."
+                    "Export actions and security event logs on accounts.bansify.com."
                 },
                 modifier = Modifier.widthIn(max = 600.dp),
             ) {
@@ -248,7 +248,7 @@ fun DataPrivacyTabScreen(
                 Column(modifier = Modifier.padding(vertical = 2.dp)) {
                     AccountSettingRow(
                         label = "Account deletion",
-                        value = "Delete your Gothwad Account",
+                        value = "Delete your Bansify Account",
                         supportingText = "Deleting your account removes core identity access, sessions, and app authorizations",
                         icon = Icons.Rounded.DeleteForever,
                         statusBadge = { StatusPill("Irreversible", StatusTone.CRITICAL) },

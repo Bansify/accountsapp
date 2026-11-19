@@ -1,4 +1,4 @@
-# Gothwad Accounts Theme & Color System
+# Bansify Accounts Theme & Color System
 
 This document is the **single source of truth** for light and dark colors, surface hierarchy, and system bar integration in `:ui` (`GothwadAccountsTheme.kt`) and `:app`. Any future UI work or AI-generated changes **must** adhere to these exact tonal scales rather than introducing off-palette blue/gray backgrounds or hardcoded hex colors in composables.
 

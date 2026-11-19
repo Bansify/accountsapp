@@ -102,13 +102,13 @@ class AccountDashboardViewModelTest {
             Result.success(IdentifierCheckResult(exists = identifier == "arjun", kind = "username"))
 
         override suspend fun checkUsername(username: String) =
-            Result.success(UsernameCheckResult(available = true, valid = true, username = username, email = "$username@gothwadtech.com"))
+            Result.success(UsernameCheckResult(available = true, valid = true, username = username, email = "$username@bansify.com"))
 
         override suspend fun signInNative(identifier: String, password: String): Result<MobileAuthSignInOutcome> {
             return if (requireMfaOnSignIn) {
                 Result.success(MobileAuthSignInOutcome.MfaRequired("chal-1", 300L, "Enter 6-digit code"))
             } else {
-                val acc = GothwadAccount("u-1", "arjun", "Arjun", email = "arjun@gothwadtech.com")
+                val acc = GothwadAccount("u-1", "arjun", "Arjun", email = "arjun@bansify.com")
                 state.value = AccountState.SignedIn(acc, listOf(acc))
                 Result.success(
                     MobileAuthSignInOutcome.Authenticated(
@@ -118,20 +118,20 @@ class AccountDashboardViewModelTest {
                         scope = "profile",
                         clientId = "gothwad-accounts-android",
                         sessionId = "s-1",
-                        user = MobileAuthUser("u-1", "arjun", "arjun@gothwadtech.com", "Arjun"),
+                        user = MobileAuthUser("u-1", "arjun", "arjun@bansify.com", "Arjun"),
                     ),
                 )
             }
         }
 
         override suspend fun verifyNativeMfa(challenge: String, code: String): Result<GothwadAccount> {
-            val acc = GothwadAccount("u-1", "arjun", "Arjun", email = "arjun@gothwadtech.com", mfaEnabled = true)
+            val acc = GothwadAccount("u-1", "arjun", "Arjun", email = "arjun@bansify.com", mfaEnabled = true)
             state.value = AccountState.SignedIn(acc, listOf(acc))
             return Result.success(acc)
         }
 
         override suspend fun signUpNative(input: NativeSignUpInput): Result<GothwadAccount> {
-            val acc = GothwadAccount("u-2", input.username, "${input.firstName} ${input.lastName}", input.firstName, input.lastName, "${input.username}@gothwadtech.com")
+            val acc = GothwadAccount("u-2", input.username, "${input.firstName} ${input.lastName}", input.firstName, input.lastName, "${input.username}@bansify.com")
             state.value = AccountState.SignedIn(acc, listOf(acc))
             return Result.success(acc)
         }
@@ -166,7 +166,7 @@ class AccountDashboardViewModelTest {
             Result.success(listOf(AccountActivityEntry(id = "act-1", type = "signin", title = "Signed in")))
 
         override suspend fun listAuthorizations(): Result<List<ConnectedAppGrant>> =
-            Result.success(listOf(ConnectedAppGrant(appId = "gothwad-mail", name = "Gothwad Mail", scopes = listOf("profile"))))
+            Result.success(listOf(ConnectedAppGrant(appId = "gothwad-mail", name = "Bansify Mail", scopes = listOf("profile"))))
 
         override suspend fun updateBasicProfile(
             firstName: String,
@@ -174,13 +174,13 @@ class AccountDashboardViewModelTest {
             dateOfBirth: String,
             gender: String,
         ): Result<GothwadAccount?> {
-            val updated = GothwadAccount("u-1", "arjun", "$firstName $lastName".trim(), firstName, lastName, "arjun@gothwadtech.com", dateOfBirth = dateOfBirth, gender = gender)
+            val updated = GothwadAccount("u-1", "arjun", "$firstName $lastName".trim(), firstName, lastName, "arjun@bansify.com", dateOfBirth = dateOfBirth, gender = gender)
             state.value = AccountState.SignedIn(updated, listOf(updated))
             return Result.success(updated)
         }
 
         override suspend fun uploadAvatar(imageDataOrBase64: String, mime: String): Result<GothwadAccount?> {
-            val cur = (state.value as AccountState.SignedIn).account.copy(avatarUrl = "https://accounts.gothwadtech.com/api/avatars/u-1?v=new")
+            val cur = (state.value as AccountState.SignedIn).account.copy(avatarUrl = "https://accounts.bansify.com/api/avatars/u-1?v=new")
             state.value = AccountState.SignedIn(cur, listOf(cur))
             return Result.success(cur)
         }
@@ -257,7 +257,7 @@ class AccountDashboardViewModelTest {
                 userId = "u-1",
                 username = "arjun",
                 name = "Arjun",
-                email = "arjun@gothwadtech.com",
+                email = "arjun@bansify.com",
                 sourcePackage = "com.gothwad.mail",
                 isAuthorizedLocally = false,
             ),
@@ -268,7 +268,7 @@ class AccountDashboardViewModelTest {
         assertNull(vm.uiState.value.activeAccount)
         assertEquals(1, vm.uiState.value.unauthorizedPeerAccounts.size)
 
-        val account = GothwadAccount("u-1", "arjun", "Arjun", email = "arjun@gothwadtech.com")
+        val account = GothwadAccount("u-1", "arjun", "Arjun", email = "arjun@bansify.com")
         controller.state.value = AccountState.SignedIn(account, listOf(account))
         advanceUntilIdle()
         assertEquals("u-1", vm.uiState.value.activeAccount?.userId)
@@ -302,7 +302,7 @@ class AccountDashboardViewModelTest {
         val controller = FakeController(nativeManage = true, nativeWrite = true)
         val vm = AccountDashboardViewModel(controller)
 
-        val account = GothwadAccount("u-1", "arjun", "Arjun", email = "arjun@gothwadtech.com")
+        val account = GothwadAccount("u-1", "arjun", "Arjun", email = "arjun@bansify.com")
         controller.state.value = AccountState.SignedIn(account, listOf(account))
         advanceUntilIdle()
 
@@ -369,7 +369,7 @@ class AccountDashboardViewModelTest {
         // 2. Peer silent SSO success & fallback
         controller.state.value = AccountState.SignedOut
         advanceUntilIdle()
-        val peer = DiscoveredAccount("u-3", "kiran", "Kiran", "kiran@gothwadtech.com", sourcePackage = "com.gothwad.mail")
+        val peer = DiscoveredAccount("u-3", "kiran", "Kiran", "kiran@bansify.com", sourcePackage = "com.gothwad.mail")
         vm.continueWithPeerAccount(peer)
         advanceUntilIdle()
         assertEquals("u-3", vm.uiState.value.activeAccount?.userId)
@@ -381,7 +381,7 @@ class AccountDashboardViewModelTest {
         vm.continueWithPeerAccount(peer)
         advanceUntilIdle()
         assertTrue(vm.uiState.value.nativeAuth.visible)
-        assertEquals("kiran@gothwadtech.com", vm.uiState.value.nativeAuth.identifier)
+        assertEquals("kiran@bansify.com", vm.uiState.value.nativeAuth.identifier)
         assertEquals(NativeAuthStep.PASSWORD, vm.uiState.value.nativeAuth.step)
     }
 
@@ -391,7 +391,7 @@ class AccountDashboardViewModelTest {
             requireMfaOnPhoneUpdate = true
         }
         val vm = AccountDashboardViewModel(controller)
-        val account = GothwadAccount("u-1", "arjun", "Arjun", email = "arjun@gothwadtech.com")
+        val account = GothwadAccount("u-1", "arjun", "Arjun", email = "arjun@bansify.com")
         controller.state.value = AccountState.SignedIn(account, listOf(account))
         advanceUntilIdle()
 

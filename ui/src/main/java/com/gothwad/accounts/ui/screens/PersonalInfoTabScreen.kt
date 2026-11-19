@@ -75,7 +75,7 @@ fun PersonalInfoTabScreen(
         item {
             TabIntroHeader(
                 title = stringResource(R.string.gothwad_tab_personal),
-                subtitle = "Basic identity and contact details stored on your Gothwad Account.",
+                subtitle = "Basic identity and contact details stored on your Bansify Account.",
                 modifier = Modifier.widthIn(max = 600.dp),
             )
         }
@@ -148,7 +148,7 @@ fun PersonalInfoTabScreen(
                 subtitle = if (canEditBasicProfileNatively) {
                     "Manage your photo, name, birthday, and gender right inside this app."
                 } else {
-                    "Changes saved on accounts.gothwadtech.com sync automatically to this app."
+                    "Changes saved on accounts.bansify.com sync automatically to this app."
                 },
                 modifier = Modifier.widthIn(max = 600.dp),
             ) {
@@ -182,7 +182,7 @@ fun PersonalInfoTabScreen(
                 AccountSettingRow(
                     label = "Date of birth",
                     value = account.dateOfBirth?.takeIf { it.isNotBlank() } ?: "Not set",
-                    supportingText = "Optional personal detail stored on Gothwad Accounts",
+                    supportingText = "Optional personal detail stored on Bansify Accounts",
                     icon = Icons.Rounded.Cake,
                     trailingIcon = if (canEditBasicProfileNatively) Icons.Rounded.Edit else Icons.AutoMirrored.Rounded.OpenInNew,
                     onClick = if (canEditBasicProfileNatively) onEditBasicProfileClick else onManagePersonalOnWeb,
@@ -191,7 +191,7 @@ fun PersonalInfoTabScreen(
                 AccountSettingRow(
                     label = "Gender",
                     value = account.gender?.takeIf { it.isNotBlank() } ?: "Not set",
-                    supportingText = "Optional personal detail stored on Gothwad Accounts",
+                    supportingText = "Optional personal detail stored on Bansify Accounts",
                     icon = Icons.Rounded.Wc,
                     trailingIcon = if (canEditBasicProfileNatively) Icons.Rounded.Edit else Icons.AutoMirrored.Rounded.OpenInNew,
                     onClick = if (canEditBasicProfileNatively) onEditBasicProfileClick else onManagePersonalOnWeb,
@@ -209,7 +209,7 @@ fun PersonalInfoTabScreen(
                 AccountSettingRow(
                     label = "Account email",
                     value = account.displayEmail(),
-                    supportingText = "Account address at gothwadtech.com; mailbox availability is managed by Mail",
+                    supportingText = "Account address at bansify.com; mailbox availability is managed by Mail",
                     icon = Icons.Rounded.AlternateEmail,
                     statusBadge = { StatusPill("Fixed", StatusTone.NEUTRAL) },
                 )
@@ -254,13 +254,13 @@ fun PersonalInfoTabScreen(
         item {
             AccountSectionCard(
                 title = "Profile visibility",
-                subtitle = "How Gothwad services receive your profile",
+                subtitle = "How Bansify services receive your profile",
                 modifier = Modifier.widthIn(max = 600.dp),
             ) {
                 AccountSettingRow(
                     label = "Sharing information",
                     value = "Service-managed visibility",
-                    supportingText = "Your name and avatar are shared only with Gothwad services and apps you authorize via OAuth.",
+                    supportingText = "Your name and avatar are shared only with Bansify services and apps you authorize via OAuth.",
                     icon = Icons.Rounded.Visibility,
                 )
                 if (!canEditBasicProfileNatively) {

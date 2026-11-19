@@ -1,4 +1,4 @@
-# Gothwad Accounts — Project Status & Handoff
+# Bansify Accounts — Project Status & Handoff
 
 Updated 2026-11-16. Strictly separates what is implemented in source, verified locally via static checks, and pending live Android CI / device verification.
 
@@ -16,7 +16,7 @@ Updated 2026-11-16. Strictly separates what is implemented in source, verified l
   - Hardened `authInterceptor` requiring `addNetworkInterceptor` and verifying HTTPS port 443 + `allowedHosts` across every network redirect hop.
 
 - **`:ui` (`com.gothwad.accounts.ui`, Material 3)**:
-  - Exact 6-tab parity with `accounts.gothwadtech.com/me` (`Home`, `Personal info`, `Security`, `Data & privacy`, `People & sharing`, `Connected apps`), backed 100% by real `:core` flows — demo profiles, hardcoded avatars, and invented tabs removed.
+  - Exact 6-tab parity with `accounts.bansify.com/me` (`Home`, `Personal info`, `Security`, `Data & privacy`, `People & sharing`, `Connected apps`), backed 100% by real `:core` flows — demo profiles, hardcoded avatars, and invented tabs removed.
   - Real `AvatarImageLoader` with bounded LRU memory cache and graceful initials fallback.
   - Signed-out peer continuation cards (`DiscoveredAccount` -> `"Continue as ..."`), `StorageCorruptedRecoveryScreen`, explicit app-local sign-out vs device-wide removal dialog, `SearchAccountScreen`, and `HelpLegalScreen`.
   - Reusable host embeddable widgets: `GothwadAccountAvatarButton`, `GothwadAccountSwitcherSheet`, `GothwadAccountSettingsCard`, `GothwadAuthStatusBanner`, `SignInButton`, and `openAccountManagement(activity)`.
@@ -36,8 +36,8 @@ Updated 2026-11-16. Strictly separates what is implemented in source, verified l
 - **Checked locally**: `python3 tools/check_docs.py` and `python3 tools/check_android_scaffold.py`.
 - **Android CI / Gradle execution**: Verify on GitHub Actions `Android CI` workflow run after push (sandbox lacks full local Android SDK).
 - **Separate repository follow-ups** (see [SERVER_CHANGES.md](SERVER_CHANGES.md)):
-  - Register Android public OAuth clients (`gothwad-accounts-android`, `gothwad-accounts-sample-alpha`, `gothwad-accounts-sample-beta`, `kiwi-store`, `gothwad-mail`, `gothwad-drive`, `gothwad-tube`) in `GothwadTech/accounts`.
-  - Add `/oauth/revoke` bearer-token endpoint + `POST /oauth/token` refresh token revocation check + optional device-scoped session metadata in `GothwadTech/accounts` (`PR-A` / `PR-B`).
+  - Register Android public OAuth clients (`gothwad-accounts-android`, `gothwad-accounts-sample-alpha`, `gothwad-accounts-sample-beta`, `kiwi-store`, `gothwad-mail`, `gothwad-drive`, `gothwad-tube`) in `Bansify/accounts`.
+  - Add `/oauth/revoke` bearer-token endpoint + `POST /oauth/token` refresh token revocation check + optional device-scoped session metadata in `Bansify/accounts` (`PR-A` / `PR-B`).
   - Once live OAuth clients are registered, exercise physical-device login, cross-flavor `alpha` <-> `beta` discovery, and signed release workflows (`RELEASE_KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`).
 
 ## 2. Documentation map
@@ -47,7 +47,7 @@ Updated 2026-11-16. Strictly separates what is implemented in source, verified l
 - [UNINSTALL_AND_RECOVERY_MATRIX.md](UNINSTALL_AND_RECOVERY_MATRIX.md) — install order, uninstall survival, keystore loss, and token revocation behavior.
 - [SECURITY.md](SECURITY.md) — STRIDE threat model and cryptographic invariants.
 - [BROKER_PROTOCOL.md](BROKER_PROTOCOL.md) — Peer Directory IPC v1 specification.
-- [SERVER_CHANGES.md](SERVER_CHANGES.md) — exact PR plan for `GothwadTech/accounts`.
+- [SERVER_CHANGES.md](SERVER_CHANGES.md) — exact PR plan for `Bansify/accounts`.
 - [PUBLIC_API.md](PUBLIC_API.md) — Kotlin/Compose integration API.
 - [INTEGRATION.md](INTEGRATION.md) — manifest setup, client table, and verification steps.
 - [RELEASES.md](RELEASES.md) — GitHub Releases, JitPack coordinates, and signing secrets checklist.

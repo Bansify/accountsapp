@@ -383,7 +383,7 @@ fun HomeTabScreen(
                                 style = MaterialTheme.typography.titleMedium,
                             )
                             Text(
-                                text = "Export your Gothwad Account snapshot, review activity, or manage shared Drive & Mail quota.",
+                                text = "Export your Bansify Account snapshot, review activity, or manage shared Drive & Mail quota.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )

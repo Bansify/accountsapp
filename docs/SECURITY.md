@@ -1,6 +1,6 @@
 # Threat Model & Security Requirements
 
-This document defines the STRIDE threat model and enforced security controls for `GothwadTech/accountsapp` and integrating Gothwad Android clients.
+This document defines the STRIDE threat model and enforced security controls for `Bansify/accountsapp` and integrating Bansify Android clients.
 
 ---
 
@@ -14,7 +14,7 @@ This document defines the STRIDE threat model and enforced security controls for
 | **T — Tampering (Shared `accountType` Collision)** | Malicious or second app declares the same `AccountManager` `android:accountType` to hijack authenticator ownership or cause uninstall-wipe denial of service. | We **reject** multi-authenticator shared `AccountManager` registration. Each app owns its isolated `TokenStore` and host-scoped `ContentProvider` authority (`${applicationId}.gothwad.account.directory`), with mutual certificate verification before IPC. |
 | **I — Information Disclosure (Token Leakage)** | Bearer header leaked across HTTP 302 redirects, shared OkHttp caches, download clients, world-readable files, or cross-app IPC. | 1. `GothwadAccounts.authInterceptor` **requires** `addNetworkInterceptor` (checked at runtime via `chain.connection() != null`), enforcing `https`, port `443`, and explicit `allowedHosts` at **every redirect hop**, stripping `Authorization` on disallowed targets.<br>2. Separate `downloadClient` must never attach `authInterceptor`.<br>3. `AccountDirectoryProvider` stores & returns **metadata only** — `access_token` and `refresh_token` never cross IPC.<br>4. HTTP caches are disabled (`null`) or cleared/partitioned per `userId`. |
 | **I — Information Disclosure (FOSS / Untrusted Mode)** | Unverified or FOSS build queries peer directory or leaks device accounts. | `BrokerPolicy.Disabled` disables both peer queries and the exported `AccountDirectoryProvider` completely (fails with `SecurityException` before touching disk). |
-| **E — Elevation of Privilege (Service & Management Confusion)** | Treating `/oauth/userinfo` identity confirmation as authorization for `mail` or `drive`, or mutating password/MFA with basic identity scopes. | 1. Resource Workers (`mail`, `drive`, `store`) must independently enforce `aud == client_id` and service scopes (`mail`, `drive`, etc.).<br>2. High-privilege `/auth/*` mutations (password, MFA, passkeys, recovery email, delete account) require reauthenticated web sessions on `accounts.gothwadtech.com/me` via Custom Tabs until explicit scoped native APIs pass backend security review. |
+| **E — Elevation of Privilege (Service & Management Confusion)** | Treating `/oauth/userinfo` identity confirmation as authorization for `mail` or `drive`, or mutating password/MFA with basic identity scopes. | 1. Resource Workers (`mail`, `drive`, `store`) must independently enforce `aud == client_id` and service scopes (`mail`, `drive`, etc.).<br>2. High-privilege `/auth/*` mutations (password, MFA, passkeys, recovery email, delete account) require reauthenticated web sessions on `accounts.bansify.com/me` via Custom Tabs until explicit scoped native APIs pass backend security review. |
 | **R / D — Replay, Race & DoS** | Concurrent API calls triggering duplicate refresh token rotation (causing family revocation), or slow refresh resurrecting a signed-out account. | 1. `SessionManager` enforces per-`userId` `refreshLocks` so 20+ concurrent callers rotate once.<br>2. Monotonic `generation` epoch + `original` credential check prevents late refresh from writing back a signed-out account.<br>3. Transient `5xx`/`IOException` preserves session offline; only `400..499` `error == "invalid_grant"` clears dead grants.<br>4. IPC callers have strict payload limits and non-blocking bounded dispatch. |
 
 ---
@@ -24,7 +24,7 @@ This document defines the STRIDE threat model and enforced security controls for
 - **Never** use `android:sharedUserId` across apps.
 - **Never** use `MODE_WORLD_READABLE`, external storage, or unencrypted `SharedPreferences` for tokens or session state.
 - **Never** send tokens, auth codes, or user session identifiers inside Android `Broadcast` intents (`sendBroadcast`).
-- **Never** collect Google passwords or render third-party Google/Gothwad login inside an embedded `WebView`.
+- **Never** collect Google passwords or render third-party Google/Bansify login inside an embedded `WebView`.
 - **Never** copy cookies out of Chrome/Custom Tabs or place tokens into redirect URLs.
 - **Never** add debug keystore SHA-256 fingerprints to production `TrustRegistry` lists.
 - **Never** embed OAuth client secrets or backend JWT signing keys inside APKs or SDK libraries.

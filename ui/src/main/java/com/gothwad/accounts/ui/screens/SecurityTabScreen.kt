@@ -142,7 +142,7 @@ fun SecurityTabScreen(
                             )
                             Text(
                                 text = if (attentionCount == 0 && account.mfaEnabled == true) {
-                                    "Your Gothwad Account is protected"
+                                    "Your Bansify Account is protected"
                                 } else {
                                     "Security checkup & sign-in"
                                 },
@@ -211,11 +211,11 @@ fun SecurityTabScreen(
         // How you sign in
         item {
             AccountSectionCard(
-                title = "How you sign in to Gothwad",
+                title = "How you sign in to Bansify",
                 subtitle = if (canManageNatively && canWriteNatively) {
                     "Manage password, 2-Step Verification, and recovery email directly in this app."
                 } else {
-                    "Manage sign-in credentials on accounts.gothwadtech.com."
+                    "Manage sign-in credentials on accounts.bansify.com."
                 },
                 modifier = Modifier.widthIn(max = 600.dp),
             ) {
@@ -287,7 +287,7 @@ fun SecurityTabScreen(
         item {
             AccountSectionCard(
                 title = "Your devices & sessions",
-                subtitle = "Each Gothwad app holds its own hardware-backed OAuth tokens on this phone.",
+                subtitle = "Each Bansify app holds its own hardware-backed OAuth tokens on this phone.",
                 modifier = Modifier.widthIn(max = 600.dp),
             ) {
                 AccountSettingRow(
@@ -300,7 +300,7 @@ fun SecurityTabScreen(
                     supportingText = if (canManageNatively) {
                         "Sign out individual sessions below or clear all other sessions"
                     } else {
-                        "Opens Security & devices on accounts.gothwadtech.com"
+                        "Opens Security & devices on accounts.bansify.com"
                     },
                     icon = Icons.Rounded.Devices,
                     trailingIcon = if (canManageNatively) null else Icons.AutoMirrored.Rounded.OpenInNew,
@@ -345,14 +345,14 @@ fun SecurityTabScreen(
                 }
                 SectionDivider()
                 AccountSettingRow(
-                    label = "Verified Gothwad apps on this device",
+                    label = "Verified Bansify apps on this device",
                     value = if (installedVerifiedPeers.isEmpty()) {
                         "This app only"
                     } else {
                         "${installedVerifiedPeers.size + 1} verified apps on device"
                     },
                     supportingText = if (installedVerifiedPeers.isEmpty()) {
-                        "No other verified sibling Gothwad apps detected"
+                        "No other verified sibling Bansify apps detected"
                     } else {
                         installedVerifiedPeers.joinToString(", ")
                     },
@@ -455,7 +455,7 @@ fun SecurityTabScreen(
                     label = "Connected apps & OAuth grants",
                     value = account.authorizationCount?.let { count ->
                         "$count authorized app(s)"
-                    } ?: "Manage Gothwad OAuth connections",
+                    } ?: "Manage Bansify OAuth connections",
                     icon = Icons.Rounded.Apps,
                     onClick = { onNavigateTab(AccountTab.CONNECTED_APPS) },
                 )

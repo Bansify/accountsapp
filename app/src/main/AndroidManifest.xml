@@ -23,7 +23,7 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data
                     android:scheme="https"
-                    android:host="accounts.gothwadtech.com"
+                    android:host="accounts.bansify.com"
                     android:path="/oauth/callback" />
             </intent-filter>
         </activity>

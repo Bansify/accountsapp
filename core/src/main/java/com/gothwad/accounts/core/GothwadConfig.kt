@@ -68,7 +68,7 @@ data class GothwadConfig(
     val clientId: String,
     val redirectUri: String,
     val scopes: Set<Scope> = setOf(Scope.Profile, Scope.Email, Scope.OfflineAccess),
-    val authBaseUrl: String = "https://accounts.gothwadtech.com/api",
+    val authBaseUrl: String = "https://accounts.bansify.com/api",
     val brokerPolicy: BrokerPolicy = BrokerPolicy.Disabled,
     val allowCustomSchemeRedirect: Boolean = true,
 ) {

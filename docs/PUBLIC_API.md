@@ -12,7 +12,7 @@ GothwadAccounts.init(
         redirectUri = if (BuildConfig.DEBUG) {
             "$packageName:/oauth/callback"
         } else {
-            "https://accounts.gothwadtech.com/oauth/callback"
+            "https://accounts.bansify.com/oauth/callback"
         },
         allowCustomSchemeRedirect = BuildConfig.DEBUG, // Release enforces verified HTTPS App Links
         scopes = setOf(
@@ -124,7 +124,7 @@ GothwadAccounts.fetchTrustedApps(pinnedPublicKey, expectedKeyId)
 val client = OkHttpClient.Builder()
     .addNetworkInterceptor(
         GothwadAccounts.authInterceptor(
-            allowedHosts = setOf("drive-api.gothwadtech.com"),
+            allowedHosts = setOf("drive-api.bansify.com"),
         ),
     )
     .build()
@@ -136,7 +136,7 @@ val client = OkHttpClient.Builder()
 
 ## 5. Shared UI & embeddable widgets (`ui`)
 
-Full-screen account management (matches `accounts.gothwadtech.com/me` 6 sections: `Home`, `Personal info`, `Security`, `Data & privacy`, `People & sharing`, `Connected apps`):
+Full-screen account management (matches `accounts.bansify.com/me` 6 sections: `Home`, `Personal info`, `Security`, `Data & privacy`, `People & sharing`, `Connected apps`):
 
 ```kotlin
 import com.gothwad.accounts.ui.openAccountManagement

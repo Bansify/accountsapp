@@ -15,7 +15,7 @@ Maven / JitPack publication targets are configured as multi-module coordinates (
 `:core` automatically merges:
 - Exported `AccountCallbackActivity` (without hardcoded intent filters — each host defines its exact callback URI),
 - Host-scoped `broker.AccountDirectoryProvider` (`android:authorities="${applicationId}.gothwad.account.directory"`, `exported="true"`),
-- Bounded `<queries>` allowlist for first-party Gothwad packages (`com.gothwad.accounts`, `com.gothwad.mail`, `com.gothwad.drive`, `com.gothwad.store`, `com.gothwad.tube`, `com.gothwad.accounts.sample.alpha`, `com.gothwad.accounts.sample.beta`).
+- Bounded `<queries>` allowlist for first-party Bansify packages (`com.gothwad.accounts`, `com.gothwad.mail`, `com.gothwad.drive`, `com.gothwad.store`, `com.gothwad.tube`, `com.gothwad.accounts.sample.alpha`, `com.gothwad.accounts.sample.beta`).
 
 Each host app adds its exact OAuth callback filter to `AccountCallbackActivity` in its own `AndroidManifest.xml`:
 
@@ -29,7 +29,7 @@ Each host app adds its exact OAuth callback filter to `AccountCallbackActivity` 
         <category android:name="android.intent.category.BROWSABLE" />
         <data
             android:scheme="https"
-            android:host="tube.gothwadtech.com"
+            android:host="tube.bansify.com"
             android:path="/oauth/callback" />
     </intent-filter>
 </activity>
@@ -45,9 +45,9 @@ For production HTTPS App Links, publish `https://<host>/.well-known/assetlinks.j
 | Sample alpha | `gothwad-accounts-sample-alpha` | `com.gothwad.accounts.sample.alpha:/oauth/callback` | `profile email offline_access` |
 | Sample beta | `gothwad-accounts-sample-beta` | `com.gothwad.accounts.sample.beta:/oauth/callback` | `profile email offline_access` |
 | Kiwi Store (`storeapp`) | `kiwi-store` | `com.gothwad.store:/oauth/callback` | `profile email offline_access` |
-| PlusTube (`tubeapp`) | `gothwad-tube` | `https://tube.gothwadtech.com/oauth/callback` (or `com.gothwad.tube:/oauth/callback`) | `profile email offline_access` |
-| Mail (`mailapp`) | `gothwad-mail` | `https://mail.gothwadtech.com/oauth/callback` (or `com.gothwad.mail:/oauth/callback`) | `profile email offline_access` |
-| Drive (`drive`) | `gothwad-drive` | `https://drive.gothwadtech.com/oauth/callback` (or `com.gothwad.drive:/oauth/callback`) | `profile email offline_access drive` |
+| PlusTube (`tubeapp`) | `gothwad-tube` | `https://tube.bansify.com/oauth/callback` (or `com.gothwad.tube:/oauth/callback`) | `profile email offline_access` |
+| Mail (`mailapp`) | `gothwad-mail` | `https://mail.bansify.com/oauth/callback` (or `com.gothwad.mail:/oauth/callback`) | `profile email offline_access` |
+| Drive (`drive`) | `gothwad-drive` | `https://drive.bansify.com/oauth/callback` (or `com.gothwad.drive:/oauth/callback`) | `profile email offline_access drive` |
 
 All mobile clients are **public PKCE (`S256`)** clients with no embedded `client_secret` in the APK.
 

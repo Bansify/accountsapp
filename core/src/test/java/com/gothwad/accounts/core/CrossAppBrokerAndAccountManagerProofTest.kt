@@ -161,7 +161,7 @@ class CrossAppBrokerAndAccountManagerProofTest {
         }
 
         // Initialize GothwadAccounts in host context with PeerDiscovery policy and a seeded store.
-        val seededAccount = GothwadAccount("uid-1", "arjun", "Arjun", "arjun@gothwadtech.com")
+        val seededAccount = GothwadAccount("uid-1", "arjun", "Arjun", "arjun@bansify.com")
         val seededStore = object : TokenStore {
             private var s = StoredSession(
                 credentials = listOf(
@@ -233,9 +233,9 @@ class CrossAppBrokerAndAccountManagerProofTest {
         var now = 1_000_000L
         val clock = { now }
 
-        val accountA = GothwadAccount("uid-a", "arjun", "Arjun", "arjun@gothwadtech.com")
-        val accountB = GothwadAccount("uid-b", "meera", "Meera", "meera@gothwadtech.com")
-        val accountC = GothwadAccount("uid-c", "kiran", "Kiran", "kiran@gothwadtech.com")
+        val accountA = GothwadAccount("uid-a", "arjun", "Arjun", "arjun@bansify.com")
+        val accountB = GothwadAccount("uid-b", "meera", "Meera", "meera@bansify.com")
+        val accountC = GothwadAccount("uid-c", "kiran", "Kiran", "kiran@bansify.com")
 
         val bus = FakeVerifiedDeviceBus()
         val trust = BrokerTrustPolicy.PinnedSigners(

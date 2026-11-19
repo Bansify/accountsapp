@@ -7,7 +7,7 @@ This document specifies the runtime sequences for first-app login, cross-app ver
 ## 1. First-Installed App Sign-In Flow (Scenario A)
 
 ```text
-User (Mail App)          :core (SessionManager)         Custom Tabs Browser         accounts.gothwadtech.com
+User (Mail App)          :core (SessionManager)         Custom Tabs Browser         accounts.bansify.com
       |                            |                             |                            |
       |-- Tap "Sign in" ---------->|                             |                            |
       |                            |-- Discover Peers ---------->| (0 peers with accounts)    |
@@ -36,7 +36,7 @@ User (Mail App)          :core (SessionManager)         Custom Tabs Browser     
 ## 2. Later-Installed App Discovery & Service-Scoped Issuance (Scenarios B, C, D)
 
 ```text
-Drive App (:core)                    Mail App (AccountDirectoryProvider)      accounts.gothwadtech.com
+Drive App (:core)                    Mail App (AccountDirectoryProvider)      accounts.bansify.com
       |                                            |                                    |
       |-- Startup / Switcher open                  |                                    |
       |-- PackageManager check (<queries> list) -->|                                    |
@@ -53,7 +53,7 @@ Drive App (:core)                    Mail App (AccountDirectoryProvider)      ac
       |   (Mail remains active on B!)              |                                    |
       |-- Current mode: Custom Tabs OAuth PKCE --->|----------------------------------->|
       |   (client_id=gothwad-drive, scope=drive,   |                                    |
-      |    login_hint=A@gothwadtech.com)           |                                    |
+      |    login_hint=A@bansify.com)               |                                    |
       |<-- Drive-scoped access + refresh tokens ---|<-----------------------------------|
       |                                            |                                    |
       |-- Future Handoff Mode (after server PR):   |                                    |
@@ -71,7 +71,7 @@ Drive App (:core)                    Mail App (AccountDirectoryProvider)      ac
 ```text
 Host App Network Layer
   |-- apiClient (OkHttpClient)
-  |     |-- .addNetworkInterceptor(GothwadAccounts.authInterceptor(allowedHosts = setOf("drive-api.gothwadtech.com")))
+  |     |-- .addNetworkInterceptor(GothwadAccounts.authInterceptor(allowedHosts = setOf("drive-api.bansify.com")))
   |     |-- .cache(null)  // or explicitly purged/partitioned per activeUserId
   |     |-- Enforces HTTPS + port 443 + allowedHosts at EVERY redirect hop
   |     '-- Single-flight per-userId refresh lock; never leaks Authorization across 302 redirects

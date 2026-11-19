@@ -83,7 +83,7 @@ fun ConnectedAppsTabScreen(
         item {
             TabIntroHeader(
                 title = stringResource(R.string.gothwad_tab_apps),
-                subtitle = "Core Gothwad services, installed device apps, and revocable OAuth permissions.",
+                subtitle = "Core Bansify services, installed device apps, and revocable OAuth permissions.",
                 modifier = Modifier.widthIn(max = 600.dp),
             )
         }
@@ -185,10 +185,10 @@ fun ConnectedAppsTabScreen(
             }
         }
 
-        // Verified Gothwad apps detected on THIS device via PackageManager + signing cert policy
+        // Verified Bansify apps detected on THIS device via PackageManager + signing cert policy
         item {
             AccountSectionCard(
-                title = "Installed Gothwad apps on this device",
+                title = "Installed Bansify apps on this device",
                 subtitle = "Verified by signing certificate; each app stores its own scoped OAuth tokens.",
                 modifier = Modifier.widthIn(max = 600.dp),
             ) {
@@ -213,11 +213,11 @@ fun ConnectedAppsTabScreen(
             }
         }
 
-        // Core Gothwad services (exact list from accounts/web/js/gothwad-apps.js)
+        // Core Bansify services (exact list from accounts/web/js/gothwad-apps.js)
         item {
             AccountSectionCard(
-                title = "Gothwad Services",
-                subtitle = "Included services covered by your Gothwad Account",
+                title = "Bansify Services",
+                subtitle = "Included services covered by your Bansify Account",
                 modifier = Modifier.widthIn(max = 600.dp),
             ) {
                 GothwadEcosystemCatalog.coreServices.forEachIndexed { index, service ->
@@ -244,8 +244,8 @@ fun ConnectedAppsTabScreen(
         // Optional catalog products
         item {
             AccountSectionCard(
-                title = "More from Gothwad",
-                subtitle = "Other apps you can sign in to with your Gothwad Account",
+                title = "More from Bansify",
+                subtitle = "Other apps you can sign in to with your Bansify Account",
                 modifier = Modifier.widthIn(max = 600.dp),
             ) {
                 GothwadEcosystemCatalog.optionalProducts.forEachIndexed { index, product ->

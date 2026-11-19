@@ -102,7 +102,7 @@ class NativeAuthAndPeerSsoTest {
 
         server.enqueue(
             MockResponse().setResponseCode(200).setBody(
-                """{"ok":true,"available":true,"valid":true,"username":"arjun99","email":"arjun99@gothwadtech.com"}""",
+                """{"ok":true,"available":true,"valid":true,"username":"arjun99","email":"arjun99@bansify.com"}""",
             ),
         )
         val userCheck = client.checkUsername("arjun99")
@@ -121,7 +121,7 @@ class NativeAuthAndPeerSsoTest {
 
         server.enqueue(
             MockResponse().setResponseCode(200).setBody(
-                """{"ok":true,"access_token":"at-native","refresh_token":"rt-native","token_type":"Bearer","expires_in":3600,"scope":"profile email offline_access","client_id":"gothwad-accounts-android","session_id":"sid-1","user":{"id":"u-1","username":"arjun","email":"arjun@gothwadtech.com","first_name":"Arjun","last_name":"Verma"}}""",
+                """{"ok":true,"access_token":"at-native","refresh_token":"rt-native","token_type":"Bearer","expires_in":3600,"scope":"profile email offline_access","client_id":"gothwad-accounts-android","session_id":"sid-1","user":{"id":"u-1","username":"arjun","email":"arjun@bansify.com","first_name":"Arjun","last_name":"Verma"}}""",
             ),
         )
         val mfaSuccess = client.nativeVerifyMfa("a".repeat(64), "123456")
@@ -133,7 +133,7 @@ class NativeAuthAndPeerSsoTest {
         // Sign-up 201
         server.enqueue(
             MockResponse().setResponseCode(201).setBody(
-                """{"ok":true,"access_token":"at-new","refresh_token":"rt-new","token_type":"Bearer","expires_in":3600,"scope":"profile","client_id":"gothwad-accounts-android","session_id":"sid-2","user":{"id":"u-2","username":"meera","email":"meera@gothwadtech.com"}}""",
+                """{"ok":true,"access_token":"at-new","refresh_token":"rt-new","token_type":"Bearer","expires_in":3600,"scope":"profile","client_id":"gothwad-accounts-android","session_id":"sid-2","user":{"id":"u-2","username":"meera","email":"meera@bansify.com"}}""",
             ),
         )
         val signUpSuccess = client.nativeSignUp(
@@ -168,7 +168,7 @@ class NativeAuthAndPeerSsoTest {
         assertEquals(1, client.revokeSession("tok-1", "sess-9"))
         assertEquals("/api/mobile/sessions/revoke", server.takeRequest().path)
 
-        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"ok":true,"avatar_url":"https://accounts.gothwadtech.com/api/avatars/u1?v=1"}"""))
+        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"ok":true,"avatar_url":"https://accounts.bansify.com/api/avatars/u1?v=1"}"""))
         val avatarUrl = client.uploadAvatar("tok-1", "data:image/jpeg;base64,/9j/4AAQ", "image/jpeg")
         assertTrue(avatarUrl?.contains("/api/avatars/") == true)
         assertEquals("/api/mobile/avatar", server.takeRequest().path)
@@ -251,7 +251,7 @@ class NativeAuthAndPeerSsoTest {
             private var s = StoredSession(
                 credentials = listOf(
                     Credential(
-                        account = GothwadAccount("u-1", "arjun", "Arjun", email = "arjun@gothwadtech.com"),
+                        account = GothwadAccount("u-1", "arjun", "Arjun", email = "arjun@bansify.com"),
                         accessToken = "expired-at-never-shared",
                         refreshToken = "rt-never-shared",
                         expiresAt = 0L,
@@ -335,7 +335,7 @@ class NativeAuthAndPeerSsoTest {
         )
         server.enqueue(
             MockResponse().setResponseCode(200).setBody(
-                """{"sub":"u-1","preferred_username":"arjun","name":"Arjun Sharma","email":"arjun@gothwadtech.com"}""",
+                """{"sub":"u-1","preferred_username":"arjun","name":"Arjun Sharma","email":"arjun@bansify.com"}""",
             ),
         )
 
@@ -354,7 +354,7 @@ class NativeAuthAndPeerSsoTest {
                         userId = "u-1",
                         username = "arjun",
                         name = "Arjun Sharma",
-                        email = "arjun@gothwadtech.com",
+                        email = "arjun@bansify.com",
                         addedAt = 100L,
                         lastSeenAt = 200L,
                     ),
@@ -394,7 +394,7 @@ class NativeAuthAndPeerSsoTest {
 
         val signedIn = GothwadAccounts.state.value as AccountState.SignedIn
         assertEquals("u-1", signedIn.account.userId)
-        assertEquals("arjun@gothwadtech.com", signedIn.account.email)
+        assertEquals("arjun@bansify.com", signedIn.account.email)
         assertEquals("/api/oauth/token", server.takeRequest().path)
         assertEquals("/api/oauth/userinfo", server.takeRequest().path)
     }
