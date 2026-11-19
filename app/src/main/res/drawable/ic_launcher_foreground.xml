@@ -1,22 +1,47 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- 24x24 grid scaled by 2.7 into centered 54x54 safe region [27..81] -->
-    <group
-        android:translateX="21.6"
-        android:translateY="21.6"
-        android:scaleX="2.7"
-        android:scaleY="2.7">
-        <!-- Outer circle ring (r=8..10) + bottom shoulder dome (nonZero safe CW/CCW winding) -->
-        <path
-            android:fillColor="#FFFFFF"
-            android:pathData="M12,2C17.52,2 22,6.48 22,12C22,17.52 17.52,22 12,22C6.48,22 2,17.52 2,12C2,6.48 6.48,2 12,2ZM18.147,17.12A8,8 0 1 0 5.853,17.12C7.55,15.8 9.68,15 12,15C14.32,15 16.45,15.8 18.147,17.12Z" />
-        <!-- Inner head circle (cx=12, cy=9.5, r=3.5) -->
-        <path
-            android:fillColor="#FFFFFF"
-            android:pathData="M12,6C13.93,6 15.5,7.57 15.5,9.5C15.5,11.43 13.93,13 12,13C10.07,13 8.5,11.43 8.5,9.5C8.5,7.57 10.07,6 12,6Z" />
-    </group>
+    <!-- Centered 54x54 safe region [27..81] with Indian tricolor gradient (saffron top, white middle, green bottom) -->
+    <!-- Outer circle ring + bottom shoulder dome (nonZero safe CW/CCW winding) -->
+    <path
+        android:pathData="M54,27C68.904,27 81,39.096 81,54C81,68.904 68.904,81 54,81C39.096,81 27,68.904 27,54C27,39.096 39.096,27 54,27ZM70.5969,67.824A21.6,21.6 0 1 0 37.4031,67.824C41.985,64.26 47.736,62.1 54,62.1C60.264,62.1 66.015,64.26 70.5969,67.824Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="54"
+                android:startY="27"
+                android:endX="54"
+                android:endY="81">
+                <item android:color="#FFFF6E00" android:offset="0.00" />
+                <item android:color="#FFFF9933" android:offset="0.24" />
+                <item android:color="#FFFFFFFF" android:offset="0.42" />
+                <item android:color="#FFFFFFFF" android:offset="0.58" />
+                <item android:color="#FF22C55E" android:offset="0.76" />
+                <item android:color="#FF15993D" android:offset="1.00" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- Inner head circle (cx=54, cy=47.25, r=9.45) -->
+    <path
+        android:pathData="M54,37.8C59.211,37.8 63.45,42.039 63.45,47.25C63.45,52.461 59.211,56.7 54,56.7C48.789,56.7 44.55,52.461 44.55,47.25C44.55,42.039 48.789,37.8 54,37.8Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="54"
+                android:startY="27"
+                android:endX="54"
+                android:endY="81">
+                <item android:color="#FFFF6E00" android:offset="0.00" />
+                <item android:color="#FFFF9933" android:offset="0.24" />
+                <item android:color="#FFFFFFFF" android:offset="0.42" />
+                <item android:color="#FFFFFFFF" android:offset="0.58" />
+                <item android:color="#FF22C55E" android:offset="0.76" />
+                <item android:color="#FF15993D" android:offset="1.00" />
+            </gradient>
+        </aapt:attr>
+    </path>
 </vector>
