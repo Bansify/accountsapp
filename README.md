@@ -1,10 +1,10 @@
 # Bansify Accounts (Android)
 
-Optional standalone **Bansify Accounts** app (`com.gothwad.accounts`) and shared Android Account SDK (`:core` + `:ui`) for the Bansify ecosystem (`Mail`, `Drive`, `Kiwi Store`, `PlusTube`, `Notes`, `Calendar`). Minimum Android API: 26.
+Optional standalone **Bansify Accounts** app (`com.bansify.accounts`) and shared Android Account SDK (`:core` + `:ui`) for the Bansify ecosystem (`Mail`, `Drive`, `Kiwi Store`, `PlusTube`, `Notes`, `Calendar`). Minimum Android API: 26.
 
 ## Overview
 
-- **Zero mandatory central app**: Installing standalone `com.gothwad.accounts` is optional. Every Bansify app works independently on day one, in any install order, and keeps functioning if any other Bansify app is uninstalled.
+- **Zero mandatory central app**: Installing standalone `com.bansify.accounts` is optional. Every Bansify app works independently on day one, in any install order, and keeps functioning if any other Bansify app is uninstalled.
 - **Per-app hardware-backed credentials**: Each app holds its own OAuth client-scoped tokens (`EncryptedTokenStore` backed by Tink + AndroidKeyStore under `noBackupFilesDir`, strictly fail-closed). Refresh tokens are never shared across apps.
 - **Distributed cross-app discovery**: With `BrokerPolicy.PeerDiscovery`, verified sibling Bansify apps exchange zero-token account directory snapshots (`AccountDirectoryProvider`) verified via `Binder.getCallingUid()` + `PackageManager` signing-certificate fingerprints so users see `"Continue as <name>"` across apps without duplicating sign-in friction.
 - **FOSS / untrusted builds**: Setting `BrokerPolicy.Disabled` disables all cross-app IPC and falls back cleanly to Custom Tabs PKCE browser login.
@@ -16,7 +16,7 @@ Optional standalone **Bansify Accounts** app (`com.gothwad.accounts`) and shared
 | --- | --- |
 | `:core` | OAuth PKCE client, `EncryptedTokenStore`, `SessionManager`, `PeerBrokerClient`, `AccountDirectoryProvider`, network-hop-safe `authInterceptor` (zero Compose dependency) |
 | `:ui` | Shared Material 3 `GothwadAccountsScreen`, `AccountManagementActivity`, `GothwadAccountAvatarButton`, `GothwadAccountSwitcherSheet`, `GothwadAccountSettingsCard`, EN/HI strings |
-| `:app` | Standalone `com.gothwad.accounts` launcher app |
+| `:app` | Standalone `com.bansify.accounts` launcher app |
 | `:sample` | Multi-flavor (`alpha` + `beta`) host app demonstrating embedded SDK integration and cross-app discovery side by side |
 
 ## Quick Checks & Build

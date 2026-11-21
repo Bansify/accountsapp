@@ -37,7 +37,7 @@ Work only in this `Bansify/mailapp` repository on the active session branch. Fir
    - **Token migration note**: `accountsapp` stores tokens in `gothwad-<sha>.enc` / alias `gothwad.accounts.<sha>`, whereas Mail's legacy `EncryptedTokenStore` used `gothwad-mail-<sha>.enc`. Upgrading users re-authenticate cleanly (or via one-tap peer SSO if another updated Bansify app holds a session).
 3. **Preserve `.github/workflows/android-ci.yml`, `.github/workflows/release.yml`, and `tools/check_docs.py` invariants**:
    - Keep `README.md` required sections (`## Architecture`, `### Endpoints used`, `## Build and test`, `## Manual device checks`), all documented API endpoints, and all 4 signing secret names (`RELEASE_KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`).
-   - Update `tools/check_android_scaffold.py` to expect `:core`'s merged components (`com.gothwad.accounts.core.AccountCallbackActivity` and `com.gothwad.accounts.core.broker.AccountDirectoryProvider` with `${applicationId}.gothwad.account.directory`) instead of the deleted local `.auth.*` classes.
+   - Update `tools/check_android_scaffold.py` to expect `:core`'s merged components (`com.bansify.accounts.core.AccountCallbackActivity` and `com.bansify.accounts.core.broker.AccountDirectoryProvider` with `${applicationId}.gothwad.account.directory`) instead of the deleted local `.auth.*` classes.
 4. **Build config check (`app/build.gradle.kts`)**:
    - Ensure `minSdk >= 26`, `compileSdk = 36`, `allowDebugBuild = BuildConfig.DEBUG` in `GothwadConfig(...)` (needed for `.debug` sibling discovery testing), and configure `settings.gradle.kts` with `maven("https://jitpack.io")`.
    - Use the latest `v1.0.*` release tag from `Bansify/accountsapp` that includes `:core` `currentAccessToken()` and `:ui` `GothwadAccounts.openSignIn(...)` (check `gh release list --repo Bansify/accountsapp --limit 5` or git tags if needed; do **not** use mutable `-SNAPSHOT` for releases).
@@ -56,11 +56,11 @@ Work only in this `Bansify/mailapp` repository on the active session branch. Fir
 
 ### 2. Android Manifest (`app/src/main/AndroidManifest.xml`)
 
-1. Keep `<queries>` or let `:core`'s manifest merger supply the bounded Bansify `<queries>` packages and `com.gothwad.accounts.core.broker.AccountDirectoryProvider`.
+1. Keep `<queries>` or let `:core`'s manifest merger supply the bounded Bansify `<queries>` packages and `com.bansify.accounts.core.broker.AccountDirectoryProvider`.
 2. Remove the old `.auth.AccountCallbackActivity` and `.auth.broker.AccountDirectoryProvider` entries from `app/src/main/AndroidManifest.xml`, and replace them with the host callback binding on `:core`'s activity:
    ```xml
    <activity
-       android:name="com.gothwad.accounts.core.AccountCallbackActivity"
+       android:name="com.bansify.accounts.core.AccountCallbackActivity"
        android:exported="true"
        android:launchMode="singleTop"
        android:theme="@android:style/Theme.Translucent.NoTitleBar">
@@ -92,7 +92,7 @@ Work only in this `Bansify/mailapp` repository on the active session branch. Fir
      - `allowDebugBuild = BuildConfig.DEBUG`
    - Wire `MailApiClient(tokenProvider = MailAccessTokenProvider { GothwadAccounts.currentAccessToken() })`.
 2. **`MailViewModel.kt`**:
-   - Replace `GothwadMailAuth`, `MailAuthAccount`, `MailAuthFailure`, `DisconnectOutcome`, `DiscoveredAccount` (local copy), and `AuthScreenState` with `com.gothwad.accounts.core.GothwadAccounts`, `AccountState`, `GothwadAccount`, `AuthFailure`, `com.gothwad.accounts.core.DiscoveredAccount`.
+   - Replace `GothwadMailAuth`, `MailAuthAccount`, `MailAuthFailure`, `DisconnectOutcome`, `DiscoveredAccount` (local copy), and `AuthScreenState` with `com.bansify.accounts.core.GothwadAccounts`, `AccountState`, `GothwadAccount`, `AuthFailure`, `com.bansify.accounts.core.DiscoveredAccount`.
    - Observe `GothwadAccounts.state` and `GothwadAccounts.discoveredAccounts` directly:
      - When `GothwadAccounts.state` emits `AccountState.SignedIn`, sync `MailRepository` accounts (`activeAccount` + `all` accounts + remove stale Room accounts no longer in `all`).
      - When `switchAccount(email)`: find matching `userId` in `(GothwadAccounts.state.value as? AccountState.SignedIn)?.all` and call `GothwadAccounts.switchTo(userId)`.
@@ -134,7 +134,7 @@ Work only in this `Bansify/mailapp` repository on the active session branch. Fir
 2. Delete obsolete tests for the deleted local auth layer (`PkceTest.kt`, `CallbackValidatorTest.kt`, `MailAuthSessionManagerTest.kt`, `NativeAuthTest.kt`, `PeerBrokerDiscoveryTest.kt` — all covered by `:core` and `:ui` tests in `accountsapp`), and keep/add Mail integration tests in `MailApiClientTest.kt`, `MailRepositorySyncTest.kt`, and `MailViewModelAuthWiringTest.kt` verifying:
    - `MailApiClient` fetches tokens cleanly from `MailAccessTokenProvider`.
    - `MailViewModel` syncs Room accounts with `AccountState.SignedIn` and purges local mail caches on `GothwadAccounts.removeFromDevice(userId)`.
-3. Update `tools/check_android_scaffold.py` so it verifies `:core` manifest components (`com.gothwad.accounts.core.AccountCallbackActivity`), `com.github.Bansify.accountsapp` dependency, `https://mail.bansify.com/oauth/callback`, and release workflow requirements without failing on deleted `.auth.*` files.
+3. Update `tools/check_android_scaffold.py` so it verifies `:core` manifest components (`com.bansify.accounts.core.AccountCallbackActivity`), `com.github.Bansify.accountsapp` dependency, `https://mail.bansify.com/oauth/callback`, and release workflow requirements without failing on deleted `.auth.*` files.
 
 ---
 

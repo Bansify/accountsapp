@@ -8,15 +8,15 @@ val resolvedVersionCode = (findProperty("versionCode") as? String)?.toIntOrNull(
 val resolvedVersionName = (findProperty("versionName") as? String)?.takeIf { it.isNotBlank() } ?: "0.1.0-dev"
 
 android {
-    namespace = "com.gothwad.accounts"
+    namespace = "com.bansify.accounts"
     compileSdk = 36
     defaultConfig {
-        applicationId = "com.gothwad.accounts"
+        applicationId = "com.bansify.accounts"
         minSdk = 26
         targetSdk = 36
         versionCode = resolvedVersionCode
         versionName = resolvedVersionName
-        manifestPlaceholders["gothwadRedirectScheme"] = "com.gothwad.accounts"
+        manifestPlaceholders["gothwadRedirectScheme"] = "com.bansify.accounts"
     }
 
     buildTypes {
