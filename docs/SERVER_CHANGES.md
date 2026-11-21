@@ -8,7 +8,7 @@
 
 Verified directly against `Bansify/accounts`:
 - **First-party OAuth clients (`0014_first_party_native.sql`)**:
-  - `gothwad-accounts-android` (`com.gothwad.accounts`) — `https://accounts.bansify.com/oauth/callback`, `com.gothwad.accounts:/oauth/callback`, scopes `profile email offline_access drive.read account.read account.profile.write`.
+  - `gothwad-accounts-android` (`com.bansify.accounts`) — `https://accounts.bansify.com/oauth/callback`, `com.bansify.accounts:/oauth/callback`, scopes `profile email offline_access drive.read account.read account.profile.write`.
   - `gothwad-accounts-sample-alpha` / `gothwad-accounts-sample-beta` — custom scheme callbacks, `profile email offline_access`.
   - `gothwad-mail`, `gothwad-drive`, `kiwi-store`, `gothwad-tube` — exact package/redirect/scope registrations.
 - **Extended `GET /oauth/userinfo`**:
@@ -38,7 +38,7 @@ Verified directly against `Bansify/accounts`:
 
 1. **Accounts Cloudflare routing & fingerprints**:
    - Route exact public `https://accounts.bansify.com/.well-known/assetlinks.json` directly to the `accounts` Worker (outside `/api/*`, no auth/redirects).
-   - Apply `migrations/0014_first_party_native.sql` (if not already applied remotely) and populate lowercase 64-hex `android_cert_sha256` fingerprints for `com.gothwad.accounts` (and sibling Android apps) in `ecosystem_apps` once the release `.jks` key is finalized.
+   - Apply `migrations/0014_first_party_native.sql` (if not already applied remotely) and populate lowercase 64-hex `android_cert_sha256` fingerprints for `com.bansify.accounts` (and sibling Android apps) in `ecosystem_apps` once the release `.jks` key is finalized.
    - Optionally configure `TRUSTED_APPS_SIGNING_JWK` (`EdDSA`/`ES256`) + `TRUSTED_APPS_KEY_ID` if consumers verify `/api/apps/trusted` signatures.
 2. **Resource Workers (`mail`, `drive`, `store`)**:
    - Ensure each sibling service Worker validates JWT `aud` + client scopes (`mail` for Mail, `drive` / `drive.read` for Drive, `kiwi-store` for Store) before accepting OAuth bearer tokens directly.

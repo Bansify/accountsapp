@@ -7,7 +7,7 @@
 | `Bansify/accounts` | Web pages (`/signin`, `/me`, `/privacy`, `/terms`) + Worker API | Cloudflare Pages & Workers |
 | `Bansify/accounts` | Schema migrations (`0001`–`0014_first_party_native.sql`+) | Cloudflare D1 |
 | `Bansify/accountsapp` | `:core` + `:ui` AARs, POMs, sources | Maven / JitPack (`com.github.Bansify.accountsapp:{core,ui}:<tag>`) |
-| `Bansify/accountsapp` | Signed standalone Bansify Accounts APK (`com.gothwad.accounts`) & Play Store AAB | GitHub Releases |
+| `Bansify/accountsapp` | Signed standalone Bansify Accounts APK (`com.bansify.accounts`) & Play Store AAB | GitHub Releases |
 
 Android requires no separate Cloudflare backend deployment; both web and Android talk directly to `https://accounts.bansify.com/api`.
 
@@ -34,6 +34,6 @@ Android requires no separate Cloudflare backend deployment; both web and Android
 
 ## Owner pre-release checklist
 
-- Add the 4 repository signing secrets in GitHub (`RELEASE_KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`) using a dedicated `.jks` keystore for `com.gothwad.accounts` (keep existing published sibling apps on their existing keystores).
+- Add the 4 repository signing secrets in GitHub (`RELEASE_KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`) using a dedicated `.jks` keystore for `com.bansify.accounts` (keep existing published sibling apps on their existing keystores).
 - Record the release APK's public SHA-256 certificate fingerprint (printed in `.github/workflows/release.yml` Job Summary) in `Bansify/accounts` D1 `ecosystem_apps.android_cert_sha256` (lowercase hex) and route `https://accounts.bansify.com/.well-known/assetlinks.json` directly to the `accounts` Worker outside `/api/*`.
 - Confirm production Worker settings (`DEV_MODE = "false"`, `https://accounts.bansify.com` origins) before distributing the release APK externally.

@@ -6,7 +6,7 @@ Updated 2026-11-16. Strictly separates what is implemented in source, verified l
 
 ### Implemented in this repository
 
-- **`:core` (`com.gothwad.accounts.core`, Compose-free)**:
+- **`:core` (`com.bansify.accounts.core`, Compose-free)**:
   - `GothwadConfig`, `Scope` (`profile`, `email`, `offline_access`, `drive`, `drive.read`, `notes`, `chat`), `BrokerPolicy`, `BrokerTrustPolicy`.
   - Three-axis reactive state: `state: StateFlow<AccountState>` (`Initializing`, `SignedOut`, `SignedIn(account, all)`, `StorageCorrupted(reason)`), `discoveredAccounts: StateFlow<List<DiscoveredAccount>>`, `isRefreshing: StateFlow<Boolean>`, `error: StateFlow<AuthFailure?>`.
   - `OAuthClient` with `/oauth/userinfo` parsing including `updated_at` and optional `drive` quota (`used_bytes`, `limit_bytes`), `followRedirects(false)`, `followSslRedirects(false)`, `retryOnConnectionFailure(false)`.
@@ -15,14 +15,14 @@ Updated 2026-11-16. Strictly separates what is implemented in source, verified l
   - `broker/` package (`BrokerModels`, `TrustVerifier`, `AccountDirectoryProvider`, `PeerBrokerClient`) implementing zero-token distributed cross-app discovery and device-removal tombstones verified by `Binder.getCallingUid()` + `PackageManager` UID & signing-certificate digests (rejecting mixed-UID packages and non-matching signers before any storage read).
   - Hardened `authInterceptor` requiring `addNetworkInterceptor` and verifying HTTPS port 443 + `allowedHosts` across every network redirect hop.
 
-- **`:ui` (`com.gothwad.accounts.ui`, Material 3)**:
+- **`:ui` (`com.bansify.accounts.ui`, Material 3)**:
   - Exact 6-tab parity with `accounts.bansify.com/me` (`Home`, `Personal info`, `Security`, `Data & privacy`, `People & sharing`, `Connected apps`), backed 100% by real `:core` flows — demo profiles, hardcoded avatars, and invented tabs removed.
   - Real `AvatarImageLoader` with bounded LRU memory cache and graceful initials fallback.
   - Signed-out peer continuation cards (`DiscoveredAccount` -> `"Continue as ..."`), `StorageCorruptedRecoveryScreen`, explicit app-local sign-out vs device-wide removal dialog, `SearchAccountScreen`, and `HelpLegalScreen`.
   - Reusable host embeddable widgets: `GothwadAccountAvatarButton`, `GothwadAccountSwitcherSheet`, `GothwadAccountSettingsCard`, `GothwadAuthStatusBanner`, `SignInButton`, and `openAccountManagement(activity)`.
   - Matching English (`values`) and Hindi (`values-hi`) string resources.
 
-- **`:app` (`com.gothwad.accounts`) & `:sample` (`alpha` / `beta`)**:
+- **`:app` (`com.bansify.accounts`) & `:sample` (`alpha` / `beta`)**:
   - `:app` hosts standalone `GothwadAccountsScreen` with `SameSigningCertificate(allowDebugBuild = BuildConfig.DEBUG)`.
   - `:sample` demonstrates real sibling-app embedding (`GothwadAccountAvatarButton`, `GothwadAccountSettingsCard`, `GothwadAccountSwitcherSheet`, `GothwadAuthStatusBanner`, `openAccountManagement`) across two independently installable flavors (`alpha` and `beta`).
 

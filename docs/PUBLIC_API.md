@@ -139,7 +139,7 @@ val client = OkHttpClient.Builder()
 Full-screen account management (matches `accounts.bansify.com/me` 6 sections: `Home`, `Personal info`, `Security`, `Data & privacy`, `People & sharing`, `Connected apps`):
 
 ```kotlin
-import com.gothwad.accounts.ui.openAccountManagement
+import com.bansify.accounts.ui.openAccountManagement
 
 GothwadAccounts.openAccountManagement(activity)
 GothwadAccountsScreen(onClose = { /* ... */ })

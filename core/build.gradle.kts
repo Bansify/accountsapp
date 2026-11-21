@@ -7,7 +7,7 @@ plugins {
 group = "com.github.Bansify.accountsapp"
 version = providers.gradleProperty("version").getOrElse("0.1.0-SNAPSHOT")
 android {
-    namespace = "com.gothwad.accounts.core"
+    namespace = "com.bansify.accounts.core"
     compileSdk = 36
     defaultConfig { minSdk = 26; consumerProguardFiles("consumer-rules.pro") }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
