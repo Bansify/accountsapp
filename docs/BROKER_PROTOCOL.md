@@ -4,8 +4,8 @@
 
 Every Bansify Android app using `:core` (`accountsapp`, `mailapp`, `drive`, `storeapp`, `tubeapp`, `sample.alpha`, `sample.beta`) participates symmetrically as both a **Peer Directory Provider** and a **Peer Directory Client**:
 
-- **No `QUERY_ALL_PACKAGES`**: Manifest `<queries>` declares only explicit first-party package IDs (`com.bansify.accounts`, `com.gothwad.mail`, `com.gothwad.drive`, `com.gothwad.store`, `com.gothwad.tube`, `com.bansify.accounts.sample.alpha`, `com.bansify.accounts.sample.beta`).
-- **Host-Scoped Authorities**: Each host exposes `${applicationId}.gothwad.account.directory` (`AccountDirectoryProvider`), preventing Android manifest authority collisions across installed apps.
+- **No `QUERY_ALL_PACKAGES`**: Manifest `<queries>` declares only explicit first-party package IDs (`com.bansify.accounts`, `com.bansify.mail`, `com.gothwad.drive`, `com.gothwad.store`, `com.gothwad.tube`, `com.bansify.accounts.sample.alpha`, `com.bansify.accounts.sample.beta`).
+- **Host-Scoped Authorities**: Each host exposes `${applicationId}.bansify.account.directory` (`AccountDirectoryProvider`), preventing Android manifest authority collisions across installed apps.
 - **No Secret Leakage**: The directory holds **metadata only** (`userId`, `username`, `name`, `email`, `avatarUrl`, `addedAt`, `lastSeenAt`, `sourcePackage`, `removedFromDeviceAt`). Access tokens and refresh tokens never cross IPC.
 
 ---

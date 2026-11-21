@@ -4,7 +4,9 @@ import kotlinx.serialization.Serializable
 
 object KnownGothwadApps {
     const val ACCOUNTS = "com.bansify.accounts"
-    const val MAIL = "com.gothwad.mail"
+    const val MAIL = "com.bansify.mail"
+    /** Previous Mail package id, still installed on devices that have not re-installed. */
+    const val MAIL_LEGACY = "com.gothwad.mail"
     const val DRIVE = "com.gothwad.drive"
     const val STORE = "com.gothwad.store"
     const val TUBE = "com.gothwad.tube"
@@ -14,6 +16,7 @@ object KnownGothwadApps {
     val FIRST_PARTY_PACKAGES: Set<String> = setOf(
         ACCOUNTS,
         MAIL,
+        MAIL_LEGACY,
         DRIVE,
         STORE,
         TUBE,

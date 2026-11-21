@@ -6,7 +6,7 @@ Every state transition preserves **zero mandatory hub app dependency**, **fail-c
 
 ## 1. Cross-App Lifecycle Matrix (Scenarios A–E & Uninstall/Reinstall)
 
-| Scenario / Action | Mail (`com.gothwad.mail`) | Drive (`com.gothwad.drive`) | Store (`com.gothwad.store`) | Accounts (`com.bansify.accounts`) | User Experience & Recovery Path |
+| Scenario / Action | Mail (`com.bansify.mail`) | Drive (`com.gothwad.drive`) | Store (`com.gothwad.store`) | Accounts (`com.bansify.accounts`) | User Experience & Recovery Path |
 | --- | --- | --- | --- | --- | --- |
 | **A. Mail installed first; signs in A & B; switches to B** | Active = B; holds `{A, B}` mail-scoped tokens | Not installed | Not installed | Not installed | Immediate standalone login via Custom Tabs PKCE; Mail exposes `{A, B}` metadata to future verified peers. |
 | **B. Drive installed later (no Accounts app); chooses A** | Active stays **B** (`mail` tokens intact) | Discovers `{A, B}` from Mail; gets Drive tokens for A (`active = A`) | Not installed | Not installed | Zero re-typing when SSO/handoff applies; Drive selection (`A`) does not switch open Mail (`B`). |

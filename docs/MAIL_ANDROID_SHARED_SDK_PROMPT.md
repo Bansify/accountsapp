@@ -12,7 +12,7 @@ Work only in this `Bansify/mailapp` repository on the active session branch. Fir
 `Bansify/mailapp` currently maintains its own duplicated copy of OAuth PKCE, Tink EncryptedTokenStore, ContentProvider peer broker (`auth/broker/*`), callback activity, signed-out onboarding screen, native auth sheet, and account switcher dialog.
 
 `Bansify/accountsapp` now publishes `:core` and `:ui` via JitPack (`com.github.Bansify.accountsapp:ui:<tag>`) with:
-- **Shared headless auth & broker (`:core`)**: `GothwadAccounts.init(...)`, `GothwadAccounts.currentAccessToken()`, `AccountCallbackActivity` (`exported="true"`), and host-scoped `AccountDirectoryProvider` (`${applicationId}.gothwad.account.directory`).
+- **Shared headless auth & broker (`:core`)**: `GothwadAccounts.init(...)`, `GothwadAccounts.currentAccessToken()`, `AccountCallbackActivity` (`exported="true"`), and host-scoped `AccountDirectoryProvider` (`${applicationId}.bansify.account.directory`).
 - **Shared Sign-In / Sign-Up / MFA / Peer SSO screen (`:ui`)**: `GothwadAccounts.openSignIn(activity, ...)` / `@Composable GothwadSignInScreen(...)` — automatically returns when sign-in or adding an account completes.
 - **Shared Account Switcher & Toolbar Widgets (`:ui`)**: `GothwadAccountAvatarButton`, `GothwadAccountSwitcherSheet`, `GothwadAuthStatusBanner`, `GothwadSignInButton`.
 - **Shared In-App Account Centre (`:ui`)**: `GothwadAccounts.openAccountManagement(activity)` — works natively inside `mailapp` (using `account.read` + `account.profile.write` scopes when enabled on `Bansify/accounts`, and gracefully falling back to authenticated web `/me` without crashing if `403 insufficient_scope` occurs), with no requirement to install the standalone Accounts APK.
@@ -21,8 +21,8 @@ Work only in this `Bansify/mailapp` repository on the active session branch. Fir
 
 ## Mandatory Compatibility & Policy Invariants
 
-1. **Keep `applicationId = "com.gothwad.mail"`** (plus `applicationIdSuffix = ".debug"` in `debug` buildType) and `${gothwadRedirectScheme}` unchanged.
-2. **Keep `OAuth client_id = "gothwad-mail"`** and redirects (`https://mail.bansify.com/oauth/callback` for release / `com.gothwad.mail:/oauth/callback` or `appLink` scheme matching manifest).
+1. **`applicationId` is `com.bansify.mail`** (renamed from `com.gothwad.mail`; the Accounts Worker keeps the legacy redirect URI registered for old installs), with `applicationIdSuffix = ".debug"` in the `debug` buildType, and the `${gothwadRedirectScheme}` manifest placeholder unchanged.
+2. **Keep `OAuth client_id = "gothwad-mail"`** and redirects (`https://mail.bansify.com/oauth/callback` for release / `com.bansify.mail:/oauth/callback` or `appLink` scheme matching manifest).
    - Request scopes:
      ```kotlin
      setOf(
@@ -37,7 +37,7 @@ Work only in this `Bansify/mailapp` repository on the active session branch. Fir
    - **Token migration note**: `accountsapp` stores tokens in `gothwad-<sha>.enc` / alias `gothwad.accounts.<sha>`, whereas Mail's legacy `EncryptedTokenStore` used `gothwad-mail-<sha>.enc`. Upgrading users re-authenticate cleanly (or via one-tap peer SSO if another updated Bansify app holds a session).
 3. **Preserve `.github/workflows/android-ci.yml`, `.github/workflows/release.yml`, and `tools/check_docs.py` invariants**:
    - Keep `README.md` required sections (`## Architecture`, `### Endpoints used`, `## Build and test`, `## Manual device checks`), all documented API endpoints, and all 4 signing secret names (`RELEASE_KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`).
-   - Update `tools/check_android_scaffold.py` to expect `:core`'s merged components (`com.bansify.accounts.core.AccountCallbackActivity` and `com.bansify.accounts.core.broker.AccountDirectoryProvider` with `${applicationId}.gothwad.account.directory`) instead of the deleted local `.auth.*` classes.
+   - Update `tools/check_android_scaffold.py` to expect `:core`'s merged components (`com.bansify.accounts.core.AccountCallbackActivity` and `com.bansify.accounts.core.broker.AccountDirectoryProvider` with `${applicationId}.bansify.account.directory`) instead of the deleted local `.auth.*` classes.
 4. **Build config check (`app/build.gradle.kts`)**:
    - Ensure `minSdk >= 26`, `compileSdk = 36`, `allowDebugBuild = BuildConfig.DEBUG` in `GothwadConfig(...)` (needed for `.debug` sibling discovery testing), and configure `settings.gradle.kts` with `maven("https://jitpack.io")`.
    - Use the latest `v1.0.*` release tag from `Bansify/accountsapp` that includes `:core` `currentAccessToken()` and `:ui` `GothwadAccounts.openSignIn(...)` (check `gh release list --repo Bansify/accountsapp --limit 5` or git tags if needed; do **not** use mutable `-SNAPSHOT` for releases).
@@ -87,7 +87,7 @@ Work only in this `Bansify/mailapp` repository on the active session branch. Fir
 1. **`MailApplication.kt`**:
    - Initialize `GothwadAccounts.init(this, GothwadConfig(...))` in `onCreate()`:
      - `clientId = "gothwad-mail"`
-     - `redirectUri = "https://mail.bansify.com/oauth/callback"` (note: match whatever `redirectUri` default Mail uses for production App Links vs custom scheme, ensuring `com.gothwad.mail:/oauth/callback` works smoothly on debug builds if App Links aren't verified on `.debug` — e.g. `if (BuildConfig.DEBUG) "com.gothwad.mail:/oauth/callback" else "https://mail.bansify.com/oauth/callback"`, keeping both registered in `Bansify/accounts`!)
+     - `redirectUri = "https://mail.bansify.com/oauth/callback"` (note: match whatever `redirectUri` default Mail uses for production App Links vs custom scheme, ensuring `com.bansify.mail:/oauth/callback` works smoothly on debug builds if App Links aren't verified on `.debug` — e.g. `if (BuildConfig.DEBUG) "com.bansify.mail:/oauth/callback" else "https://mail.bansify.com/oauth/callback"`, keeping both registered in `Bansify/accounts`!)
      - `scopes = setOf(Scope.Profile, Scope.Email, Scope.OfflineAccess, Scope.Mail, Scope.AccountRead, Scope.AccountProfileWrite)`
      - `allowDebugBuild = BuildConfig.DEBUG`
    - Wire `MailApiClient(tokenProvider = MailAccessTokenProvider { GothwadAccounts.currentAccessToken() })`.

@@ -2,7 +2,7 @@
 
 **Status**: Architecture & SDK Implementation Baseline (`accountsapp` branch `arena/926fcc7f-accountsapp`)
 **Backend Source of Truth**: `Bansify/accounts` (`100% Cloudflare Worker + D1 + R2`, zero Supabase)
-**Target Ecosystem**: `accountsapp` (`com.bansify.accounts`), `mailapp` (`com.gothwad.mail`), `drive` (`com.gothwad.drive`), `storeapp` (`com.gothwad.store`), `tubeapp` (`com.gothwad.tube`), and side-by-side verification hosts (`sample:alpha`, `sample:beta`).
+**Target Ecosystem**: `accountsapp` (`com.bansify.accounts`), `mailapp` (`com.bansify.mail`), `drive` (`com.gothwad.drive`), `storeapp` (`com.gothwad.store`), `tubeapp` (`com.gothwad.tube`), and side-by-side verification hosts (`sample:alpha`, `sample:beta`).
 
 ---
 
@@ -39,7 +39,7 @@ Android's `android.accounts.AccountManager` is structurally incompatible with in
 |                                                                             |
 |  +-----------------------+    +-----------------------+    +--------------+ |
 |  | Bansify Mail          |    | Bansify Drive         |    | Kiwi Store   | |
-|  | com.gothwad.mail      |    | com.gothwad.drive     |    | com.gothwad  | |
+|  | com.bansify.mail      |    | com.gothwad.drive     |    | com.gothwad  | |
 |  |                       |    |                       |    | .store       | |
 |  | Vault (Keystore AEAD) |    | Vault (Keystore AEAD) |    | Vault (AEAD) | |
 |  |  - Active: Account B  |    |  - Active: Account A  |    |  - Active: A | |
@@ -65,7 +65,7 @@ Android's `android.accounts.AccountManager` is structurally incompatible with in
 
 ### How First-Installed-App & Scenarios A–E Work
 
-- **Scenario A (Mail installed first, no Accounts app)**: Mail sees zero verified peers with accounts. User signs into Account A and Account B via Custom Tabs PKCE (`client_id=gothwad-mail`). Mail stores `{A, B}` tokens in Mail's encrypted vault, sets `activeUserId`, and exposes non-secret directory records `{A, B}` via `com.gothwad.mail.gothwad.account.directory` (`AccountDirectoryProvider`).
+- **Scenario A (Mail installed first, no Accounts app)**: Mail sees zero verified peers with accounts. User signs into Account A and Account B via Custom Tabs PKCE (`client_id=gothwad-mail`). Mail stores `{A, B}` tokens in Mail's encrypted vault, sets `activeUserId`, and exposes non-secret directory records `{A, B}` via `com.bansify.mail.bansify.account.directory` (`AccountDirectoryProvider`).
 - **Scenario B (Drive installed later, no Accounts app)**: On launch, Drive queries installed known peers via `PackageManager` (`<queries>` allowlist, no `QUERY_ALL_PACKAGES`), verifies Mail's signing certificate, and Mail verifies Drive's Binder UID + package + SHA-256 certificate before returning `{A, B}` directory metadata. Drive renders **"Continue as A"**, **"Continue as B"**, or **"Add another account"**. Tapping **"Continue as A"** runs PKCE `/oauth/authorize` for `client_id=gothwad-drive` (`drive` scope, leveraging browser SSO if present or clean login without copying cookies) to issue Drive's own tokens. Mail stays independently selected on **B**!
 - **Scenario C (Drive adds Account C)**: Drive signs in Account C, stores C's tokens in Drive's vault (`Drive.activeUserId = C`), and advertises C in Drive's `AccountDirectoryProvider`. When Mail refreshes peer discovery, Mail learns `{A, B, C}` while remaining active on **B**.
 - **Scenario D (Accounts app installed later)**: `com.bansify.accounts` queries installed verified peers (`mailapp`, `drive`, `storeapp`), adopts the union `{A, B, C}` in its device-available list immediately, and never overwrites or wipes Mail's or Drive's local state.
