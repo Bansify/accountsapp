@@ -157,6 +157,12 @@ interface AccountSessionController {
 
     suspend fun deleteAccount(password: String, mfaCode: String? = null): Result<Unit> =
         Result.failure(UnsupportedOperationException())
+
+    suspend fun deleteAccount(
+        password: String,
+        mfaCode: String?,
+        expectedUserId: String?,
+    ): Result<Unit> = deleteAccount(password, mfaCode)
 }
 
 object LiveGothwadAccountController : AccountSessionController {
@@ -252,6 +258,9 @@ object LiveGothwadAccountController : AccountSessionController {
     override suspend fun exportAccountDataJson() = GothwadAccounts.exportAccountDataJson()
     override suspend fun deleteAccount(password: String, mfaCode: String?) =
         GothwadAccounts.deleteAccount(password, mfaCode)
+
+    override suspend fun deleteAccount(password: String, mfaCode: String?, expectedUserId: String?) =
+        GothwadAccounts.deleteAccount(password, mfaCode, expectedUserId)
 }
 
 class AccountDashboardViewModel(
@@ -332,6 +341,8 @@ class AccountDashboardViewModel(
                 val activeUserChanged = activeId != lastActiveUserId
                 if (activeUserChanged) {
                     lastActiveUserId = activeId
+                    lastLoadedNativeUserId = null
+                    nativeRefreshGeneration++
                     activeManagementOpId++
                     activeProfileSaveOpId++
                     activeExportOpId++
@@ -537,18 +548,16 @@ class AccountDashboardViewModel(
             currentState.authSuccessCount > 0
         }
         val hasScreenBrowserSuccess = startedBrowserFlow &&
+            signedIn != null &&
             currentState.latestBrowserAuthEventId != null &&
             currentState.latestBrowserAuthEventId != baseline.browserEventId
         val becameSignedInFromSignedOut = baseline.userIds.isEmpty() && signedIn != null
         val addedNewLocalAccount = (currentIds - baseline.userIds).isNotEmpty()
-        val switchedAfterBrowser =
-            startedBrowserFlow && signedIn != null && signedIn.account.userId != baseline.activeUserId
 
         return hasNewNativeSuccess ||
             hasScreenBrowserSuccess ||
             becameSignedInFromSignedOut ||
-            addedNewLocalAccount ||
-            switchedAfterBrowser
+            addedNewLocalAccount
     }
 
     fun dismissNativeAuthDialog() {
@@ -1249,7 +1258,7 @@ class AccountDashboardViewModel(
         val opId = ++activeManagementOpId
         viewModelScope.launch {
             mutableUiState.update { it.copy(isManagementBusy = true, managementError = null) }
-            val result = controller.deleteAccount(password, mfaCode)
+            val result = controller.deleteAccount(password, mfaCode, initiatingUserId)
             result.onSuccess {
                 val currentActiveId = mutableUiState.value.activeAccount?.userId
                 if (currentActiveId != null && (opId != activeManagementOpId || initiatingUserId != currentActiveId)) {

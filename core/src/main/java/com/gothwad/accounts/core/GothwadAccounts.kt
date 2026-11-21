@@ -15,7 +15,6 @@ import com.gothwad.accounts.core.broker.PeerBrokerClient
 import com.gothwad.accounts.core.broker.PeerDirectoryTransport
 import java.io.IOException
 import java.security.PublicKey
-import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -116,6 +115,7 @@ object GothwadAccounts {
         ready = scope.async {
             try {
                 session.load()
+                mutableBrowserAuthCompletion.value = session.browserAuthCompletion.value
                 syncDiscoveredAccountsInternal()
                 if (
                     session.currentLocalAccounts().isEmpty() &&
@@ -429,6 +429,7 @@ object GothwadAccounts {
         action {
             readyOrThrow()
             session.recoverCorruptedStorage()
+            mutableBrowserAuthCompletion.value = null
             syncDiscoveredAccountsInternal()
         }
     }
@@ -570,19 +571,40 @@ object GothwadAccounts {
         mobileClient.exportAccountDataJson(bearer)
     }
 
-    suspend fun deleteAccount(password: String, mfaCode: String? = null): Result<Unit> = withContext(Dispatchers.IO) {
+    suspend fun deleteAccount(
+        password: String,
+        mfaCode: String? = null,
+        expectedUserId: String? = null,
+    ): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
             readyOrThrow()
             requireAccountProfileWriteScope()
-            val (capturedUserId, bearer) = session.activeAccessTokenAndUserId()
-                ?: throw OAuthException(rejected = true)
+            val resolution = session.activeAccessTokenForDeletion(expectedUserId)
+            val (capturedUserId, bearer) = when (resolution) {
+                is SessionManager.DeletionAuthResolution.Ready -> resolution.userId to resolution.bearerToken
+                SessionManager.DeletionAuthResolution.AccountChanged ->
+                    throw IllegalStateException("Active account changed before deletion; please try again.")
+                SessionManager.DeletionAuthResolution.NoActiveSession ->
+                    throw OAuthException(rejected = true)
+            }
             mobileClient.deleteAccount(bearer, password, mfaCode)
-            val anyRemainingLocal = runCatching {
-                val removedAt = session.removeFromDevice(capturedUserId, revokeOnServer = false)
+            val removedAt = try {
+                session.removeFromDevice(capturedUserId, revokeOnServer = false)
+            } catch (_: Exception) {
+                try {
+                    session.removeFromDevice(capturedUserId, revokeOnServer = false)
+                } catch (secondErr: Exception) {
+                    throw IllegalStateException(
+                        "Account deleted on server, but local device cleanup failed; remove the account locally or restart.",
+                        secondErr,
+                    )
+                }
+            }
+            runCatching {
                 peerBroker.broadcastDeviceRemoval(capturedUserId, removedAt, config.brokerPolicy)
                 syncDiscoveredAccountsInternal()
-                session.currentLocalAccounts().isNotEmpty()
-            }.getOrDefault(false)
+            }
+            val anyRemainingLocal = runCatching { session.currentLocalAccounts().isNotEmpty() }.getOrDefault(false)
             if (!anyRemainingLocal) {
                 locallySignedOutInProcess = true
             }
@@ -660,12 +682,9 @@ object GothwadAccounts {
         try {
             action {
                 readyOrThrow()
-                val account = session.completeLogin(uri, config.redirectUri)
+                session.completeLogin(uri, config.redirectUri)
                 locallySignedOutInProcess = false
-                mutableBrowserAuthCompletion.value = BrowserAuthCompletion(
-                    eventId = UUID.randomUUID().toString(),
-                    userId = account.userId,
-                )
+                mutableBrowserAuthCompletion.value = session.browserAuthCompletion.value
                 syncDiscoveredAccountsInternal()
             }
         } finally {

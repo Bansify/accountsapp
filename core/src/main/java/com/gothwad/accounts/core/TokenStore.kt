@@ -30,6 +30,8 @@ internal data class StoredSession(
     val activeUserId: String? = null,
     val pending: PendingLogin? = null,
     val deviceRemovalTombstones: Map<String, Long> = emptyMap(),
+    val lastBrowserCompletionEventId: String? = null,
+    val lastBrowserCompletionUserId: String? = null,
 )
 
 internal interface TokenStore {

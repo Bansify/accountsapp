@@ -593,6 +593,27 @@ class AccountDashboardViewModelTest {
         advanceUntilIdle()
         assertTrue(postDeathVm.evaluateSignInCompletion(browserBaseline, startedBrowserFlow = true))
 
+        // Canceling browser auth and switching to an already-stored account must NOT count as browser completion,
+        // nor should a stale browser event while SignedOut trigger completion.
+        val storedB = GothwadAccount("u-b-stored", "bella", "Bella", email = "bella@bansify.com")
+        val twoAccountBaseline = idleBaseline.copy(
+            browserEventId = postDeathVm.uiState.value.latestBrowserAuthEventId,
+            userIds = setOf(meeraId, storedB.userId),
+        )
+        controller.state.value = AccountState.SignedIn(storedB, listOf(controller.state.value.let { (it as AccountState.SignedIn).account }, storedB))
+        advanceUntilIdle()
+        assertFalse(postDeathVm.evaluateSignInCompletion(twoAccountBaseline, startedBrowserFlow = true))
+
+        val signedOutCheckVm = AccountDashboardViewModel(controller)
+        controller.state.value = AccountState.SignedOut
+        advanceUntilIdle()
+        assertFalse(signedOutCheckVm.evaluateSignInCompletion(browserBaseline, startedBrowserFlow = true))
+
+        // Restore active state back to Meera for subsequent management tests.
+        val meeraAcc = GothwadAccount(meeraId, "meera", "Meera", email = "meera@bansify.com")
+        controller.state.value = AccountState.SignedIn(meeraAcc, listOf(meeraAcc))
+        advanceUntilIdle()
+
         // Late 403 from an obsolete refresh generation does not poison newer refresh state.
         val firstRefreshGate = CompletableDeferred<Boolean>()
         controller.pendingRefreshGate = firstRefreshGate
@@ -639,6 +660,18 @@ class AccountDashboardViewModelTest {
         assertFalse(vm.uiState.value.isManagementBusy)
         assertFalse(vm.uiState.value.snackbarMessage == "Profile photo updated")
         assertEquals("u-b", vm.uiState.value.activeAccount?.userId)
+
+        // Switching back from a scope-denied account to an eligible account reloads its management lists.
+        controller.rejectMobileScopesWith403 = true
+        vm.loadMfaStatus() // trigger 403 scope denial on userB
+        advanceUntilIdle()
+        assertFalse(vm.uiState.value.canManageNatively)
+
+        controller.rejectMobileScopesWith403 = false
+        controller.state.value = AccountState.SignedIn(meeraAcc, listOf(meeraAcc, userB))
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.canManageNatively)
+        assertTrue(vm.uiState.value.webSessions.isNotEmpty())
 
         // ViewModel-bound sign-in entry preserves rotation state while resetting on process recreation.
         val sessionKey = "sess-1"
