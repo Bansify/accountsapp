@@ -399,6 +399,71 @@ class NativeAuthAndPeerSsoTest {
         assertEquals("/api/oauth/userinfo", server.takeRequest().path)
     }
 
+    @Test
+    fun siblingFirstPartyClientWithAccountScopesCanManageNativelyAndSupplyCurrentAccessToken() = runTest {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val okHttp = testOkHttp()
+        val fullMailConfig = GothwadConfig(
+            clientId = "gothwad-mail",
+            redirectUri = "com.gothwad.mail:/oauth/callback",
+            authBaseUrl = server.url("/api").toString().trimEnd('/'),
+            scopes = setOf(
+                Scope.Profile,
+                Scope.Email,
+                Scope.OfflineAccess,
+                Scope.Mail,
+                Scope.AccountRead,
+                Scope.AccountProfileWrite,
+            ),
+        )
+        val store = object : TokenStore {
+            private var s = StoredSession(
+                credentials = listOf(
+                    Credential(
+                        account = GothwadAccount("u-mail", "arjun", "Arjun", email = "arjun@bansify.com"),
+                        accessToken = "mail-at-live",
+                        refreshToken = "mail-rt-live",
+                        expiresAt = System.currentTimeMillis() + 3_600_000L,
+                    ),
+                ),
+                activeUserId = "u-mail",
+            )
+            override fun read() = s
+            override fun write(value: StoredSession) { s = value }
+        }
+        GothwadAccounts.initWithStoreForTesting(
+            app,
+            fullMailConfig,
+            store,
+            oauth = OAuthClient(fullMailConfig, okHttp),
+            mobile = MobileAccountClient(fullMailConfig, okHttp),
+        )
+
+        assertTrue(GothwadAccounts.canManageAccountNatively())
+        assertTrue(GothwadAccounts.canWriteProfileNatively())
+        assertEquals("gothwad-mail", GothwadAccounts.currentClientId())
+        assertEquals("mail-at-live", GothwadAccounts.currentAccessToken())
+        assertFalse(GothwadAccounts.isAccountsAppInstalled())
+
+        installFakePackage(app, KnownGothwadApps.ACCOUNTS, 1020, byteArrayOf(0x05, 0x06))
+        assertTrue(GothwadAccounts.isAccountsAppInstalled())
+
+        // Without Scope.AccountRead, native management remains cleanly disabled.
+        GothwadAccounts.resetForTesting()
+        val mailOnlyConfig = fullMailConfig.copy(
+            scopes = setOf(Scope.Profile, Scope.Email, Scope.OfflineAccess, Scope.Mail),
+        )
+        GothwadAccounts.initWithStoreForTesting(
+            app,
+            mailOnlyConfig,
+            store,
+            oauth = OAuthClient(mailOnlyConfig, okHttp),
+            mobile = MobileAccountClient(mailOnlyConfig, okHttp),
+        )
+        assertFalse(GothwadAccounts.canManageAccountNatively())
+        assertFalse(GothwadAccounts.canWriteProfileNatively())
+    }
+
     private fun installFakePackage(
         context: Context,
         packageName: String,

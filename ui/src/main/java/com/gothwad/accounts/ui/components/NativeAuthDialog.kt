@@ -73,6 +73,56 @@ fun NativeAuthDialog(
 ) {
     if (!state.visible) return
 
+    Dialog(
+        onDismissRequest = { if (!state.isBusy) onDismiss() },
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Surface(
+            shape = RoundedCornerShape(22.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            tonalElevation = 6.dp,
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 440.dp)
+                .padding(horizontal = 14.dp, vertical = 18.dp),
+        ) {
+            NativeAuthCardContent(
+                state = state,
+                onDismiss = onDismiss,
+                onSwitchStep = onSwitchStep,
+                onSubmitIdentifier = onSubmitIdentifier,
+                onCheckUsername = onCheckUsername,
+                onSubmitPassword = onSubmitPassword,
+                onSubmitMfa = onSubmitMfa,
+                onSubmitSignUp = onSubmitSignUp,
+                onSubmitForgotPassword = onSubmitForgotPassword,
+                onSubmitResetPassword = onSubmitResetPassword,
+                onSignInWithBrowser = onSignInWithBrowser,
+                showCloseButton = true,
+                scrollable = true,
+            )
+        }
+    }
+}
+
+@Composable
+fun NativeAuthCardContent(
+    state: NativeAuthDialogState,
+    onDismiss: () -> Unit,
+    onSwitchStep: (NativeAuthStep) -> Unit,
+    onSubmitIdentifier: (String) -> Unit,
+    onCheckUsername: (String) -> Unit,
+    onSubmitPassword: (identifier: String, password: String) -> Unit,
+    onSubmitMfa: (code: String) -> Unit,
+    onSubmitSignUp: (NativeSignUpInput) -> Unit,
+    onSubmitForgotPassword: (username: String) -> Unit,
+    onSubmitResetPassword: (token: String, newPassword: String) -> Unit,
+    onSignInWithBrowser: () -> Unit,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    showCloseButton: Boolean = false,
+    scrollable: Boolean = false,
+) {
     val semantic = LocalAccountColors.current
     var identifierInput by rememberSaveable(state.identifier) { mutableStateOf(state.identifier) }
     var passwordInput by rememberSaveable { mutableStateOf("") }
@@ -105,83 +155,86 @@ fun NativeAuthDialog(
         NativeAuthStep.RESET_PASSWORD -> "Set a new password"
     }
 
-    Dialog(
-        onDismissRequest = { if (!state.isBusy) onDismiss() },
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+    val containerModifier = if (scrollable) {
+        modifier
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp)
+    } else {
+        modifier.padding(16.dp)
+    }
+
+    Column(
+        modifier = containerModifier,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Surface(
-            shape = RoundedCornerShape(22.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
-            tonalElevation = 6.dp,
-            modifier = Modifier
-                .fillMaxWidth()
-                .widthIn(max = 440.dp)
-                .padding(horizontal = 14.dp, vertical = 18.dp),
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(
-                modifier = Modifier
-                    .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.AccountCircle,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp),
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
+            Icon(
+                imageVector = Icons.Rounded.AccountCircle,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp),
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                if (!subtitle.isNullOrBlank()) {
                     Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.weight(1f),
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    IconButton(onClick = { if (!state.isBusy) onDismiss() }) {
-                        Icon(
-                            imageVector = Icons.Rounded.Close,
-                            contentDescription = stringResource(R.string.gothwad_cd_close),
-                        )
-                    }
                 }
-
-                state.infoMessage?.let { msg ->
-                    Surface(
-                        shape = RoundedCornerShape(14.dp),
-                        color = semantic.verifiedContainer,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(
-                            text = msg,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = semantic.onVerifiedContainer,
-                            modifier = Modifier.padding(12.dp),
-                        )
-                    }
+            }
+            if (showCloseButton) {
+                IconButton(onClick = { if (!state.isBusy) onDismiss() }) {
+                    Icon(
+                        imageVector = Icons.Rounded.Close,
+                        contentDescription = stringResource(R.string.gothwad_cd_close),
+                    )
                 }
+            }
+        }
 
-                state.errorMessage?.let { err ->
-                    Surface(
-                        shape = RoundedCornerShape(14.dp),
-                        color = semantic.criticalContainer,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("native_auth_error_banner"),
-                    ) {
-                        Text(
-                            text = err,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = semantic.onCriticalContainer,
-                            modifier = Modifier.padding(12.dp),
-                        )
-                    }
-                }
+        state.infoMessage?.let { msg ->
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = semantic.verifiedContainer,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    text = msg,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = semantic.onVerifiedContainer,
+                    modifier = Modifier.padding(12.dp),
+                )
+            }
+        }
 
-                when (state.step) {
+        state.errorMessage?.let { err ->
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = semantic.criticalContainer,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("native_auth_error_banner"),
+            ) {
+                Text(
+                    text = err,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = semantic.onCriticalContainer,
+                    modifier = Modifier.padding(12.dp),
+                )
+            }
+        }
+
+        when (state.step) {
                     NativeAuthStep.IDENTIFIER -> {
                         Text(
                             text = "Enter your Bansify username, @bansify.com email, or registered phone number.",
@@ -642,7 +695,5 @@ fun NativeAuthDialog(
                         modifier = Modifier.size(16.dp),
                     )
                 }
-            }
-        }
     }
 }

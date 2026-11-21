@@ -30,7 +30,9 @@ import com.gothwad.accounts.ui.components.GothwadAccountAvatarButton
 import com.gothwad.accounts.ui.components.GothwadAccountSettingsCard
 import com.gothwad.accounts.ui.components.GothwadAccountSwitcherSheet
 import com.gothwad.accounts.ui.components.GothwadAuthStatusBanner
+import com.gothwad.accounts.ui.model.NativeAuthStep
 import com.gothwad.accounts.ui.openAccountManagement
+import com.gothwad.accounts.ui.openSignIn
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -77,7 +79,10 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onSignInAgain = {
                                     GothwadAccounts.clearError()
-                                    GothwadAccounts.signIn(this@MainActivity, chooseAccount = true)
+                                    GothwadAccounts.openSignIn(
+                                        this@MainActivity,
+                                        appName = "Sample Host (${BuildConfig.FLAVOR})",
+                                    )
                                 },
                                 onDismiss = { GothwadAccounts.clearError() },
                             )
@@ -86,13 +91,33 @@ class MainActivity : ComponentActivity() {
                         GothwadAccountSettingsCard(
                             accountState = accountState,
                             discoveredCount = discovered.size,
-                            onSignInClick = { GothwadAccounts.signIn(this@MainActivity, chooseAccount = true) },
+                            onSignInClick = {
+                                GothwadAccounts.openSignIn(
+                                    this@MainActivity,
+                                    appName = "Sample Host (${BuildConfig.FLAVOR})",
+                                )
+                            },
                             onSwitchOrManageClick = {
                                 GothwadAccounts.syncDiscoveredAccounts()
                                 showSwitcher = true
                             },
                             onManageAccountClick = { GothwadAccounts.openAccountManagement(this@MainActivity) },
                         )
+
+                        if (accountState is AccountState.SignedOut) {
+                            OutlinedButton(
+                                onClick = {
+                                    GothwadAccounts.openSignIn(
+                                        this@MainActivity,
+                                        startStep = NativeAuthStep.SIGN_UP,
+                                        appName = "Sample Host (${BuildConfig.FLAVOR})",
+                                    )
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text("Create a Bansify Account")
+                            }
+                        }
 
                         if (accountState is AccountState.SignedIn) {
                             OutlinedButton(
@@ -126,17 +151,21 @@ class MainActivity : ComponentActivity() {
                             lifecycleScope.launch {
                                 val res = GothwadAccounts.signInSilentlyWithPeer(peer)
                                 if (res.isFailure) {
-                                    GothwadAccounts.signIn(
+                                    GothwadAccounts.openSignIn(
                                         this@MainActivity,
-                                        chooseAccount = false,
-                                        loginHint = peer.email ?: peer.username,
+                                        startStep = NativeAuthStep.PASSWORD,
+                                        initialIdentifier = peer.email ?: peer.username.orEmpty(),
+                                        appName = "Sample Host (${BuildConfig.FLAVOR})",
                                     )
                                 }
                             }
                         },
                         onAddAnotherAccount = {
                             showSwitcher = false
-                            GothwadAccounts.signIn(this@MainActivity, chooseAccount = true)
+                            GothwadAccounts.openSignIn(
+                                this@MainActivity,
+                                appName = "Sample Host (${BuildConfig.FLAVOR})",
+                            )
                         },
                         onManageGothwadAccount = {
                             showSwitcher = false

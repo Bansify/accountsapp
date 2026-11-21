@@ -1,3 +1,6 @@
+group = "com.github.Bansify.accountsapp"
+version = providers.gradleProperty("version").getOrElse("0.1.0-SNAPSHOT")
+
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
@@ -36,7 +39,7 @@ dependencies {
 afterEvaluate {
     publishing { publications { register<MavenPublication>("release") {
         from(components["release"])
-        groupId = "com.github.GothwadTech.accountsapp"
+        groupId = "com.github.Bansify.accountsapp"
         artifactId = "ui"
         version = providers.gradleProperty("version").getOrElse("0.1.0-SNAPSHOT")
     } } }

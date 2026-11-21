@@ -2,6 +2,9 @@
     <string name="gothwad_accounts">Bansify Accounts</string>
     <string name="gothwad_account_brand">Bansify खाता</string>
     <string name="gothwad_sign_in">Bansify से साइन इन करें</string>
+    <string name="gothwad_create_account">खाता बनाएँ</string>
+    <string name="gothwad_sign_in_continue_to">%1$s पर जारी रखने के लिए</string>
+    <string name="gothwad_native_auth_subtitle">Mail, Drive, Meet, Notes और Kiwi Store के लिए एक सुरक्षित पहचान।</string>
     <string name="gothwad_sign_in_browser">ब्राउज़र से साइन इन करें</string>
     <string name="gothwad_continue_as">%1$s के रूप में जारी रखें</string>
     <string name="gothwad_auth_description">सीधे इस ऐप में अपने Bansify खाते से साइन इन करें या नया खाता बनाएँ।</string>

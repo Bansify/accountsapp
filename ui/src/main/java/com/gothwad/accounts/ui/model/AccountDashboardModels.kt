@@ -120,6 +120,7 @@ data class AccountDashboardUiState(
     val showAccountSwitcher: Boolean = false,
     val signOutTarget: SignOutDialogTarget? = null,
     val snackbarMessage: String? = null,
+    val authSuccessCount: Int = 0,
     val canManageNatively: Boolean = false,
     val canWriteProfileNatively: Boolean = false,
     val webSessions: List<WebSessionInfo> = emptyList(),

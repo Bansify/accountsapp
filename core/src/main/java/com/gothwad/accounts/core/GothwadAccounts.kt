@@ -3,11 +3,14 @@ package com.gothwad.accounts.core
 import android.app.Activity
 import android.app.Application
 import android.content.ActivityNotFoundException
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Looper
 import androidx.browser.customtabs.CustomTabsIntent
 import com.gothwad.accounts.core.broker.AndroidPeerDirectoryTransport
 import com.gothwad.accounts.core.broker.DirectorySnapshot
+import com.gothwad.accounts.core.broker.KnownGothwadApps
 import com.gothwad.accounts.core.broker.PeerBrokerClient
 import com.gothwad.accounts.core.broker.PeerDirectoryTransport
 import java.io.IOException
@@ -27,12 +30,11 @@ import kotlinx.coroutines.withTimeout
 import okhttp3.Interceptor
 
 object GothwadAccounts {
-    private const val FIRST_PARTY_ACCOUNTS_CLIENT_ID = "gothwad-accounts-android"
-
     private lateinit var config: GothwadConfig
     private lateinit var session: SessionManager
     private lateinit var mobileClient: MobileAccountClient
     private lateinit var peerBroker: PeerBrokerClient
+    private var appContext: Application? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var ready: kotlinx.coroutines.Deferred<Unit>? = null
     @Volatile
@@ -74,6 +76,7 @@ object GothwadAccounts {
     @Synchronized
     internal fun resetForTesting() {
         ready = null
+        appContext = null
         locallySignedOutInProcess = false
         mutableError.value = null
         mutableDiscoveredAccounts.value = emptyList()
@@ -93,6 +96,7 @@ object GothwadAccounts {
             require(this.config == config) { "GothwadAccounts.init called twice with different GothwadConfig" }
             return
         }
+        this.appContext = application
         this.config = config
         this.mobileClient = mobile
         this.session = SessionManager(
@@ -125,13 +129,45 @@ object GothwadAccounts {
         }
     }
 
+    /**
+     * Returns true when this host app requests [Scope.AccountRead] so shared `:ui` screens can
+     * manage `/api/mobile/*` Account Centre data directly. When a server or legacy cached token
+     * rejects `/api/mobile/*` with `insufficient_scope`, `:ui` degrades automatically to web `/me`.
+     */
     fun canManageAccountNatively(): Boolean =
-        ::config.isInitialized &&
-            config.clientId == FIRST_PARTY_ACCOUNTS_CLIENT_ID &&
-            Scope.AccountRead in config.scopes
+        ::config.isInitialized && Scope.AccountRead in config.scopes
 
     fun canWriteProfileNatively(): Boolean =
         canManageAccountNatively() && Scope.AccountProfileWrite in config.scopes
+
+    fun currentClientId(): String? = if (::config.isInitialized) config.clientId else null
+
+    /**
+     * Returns a valid OAuth bearer token for the currently active account (refreshing silently
+     * when near expiration), or `null` when signed out or storage is unavailable.
+     */
+    suspend fun currentAccessToken(): String? = withContext(Dispatchers.IO) {
+        runCatching {
+            readyOrThrow()
+            session.accessToken()
+        }.getOrNull()
+    }
+
+    fun isAccountsAppInstalled(): Boolean {
+        val ctx = appContext ?: return false
+        return runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ctx.packageManager.getPackageInfo(
+                    KnownGothwadApps.ACCOUNTS,
+                    PackageManager.PackageInfoFlags.of(0L),
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                ctx.packageManager.getPackageInfo(KnownGothwadApps.ACCOUNTS, 0)
+            }
+            true
+        }.getOrDefault(false)
+    }
 
     fun manageOnWeb(activity: Activity, section: String? = null) = scope.launch {
         action {

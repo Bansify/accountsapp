@@ -179,6 +179,7 @@ fun AccountsTopAppBar(
     subScreenTitle: String?,
     isRefreshing: Boolean,
     showMenuButton: Boolean = false,
+    showCloseButton: Boolean = false,
     onMenuClick: () -> Unit = {},
     onBackClick: () -> Unit,
     onSearchClick: () -> Unit,
@@ -225,7 +226,17 @@ fun AccountsTopAppBar(
                             .semantics { heading() },
                     )
                 } else {
-                    if (showMenuButton) {
+                    if (showCloseButton) {
+                        IconButton(
+                            onClick = onBackClick,
+                            modifier = Modifier.testTag("top_close_button"),
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                                contentDescription = stringResource(R.string.gothwad_cd_back),
+                            )
+                        }
+                    } else if (showMenuButton) {
                         IconButton(
                             onClick = onMenuClick,
                             modifier = Modifier.testTag("top_menu_button"),
@@ -239,7 +250,7 @@ fun AccountsTopAppBar(
                     Row(
                         modifier = Modifier
                             .weight(1f)
-                            .padding(start = if (showMenuButton) 2.dp else 10.dp),
+                            .padding(start = if (showMenuButton || showCloseButton) 2.dp else 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {

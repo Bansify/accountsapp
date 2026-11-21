@@ -69,6 +69,7 @@ class AccountDashboardViewModelTest {
         var failPeerSilentSso = false
         var requireMfaOnSignIn = false
         var requireMfaOnPhoneUpdate = false
+        var rejectMobileScopesWith403 = false
         var lastRevokedSessionId: String? = null
 
         override fun signIn(activity: Activity, chooseAccount: Boolean, loginHint: String?) = Unit
@@ -150,12 +151,16 @@ class AccountDashboardViewModelTest {
         }
 
         override suspend fun listWebSessions(): Result<List<WebSessionInfo>> =
-            Result.success(
-                listOf(
-                    WebSessionInfo(id = "ws-1", browser = "Chrome", os = "Android", current = true),
-                    WebSessionInfo(id = "ws-2", browser = "Firefox", os = "Linux", current = false),
-                ),
-            )
+            if (rejectMobileScopesWith403) {
+                Result.failure(MobileApiException(403, "insufficient_scope", "insufficient_scope"))
+            } else {
+                Result.success(
+                    listOf(
+                        WebSessionInfo(id = "ws-1", browser = "Chrome", os = "Android", current = true),
+                        WebSessionInfo(id = "ws-2", browser = "Firefox", os = "Linux", current = false),
+                    ),
+                )
+            }
 
         override suspend fun revokeWebSession(sessionId: String): Result<Int> {
             lastRevokedSessionId = sessionId
@@ -485,5 +490,44 @@ class AccountDashboardViewModelTest {
         assertEquals(listOf(AccountSubScreen.AppSettings), vm.uiState.value.subScreenStack)
         assertTrue(vm.navigateBack())
         assertNull(vm.uiState.value.currentSubScreen)
+    }
+
+    @Test
+    fun authSuccessCountAndInsufficientScopeDegradationBehaveDeterministically() = runTest {
+        val controller = FakeController(nativeManage = true, nativeWrite = true).apply {
+            rejectMobileScopesWith403 = true
+        }
+        val vm = AccountDashboardViewModel(controller)
+
+        vm.configureNativeAuthEntry(NativeAuthStep.SIGN_UP, "meera")
+        assertFalse(vm.uiState.value.nativeAuth.visible)
+        assertEquals(NativeAuthStep.SIGN_UP, vm.uiState.value.nativeAuth.step)
+        assertEquals("meera", vm.uiState.value.nativeAuth.identifier)
+        assertEquals(0, vm.uiState.value.authSuccessCount)
+
+        // Native sign-up increments authSuccessCount cleanly.
+        vm.submitNativeSignUp(
+            NativeSignUpInput(
+                firstName = "Meera",
+                lastName = "Rao",
+                username = "meera",
+                password = "Password123!",
+                recoveryEmail = "meera@example.com",
+            ),
+        )
+        advanceUntilIdle()
+        assertEquals(1, vm.uiState.value.authSuccessCount)
+
+        // 403 insufficient_scope automatically degrades native management to web /me links without crash.
+        assertFalse(vm.uiState.value.canManageNatively)
+        assertFalse(vm.uiState.value.canWriteProfileNatively)
+
+        // Once server grants account scopes and user refreshes, native management activates cleanly.
+        controller.rejectMobileScopesWith403 = false
+        vm.refreshProfile()
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.canManageNatively)
+        assertTrue(vm.uiState.value.canWriteProfileNatively)
+        assertTrue(vm.uiState.value.webSessions.isNotEmpty())
     }
 }

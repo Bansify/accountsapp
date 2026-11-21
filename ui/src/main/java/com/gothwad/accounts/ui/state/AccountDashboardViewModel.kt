@@ -254,6 +254,7 @@ class AccountDashboardViewModel(
 ) : ViewModel() {
 
     private var lastLoadedNativeUserId: String? = null
+    private val nativeScopeDeniedUserIds = mutableSetOf<String>()
 
     private val mutableUiState = MutableStateFlow(
         AccountDashboardUiState(
@@ -287,9 +288,10 @@ class AccountDashboardViewModel(
                 val err = values[3] as AuthFailure?
                 val disconnectOutcome = values[4] as DisconnectOutcome?
                 val peers = runCatching { controller.installedVerifiedPeers() }.getOrDefault(emptyList())
-                val canManage = runCatching { controller.canManageAccountNatively() }.getOrDefault(false)
-                val canWrite = runCatching { controller.canWriteProfileNatively() }.getOrDefault(false)
                 val activeId = (accountState as? AccountState.SignedIn)?.account?.userId
+                val denied = activeId != null && activeId in nativeScopeDeniedUserIds
+                val canManage = !denied && runCatching { controller.canManageAccountNatively() }.getOrDefault(false)
+                val canWrite = !denied && runCatching { controller.canWriteProfileNatively() }.getOrDefault(false)
 
                 val outcomeMsg = when (disconnectOutcome) {
                     DisconnectOutcome.RevokedOnServer ->
@@ -426,6 +428,23 @@ class AccountDashboardViewModel(
         }
     }
 
+    /** Configures inline native auth flow state (e.g. for [AccountSignInActivity] / [GothwadSignInScreen]). */
+    fun configureNativeAuthEntry(
+        startStep: NativeAuthStep = NativeAuthStep.IDENTIFIER,
+        initialIdentifier: String = "",
+    ) {
+        mutableUiState.update {
+            it.copy(
+                showAccountSwitcher = false,
+                nativeAuth = NativeAuthDialogState(
+                    visible = false,
+                    step = startStep,
+                    identifier = initialIdentifier.trim(),
+                ),
+            )
+        }
+    }
+
     fun dismissNativeAuthDialog() {
         mutableUiState.update { it.copy(nativeAuth = NativeAuthDialogState()) }
     }
@@ -540,9 +559,12 @@ class AccountDashboardViewModel(
             result.onSuccess { outcome ->
                 when (outcome) {
                     is MobileAuthSignInOutcome.Authenticated -> {
+                        val signedUserId = outcome.user?.id ?: uiState.value.activeAccount?.userId
+                        if (signedUserId != null) nativeScopeDeniedUserIds.remove(signedUserId)
                         mutableUiState.update {
                             it.copy(
                                 nativeAuth = NativeAuthDialogState(),
+                                authSuccessCount = it.authSuccessCount + 1,
                                 snackbarMessage = "Signed in as ${outcome.user?.email ?: cleanId}",
                             )
                         }
@@ -583,9 +605,11 @@ class AccountDashboardViewModel(
             mutableUiState.update { it.copy(nativeAuth = it.nativeAuth.copy(isBusy = true, errorMessage = null)) }
             val result = controller.verifyNativeMfa(challenge, cleanCode)
             result.onSuccess { acc ->
+                nativeScopeDeniedUserIds.remove(acc.userId)
                 mutableUiState.update {
                     it.copy(
                         nativeAuth = NativeAuthDialogState(),
+                        authSuccessCount = it.authSuccessCount + 1,
                         snackbarMessage = "Signed in as ${acc.email ?: acc.username ?: acc.userId}",
                     )
                 }
@@ -603,9 +627,11 @@ class AccountDashboardViewModel(
             mutableUiState.update { it.copy(nativeAuth = it.nativeAuth.copy(isBusy = true, errorMessage = null)) }
             val result = controller.signUpNative(input)
             result.onSuccess { acc ->
+                nativeScopeDeniedUserIds.remove(acc.userId)
                 mutableUiState.update {
                     it.copy(
                         nativeAuth = NativeAuthDialogState(),
+                        authSuccessCount = it.authSuccessCount + 1,
                         snackbarMessage = "Welcome to Bansify, ${acc.firstName ?: acc.username ?: acc.userId}",
                     )
                 }
@@ -681,9 +707,11 @@ class AccountDashboardViewModel(
             mutableUiState.update { it.copy(showAccountSwitcher = false, isPeerSilentSigningIn = true) }
             val result = controller.signInSilentlyWithPeer(peer)
             result.onSuccess { acc ->
+                nativeScopeDeniedUserIds.remove(acc.userId)
                 mutableUiState.update {
                     it.copy(
                         isPeerSilentSigningIn = false,
+                        authSuccessCount = it.authSuccessCount + 1,
                         snackbarMessage = "Signed in silently as ${acc.email ?: acc.username ?: acc.userId}",
                     )
                 }
@@ -1116,13 +1144,38 @@ class AccountDashboardViewModel(
     }
 
     fun refreshProfile() {
+        mutableUiState.value.activeAccount?.userId?.let { nativeScopeDeniedUserIds.remove(it) }
         controller.refreshProfile()
         if (controller.canManageAccountNatively()) {
             refreshNativeManagementData()
         }
     }
 
+    private fun isInsufficientScopeError(err: Throwable?): Boolean =
+        err is MobileApiException && (err.code == 403 || err.errorCode == "insufficient_scope")
+
+    private fun downgradeNativeManagementForActiveUser(message: String? = null) {
+        val activeId = mutableUiState.value.activeAccount?.userId
+        if (activeId != null) {
+            nativeScopeDeniedUserIds.add(activeId)
+        }
+        mutableUiState.update {
+            it.copy(
+                canManageNatively = false,
+                canWriteProfileNatively = false,
+                isManagementBusy = false,
+                activeManagementDialog = null,
+                managementError = null,
+                snackbarMessage = message ?: it.snackbarMessage,
+            )
+        }
+    }
+
     private fun handleManagementFailure(err: Throwable, fallback: String) {
+        if (isInsufficientScopeError(err)) {
+            downgradeNativeManagementForActiveUser("Native management requires account scopes; use Manage on web.")
+            return
+        }
         val needsMfa = (err as? MobileApiException)?.errorCode == "mfa_required" ||
             err.message?.contains("authenticator", ignoreCase = true) == true
         mutableUiState.update {
@@ -1136,14 +1189,30 @@ class AccountDashboardViewModel(
 
     private fun refreshNativeManagementData() {
         viewModelScope.launch {
-            val sessionsDeferred = async { controller.listWebSessions().getOrNull() }
-            val activityDeferred = async { controller.listActivity().getOrNull() }
-            val authsDeferred = async { controller.listAuthorizations().getOrNull() }
-            val sessions = sessionsDeferred.await()
-            val activity = activityDeferred.await()
-            val auths = authsDeferred.await()
+            val activeId = mutableUiState.value.activeAccount?.userId
+            val sessionsDeferred = async { controller.listWebSessions() }
+            val activityDeferred = async { controller.listActivity() }
+            val authsDeferred = async { controller.listAuthorizations() }
+            val sessionsRes = sessionsDeferred.await()
+            val activityRes = activityDeferred.await()
+            val authsRes = authsDeferred.await()
+            val scopeRejected = listOf(sessionsRes, activityRes, authsRes)
+                .mapNotNull { it.exceptionOrNull() }
+                .any { isInsufficientScopeError(it) }
+            if (scopeRejected && activeId == mutableUiState.value.activeAccount?.userId) {
+                downgradeNativeManagementForActiveUser()
+                return@launch
+            }
+            val sessions = sessionsRes.getOrNull()
+            val activity = activityRes.getOrNull()
+            val auths = authsRes.getOrNull()
+            val denied = activeId != null && activeId in nativeScopeDeniedUserIds
+            val canManage = !denied && runCatching { controller.canManageAccountNatively() }.getOrDefault(false)
+            val canWrite = !denied && runCatching { controller.canWriteProfileNatively() }.getOrDefault(false)
             mutableUiState.update { current ->
                 current.copy(
+                    canManageNatively = canManage,
+                    canWriteProfileNatively = canWrite,
                     webSessions = sessions ?: current.webSessions,
                     activityFeed = activity ?: current.activityFeed,
                     authorizations = auths ?: current.authorizations,

@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | `Bansify/accounts` | Web pages (`/signin`, `/me`, `/privacy`, `/terms`) + Worker API | Cloudflare Pages & Workers |
 | `Bansify/accounts` | Schema migrations (`0001`–`0014_first_party_native.sql`+) | Cloudflare D1 |
-| `Bansify/accountsapp` | `:core` + `:ui` AARs, POMs, sources | Maven / JitPack (`com.github.GothwadTech.accountsapp:{core,ui}:<tag>`) |
+| `Bansify/accountsapp` | `:core` + `:ui` AARs, POMs, sources | Maven / JitPack (`com.github.Bansify.accountsapp:{core,ui}:<tag>`) |
 | `Bansify/accountsapp` | Signed standalone Bansify Accounts APK (`com.gothwad.accounts`) & Play Store AAB | GitHub Releases |
 
 Android requires no separate Cloudflare backend deployment; both web and Android talk directly to `https://accounts.bansify.com/api`.
@@ -28,8 +28,8 @@ Android requires no separate Cloudflare backend deployment; both web and Android
 
 3. **JitPack (`jitpack.yml`)**:
    - Multi-module coordinates:
-     - `com.github.GothwadTech.accountsapp:core:<tag>`
-     - `com.github.GothwadTech.accountsapp:ui:<tag>`
+     - `com.github.Bansify.accountsapp:core:<tag>`
+     - `com.github.Bansify.accountsapp:ui:<tag>`
    - Verify clean external resolution from `plusTube` / `storeapp` / `mailapp` before promoting a production tag.
 
 ## Owner pre-release checklist

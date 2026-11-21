@@ -94,6 +94,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun GothwadAccountsScreen(
     onClose: () -> Unit = {},
+    showCloseButton: Boolean = false,
     accountViewModel: AccountDashboardViewModel = viewModel(),
 ) {
     val uiState by accountViewModel.uiState.collectAsState()
@@ -176,6 +177,7 @@ fun GothwadAccountsScreen(
                                 subScreenTitle = subScreenTitle,
                                 isRefreshing = uiState.isRefreshing,
                                 showMenuButton = useModalSidebar && !canNavigateBack,
+                                showCloseButton = showCloseButton,
                                 onMenuClick = { scope.launch { drawerState.open() } },
                                 onBackClick = {
                                     if (!accountViewModel.navigateBack()) onClose()
