@@ -28,8 +28,8 @@ Both `project.group` and `MavenPublication.groupId` are configured as `com.githu
 
 `:core` automatically merges:
 - Exported `AccountCallbackActivity` (without hardcoded intent filters — each host defines its exact callback URI),
-- Host-scoped `broker.AccountDirectoryProvider` (`android:authorities="${applicationId}.gothwad.account.directory"`, `exported="true"`),
-- Bounded `<queries>` allowlist for first-party Bansify packages (`com.bansify.accounts`, `com.gothwad.mail`, `com.gothwad.drive`, `com.gothwad.store`, `com.gothwad.tube`, `com.bansify.accounts.sample.alpha`, `com.bansify.accounts.sample.beta`).
+- Host-scoped `broker.AccountDirectoryProvider` (`android:authorities="${applicationId}.bansify.account.directory"`, `exported="true"`),
+- Bounded `<queries>` allowlist for first-party Bansify packages (`com.bansify.accounts`, `com.bansify.mail`, `com.gothwad.drive`, `com.gothwad.store`, `com.gothwad.tube`, `com.bansify.accounts.sample.alpha`, `com.bansify.accounts.sample.beta`).
 
 `:ui` automatically merges:
 - `AccountManagementActivity` (`exported="false"`, `windowSoftInputMode="adjustResize"`),
@@ -114,7 +114,7 @@ For production HTTPS App Links, publish `https://<host>/.well-known/assetlinks.j
 | Sample beta | `gothwad-accounts-sample-beta` | `com.bansify.accounts.sample.beta:/oauth/callback` | `profile email offline_access` |
 | Kiwi Store (`storeapp`) | `kiwi-store` | `kiwistore://oauth/callback`, `https://kiwistore.bansify.com/oauth/callback`, `com.gothwad.store:/oauth/callback` | `profile email offline_access account.read account.profile.write` |
 | PlusTube (`tubeapp`) | `gothwad-tube` | `https://tube.bansify.com/oauth/callback`, `com.gothwad.tube:/oauth/callback` | `profile email offline_access account.read account.profile.write` |
-| Mail (`mailapp`) | `gothwad-mail` | `https://mail.bansify.com/oauth/callback`, `com.gothwad.mail:/oauth/callback` | `profile email offline_access mail account.read account.profile.write` |
+| Mail (`mailapp`) | `gothwad-mail` | `https://mail.bansify.com/oauth/callback`, `com.bansify.mail:/oauth/callback` | `profile email offline_access mail account.read account.profile.write` |
 | Drive (`drive`) | `gothwad-drive` | `https://drive.bansify.com/oauth/callback`, `com.gothwad.drive:/oauth/callback` | `profile email offline_access drive drive.read account.read account.profile.write` |
 
 All mobile clients are **public PKCE (`S256`)** clients with no embedded `client_secret` in the APK.
