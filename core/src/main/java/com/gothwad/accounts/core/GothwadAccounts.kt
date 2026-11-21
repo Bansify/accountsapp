@@ -135,8 +135,8 @@ object GothwadAccounts {
 
     /**
      * Returns true when this host app requests [Scope.AccountRead] so shared `:ui` screens can
-     * manage `/api/mobile/*` Account Centre data directly. When a server or legacy cached token
-     * rejects `/api/mobile/*` with `insufficient_scope`, `:ui` degrades automatically to web `/me`.
+     * manage `/api/mobile/...` Account Centre data directly. When a server or legacy cached token
+     * rejects `/api/mobile/...` with `insufficient_scope`, `:ui` degrades automatically to web `/me`.
      */
     fun canManageAccountNatively(): Boolean =
         ::config.isInitialized && Scope.AccountRead in config.scopes
