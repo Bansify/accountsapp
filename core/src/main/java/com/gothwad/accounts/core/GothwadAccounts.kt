@@ -15,6 +15,7 @@ import com.gothwad.accounts.core.broker.PeerBrokerClient
 import com.gothwad.accounts.core.broker.PeerDirectoryTransport
 import java.io.IOException
 import java.security.PublicKey
+import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -569,17 +570,29 @@ object GothwadAccounts {
         mobileClient.exportAccountDataJson(bearer)
     }
 
-    suspend fun deleteAccount(password: String, mfaCode: String? = null): Result<Unit> = mobileCall { bearer ->
-        requireAccountProfileWriteScope()
-        val activeUserId = session.activeUserId()
-        mobileClient.deleteAccount(bearer, password, mfaCode)
-        if (activeUserId != null) {
-            locallySignedOutInProcess = true
-            val removedAt = session.removeFromDevice(activeUserId, revokeOnServer = false)
-            peerBroker.broadcastDeviceRemoval(activeUserId, removedAt, config.brokerPolicy)
-            syncDiscoveredAccountsInternal()
+    suspend fun deleteAccount(password: String, mfaCode: String? = null): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            readyOrThrow()
+            requireAccountProfileWriteScope()
+            val (capturedUserId, bearer) = session.activeAccessTokenAndUserId()
+                ?: throw OAuthException(rejected = true)
+            mobileClient.deleteAccount(bearer, password, mfaCode)
+            val anyRemainingLocal = runCatching {
+                val removedAt = session.removeFromDevice(capturedUserId, revokeOnServer = false)
+                peerBroker.broadcastDeviceRemoval(capturedUserId, removedAt, config.brokerPolicy)
+                syncDiscoveredAccountsInternal()
+                session.currentLocalAccounts().isNotEmpty()
+            }.getOrDefault(false)
+            if (!anyRemainingLocal) {
+                locallySignedOutInProcess = true
+            }
+            Unit
+        }.also { result ->
+            val err = result.exceptionOrNull()
+            if (err is OAuthException && err.rejected) {
+                mutableError.value = AuthFailure.SessionExpired
+            }
         }
-        Unit
     }
 
     suspend fun fetchTrustedApps(
@@ -649,8 +662,10 @@ object GothwadAccounts {
                 readyOrThrow()
                 val account = session.completeLogin(uri, config.redirectUri)
                 locallySignedOutInProcess = false
-                val nextGen = (mutableBrowserAuthCompletion.value?.generation ?: 0) + 1
-                mutableBrowserAuthCompletion.value = BrowserAuthCompletion(nextGen, account.userId)
+                mutableBrowserAuthCompletion.value = BrowserAuthCompletion(
+                    eventId = UUID.randomUUID().toString(),
+                    userId = account.userId,
+                )
                 syncDiscoveredAccountsInternal()
             }
         } finally {

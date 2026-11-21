@@ -73,6 +73,6 @@ enum class DisconnectOutcome {
 }
 
 data class BrowserAuthCompletion(
-    val generation: Int,
+    val eventId: String,
     val userId: String,
 )

@@ -30,6 +30,7 @@ import com.gothwad.accounts.ui.model.NavigationLayoutMode
 import com.gothwad.accounts.ui.model.SearchableSetting
 import com.gothwad.accounts.ui.model.SignOutDialogTarget
 import com.gothwad.accounts.ui.model.ThemePreference
+import java.util.UUID
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -265,23 +266,24 @@ class AccountDashboardViewModel(
         val disconnectOutcome: DisconnectOutcome?,
     )
 
-    private data class SignInSessionTracker(
-        val sessionKey: String,
-        val baselineCaptured: Boolean = false,
-        val baselineSuccessCount: Int = 0,
-        val baselineUserIds: Set<String> = emptySet(),
-        val baselineActiveUserId: String? = null,
-        val completionDispatched: Boolean = false,
+    data class SignInBaseline(
+        val viewModelInstanceId: String = "",
+        val nativeSuccessCount: Int = 0,
+        val browserEventId: String? = null,
+        val userIds: Set<String> = emptySet(),
+        val activeUserId: String? = null,
     )
+
+    val viewModelInstanceId: String = UUID.randomUUID().toString()
 
     private var lastLoadedNativeUserId: String? = null
     private var lastActiveUserId: String? = (controller.state.value as? AccountState.SignedIn)?.account?.userId
-    private var lastObservedBrowserAuthGeneration: Int = controller.browserAuthCompletion.value?.generation ?: 0
+    private var lastObservedBrowserEventId: String? = controller.browserAuthCompletion.value?.eventId
     private var nativeRefreshGeneration: Long = 0L
     private var activeManagementOpId: Long = 0L
     private var activeProfileSaveOpId: Long = 0L
     private var activeExportOpId: Long = 0L
-    private var signInSessionTracker: SignInSessionTracker? = null
+    private var initializedSignInSessionKey: String? = null
     private val nativeScopeDeniedUserIds = mutableSetOf<String>()
 
     private val mutableUiState = MutableStateFlow(
@@ -290,6 +292,7 @@ class AccountDashboardViewModel(
             discoveredAccounts = controller.discoveredAccounts.value,
             isRefreshing = controller.isRefreshing.value,
             authError = controller.error.value,
+            latestBrowserAuthEventId = controller.browserAuthCompletion.value?.eventId,
             installedVerifiedPeers = runCatching { controller.installedVerifiedPeers() }.getOrDefault(emptyList()),
             canManageNatively = runCatching { controller.canManageAccountNatively() }.getOrDefault(false),
             canWriteProfileNatively = runCatching { controller.canWriteProfileNatively() }.getOrDefault(false),
@@ -321,9 +324,9 @@ class AccountDashboardViewModel(
                 val peers = runCatching { controller.installedVerifiedPeers() }.getOrDefault(emptyList())
                 val activeId = (accountState as? AccountState.SignedIn)?.account?.userId
                 val browserCompleted =
-                    browserCompletion != null && browserCompletion.generation > lastObservedBrowserAuthGeneration
+                    browserCompletion != null && browserCompletion.eventId != lastObservedBrowserEventId
                 if (browserCompleted) {
-                    lastObservedBrowserAuthGeneration = browserCompletion.generation
+                    lastObservedBrowserEventId = browserCompletion.eventId
                     nativeScopeDeniedUserIds.remove(browserCompletion.userId)
                 }
                 val activeUserChanged = activeId != lastActiveUserId
@@ -356,7 +359,7 @@ class AccountDashboardViewModel(
                         discoveredAccounts = discovered,
                         isRefreshing = refreshing,
                         authError = err,
-                        authSuccessCount = if (browserCompleted) current.authSuccessCount + 1 else current.authSuccessCount,
+                        latestBrowserAuthEventId = browserCompletion?.eventId ?: current.latestBrowserAuthEventId,
                         installedVerifiedPeers = peers,
                         canManageNatively = canManage,
                         canWriteProfileNatively = canWrite,
@@ -368,11 +371,12 @@ class AccountDashboardViewModel(
                         managementError = if (activeUserChanged) null else current.managementError,
                         managementRequiresMfaPrompt = if (activeUserChanged) false else current.managementRequiresMfaPrompt,
                         recoveryEmailPendingVerification = if (activeUserChanged) false else current.recoveryEmailPendingVerification,
+                        mfaStatus = if (activeUserChanged || activeId == null) null else current.mfaStatus,
                         mfaSetup = if (activeUserChanged) null else current.mfaSetup,
                         mfaRecoveryCodes = if (activeUserChanged) emptyList() else current.mfaRecoveryCodes,
-                        webSessions = if (activeId == null) emptyList() else current.webSessions,
-                        activityFeed = if (activeId == null) emptyList() else current.activityFeed,
-                        authorizations = if (activeId == null) emptyList() else current.authorizations,
+                        webSessions = if (activeId == null || activeUserChanged) emptyList() else current.webSessions,
+                        activityFeed = if (activeId == null || activeUserChanged) emptyList() else current.activityFeed,
+                        authorizations = if (activeId == null || activeUserChanged) emptyList() else current.authorizations,
                     )
                 }
 
@@ -503,60 +507,48 @@ class AccountDashboardViewModel(
 
     /**
      * Binds an embedded or standalone [GothwadSignInScreen] session to this ViewModel so configuration
-     * changes preserve in-flight MFA/form state while process death recreates entry state and a matching
-     * completion baseline cleanly.
+     * changes preserve in-flight MFA/form state while process death recreates entry arguments cleanly.
      */
     fun ensureSignInSessionInitialized(
         sessionKey: String,
         startStep: NativeAuthStep = NativeAuthStep.IDENTIFIER,
         initialIdentifier: String = "",
     ) {
-        if (signInSessionTracker?.sessionKey == sessionKey) return
-        signInSessionTracker = SignInSessionTracker(sessionKey = sessionKey)
+        if (initializedSignInSessionKey == sessionKey) return
+        initializedSignInSessionKey = sessionKey
         configureNativeAuthEntry(startStep, initialIdentifier)
         syncPeers()
     }
 
     fun evaluateSignInCompletion(
-        sessionKey: String,
-        allowWhenAlreadySignedIn: Boolean,
+        baseline: SignInBaseline,
         startedBrowserFlow: Boolean,
     ): Boolean {
         val currentState = mutableUiState.value
         val accountState = currentState.accountState
         if (accountState == AccountState.Initializing) return false
 
-        val existingTracker = signInSessionTracker?.takeIf { it.sessionKey == sessionKey }
-            ?: SignInSessionTracker(sessionKey = sessionKey).also { signInSessionTracker = it }
-
-        if (!existingTracker.baselineCaptured) {
-            val signedIn = accountState as? AccountState.SignedIn
-            val shouldFinishImmediately = !allowWhenAlreadySignedIn && signedIn != null
-            signInSessionTracker = existingTracker.copy(
-                baselineCaptured = true,
-                baselineSuccessCount = currentState.authSuccessCount,
-                baselineUserIds = signedIn?.all?.map { it.userId }?.toSet().orEmpty(),
-                baselineActiveUserId = signedIn?.account?.userId,
-                completionDispatched = shouldFinishImmediately,
-            )
-            return shouldFinishImmediately
-        }
-
-        if (existingTracker.completionDispatched) return false
-
         val signedIn = accountState as? AccountState.SignedIn
         val currentIds = signedIn?.all?.map { it.userId }?.toSet().orEmpty()
-        val hasNewAuthSuccess = currentState.authSuccessCount > existingTracker.baselineSuccessCount
-        val becameSignedInFromSignedOut = existingTracker.baselineUserIds.isEmpty() && signedIn != null
-        val addedNewLocalAccount = (currentIds - existingTracker.baselineUserIds).isNotEmpty()
-        val switchedAfterBrowser =
-            startedBrowserFlow && signedIn != null && signedIn.account.userId != existingTracker.baselineActiveUserId
-
-        if (hasNewAuthSuccess || becameSignedInFromSignedOut || addedNewLocalAccount || switchedAfterBrowser) {
-            signInSessionTracker = existingTracker.copy(completionDispatched = true)
-            return true
+        val baselineVmMatches = baseline.viewModelInstanceId == viewModelInstanceId
+        val hasNewNativeSuccess = if (baselineVmMatches) {
+            currentState.authSuccessCount > baseline.nativeSuccessCount
+        } else {
+            currentState.authSuccessCount > 0
         }
-        return false
+        val hasScreenBrowserSuccess = startedBrowserFlow &&
+            currentState.latestBrowserAuthEventId != null &&
+            currentState.latestBrowserAuthEventId != baseline.browserEventId
+        val becameSignedInFromSignedOut = baseline.userIds.isEmpty() && signedIn != null
+        val addedNewLocalAccount = (currentIds - baseline.userIds).isNotEmpty()
+        val switchedAfterBrowser =
+            startedBrowserFlow && signedIn != null && signedIn.account.userId != baseline.activeUserId
+
+        return hasNewNativeSuccess ||
+            hasScreenBrowserSuccess ||
+            becameSignedInFromSignedOut ||
+            addedNewLocalAccount ||
+            switchedAfterBrowser
     }
 
     fun dismissNativeAuthDialog() {
@@ -940,17 +932,15 @@ class AccountDashboardViewModel(
             mutableUiState.update { it.copy(isSavingProfile = true) }
             val result = controller.updateBasicProfile(firstName, lastName, dateOfBirth, gender)
             val err = result.exceptionOrNull()
+            if (opId != activeProfileSaveOpId || initiatingUserId != mutableUiState.value.activeAccount?.userId) {
+                return@launch
+            }
             if (isInsufficientScopeError(err)) {
-                if (opId == activeProfileSaveOpId && initiatingUserId == mutableUiState.value.activeAccount?.userId) {
-                    mutableUiState.update { it.copy(isSavingProfile = false) }
-                }
+                mutableUiState.update { it.copy(isSavingProfile = false) }
                 downgradeNativeManagementForUser(
                     initiatingUserId,
                     "Native management requires account scopes; use Manage on web.",
                 )
-                return@launch
-            }
-            if (opId != activeProfileSaveOpId || initiatingUserId != mutableUiState.value.activeAccount?.userId) {
                 return@launch
             }
             mutableUiState.update { current ->
@@ -1236,15 +1226,16 @@ class AccountDashboardViewModel(
                     )
                 }
             }.onFailure { err ->
-                if (opId == activeExportOpId && initiatingUserId == mutableUiState.value.activeAccount?.userId) {
-                    mutableUiState.update { it.copy(isExportingData = false) }
+                if (opId != activeExportOpId || initiatingUserId != mutableUiState.value.activeAccount?.userId) {
+                    return@onFailure
                 }
+                mutableUiState.update { it.copy(isExportingData = false) }
                 if (isInsufficientScopeError(err)) {
                     downgradeNativeManagementForUser(
                         initiatingUserId,
                         "Native management requires account scopes; use Manage on web.",
                     )
-                } else if (opId == activeExportOpId && initiatingUserId == mutableUiState.value.activeAccount?.userId) {
+                } else {
                     mutableUiState.update {
                         it.copy(snackbarMessage = "Export failed: ${err.message ?: "try again"}")
                     }
@@ -1396,6 +1387,7 @@ class AccountDashboardViewModel(
         initiatingUserId: String?,
         opId: Long = activeManagementOpId,
     ) {
+        if (opId != activeManagementOpId || initiatingUserId != mutableUiState.value.activeAccount?.userId) return
         if (isInsufficientScopeError(err)) {
             downgradeNativeManagementForUser(
                 initiatingUserId,
@@ -1403,7 +1395,6 @@ class AccountDashboardViewModel(
             )
             return
         }
-        if (opId != activeManagementOpId || initiatingUserId != mutableUiState.value.activeAccount?.userId) return
         mutableUiState.update {
             it.copy(isManagementBusy = false, managementError = err.message ?: fallback)
         }
@@ -1415,6 +1406,7 @@ class AccountDashboardViewModel(
         initiatingUserId: String?,
         opId: Long = activeManagementOpId,
     ) {
+        if (opId != activeManagementOpId || initiatingUserId != mutableUiState.value.activeAccount?.userId) return
         if (isInsufficientScopeError(err)) {
             downgradeNativeManagementForUser(
                 initiatingUserId,
@@ -1422,7 +1414,6 @@ class AccountDashboardViewModel(
             )
             return
         }
-        if (opId != activeManagementOpId || initiatingUserId != mutableUiState.value.activeAccount?.userId) return
         val needsMfa = (err as? MobileApiException)?.errorCode == "mfa_required" ||
             err.message?.contains("authenticator", ignoreCase = true) == true
         mutableUiState.update {

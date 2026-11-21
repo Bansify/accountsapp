@@ -53,6 +53,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -171,7 +172,14 @@ fun GothwadSignInScreen(
 
     val sessionKey = rememberSaveable { UUID.randomUUID().toString() }
     var entryPrepared by remember { mutableStateOf(false) }
+    var baselineCaptured by rememberSaveable { mutableStateOf(false) }
+    var baselineVmId by rememberSaveable { mutableStateOf("") }
+    var baselineNativeSuccessCount by rememberSaveable { mutableIntStateOf(0) }
+    var baselineBrowserEventId by rememberSaveable { mutableStateOf<String?>(null) }
+    var baselineUserIdsList by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
+    var baselineActiveUserId by rememberSaveable { mutableStateOf<String?>(null) }
     var startedBrowserFlow by rememberSaveable { mutableStateOf(false) }
+    var completionDispatched by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(sessionKey) {
         accountViewModel.setThemePreference(initialTheme)
@@ -180,9 +188,41 @@ fun GothwadSignInScreen(
         prefsInitialized = true
     }
 
-    LaunchedEffect(uiState.accountState, uiState.authSuccessCount, entryPrepared, startedBrowserFlow) {
-        if (!entryPrepared) return@LaunchedEffect
-        if (accountViewModel.evaluateSignInCompletion(sessionKey, allowWhenAlreadySignedIn, startedBrowserFlow)) {
+    LaunchedEffect(
+        uiState.accountState,
+        uiState.authSuccessCount,
+        uiState.latestBrowserAuthEventId,
+        entryPrepared,
+        startedBrowserFlow,
+    ) {
+        if (!entryPrepared || completionDispatched) return@LaunchedEffect
+        val accountState = uiState.accountState
+        if (accountState == AccountState.Initializing) return@LaunchedEffect
+
+        if (!baselineCaptured) {
+            baselineCaptured = true
+            baselineVmId = accountViewModel.viewModelInstanceId
+            baselineNativeSuccessCount = uiState.authSuccessCount
+            baselineBrowserEventId = uiState.latestBrowserAuthEventId
+            val existing = (accountState as? AccountState.SignedIn)
+            baselineUserIdsList = existing?.all?.map { it.userId }.orEmpty()
+            baselineActiveUserId = existing?.account?.userId
+            if (!allowWhenAlreadySignedIn && existing != null) {
+                completionDispatched = true
+                onSignedInComplete()
+            }
+            return@LaunchedEffect
+        }
+
+        val baseline = AccountDashboardViewModel.SignInBaseline(
+            viewModelInstanceId = baselineVmId,
+            nativeSuccessCount = baselineNativeSuccessCount,
+            browserEventId = baselineBrowserEventId,
+            userIds = baselineUserIdsList.toSet(),
+            activeUserId = baselineActiveUserId,
+        )
+        if (accountViewModel.evaluateSignInCompletion(baseline, startedBrowserFlow)) {
+            completionDispatched = true
             onSignedInComplete()
         }
     }

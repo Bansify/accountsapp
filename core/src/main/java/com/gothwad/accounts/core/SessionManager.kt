@@ -325,6 +325,12 @@ internal class SessionManager(
         return accessTokenForResolvedUserId(userId, requireActive = true)
     }
 
+    suspend fun activeAccessTokenAndUserId(): Pair<String, String>? {
+        val userId = mutex.withLock { if (corrupted) null else data.activeUserId } ?: return null
+        val token = accessTokenForResolvedUserId(userId, requireActive = true) ?: return null
+        return userId to token
+    }
+
     /**
      * Resolves a local credential matching [userId], [username], or [email] (or active user if all blank)
      * and returns `(resolvedUserId, validAccessToken)`, silently refreshing via [oauth.refresh] when needed.
@@ -354,10 +360,19 @@ internal class SessionManager(
 
     private suspend fun accessTokenForResolvedUserId(userId: String, requireActive: Boolean): String? {
         return refreshLocks.getOrPut(userId) { Mutex() }.withLock {
-            val original = mutex.withLock { data.credentials.find { it.account.userId == userId } } ?: return@withLock null
-            if (original.expiresAt - clock() > 60_000) return@withLock original.accessToken
+            val original = mutex.withLock {
+                data.credentials.find { it.account.userId == userId }
+                    ?.takeIf { !requireActive || data.activeUserId == userId }
+            } ?: return@withLock null
+            val remainingMs = original.expiresAt - clock()
+            if (remainingMs > 60_000) return@withLock original.accessToken
+            val refreshToken = original.refreshToken
+            if (refreshToken == null) {
+                if (remainingMs > 0) return@withLock original.accessToken
+                throw OAuthException(true)
+            }
             val tokens = try {
-                oauth.refresh(original.refreshToken ?: throw OAuthException(true))
+                oauth.refresh(refreshToken)
             } catch (error: OAuthException) {
                 if (error.rejected) mutex.withLock {
                     if (data.credentials.find { it.account.userId == userId } == original) {

@@ -201,10 +201,15 @@ class AccountDashboardViewModelTest {
         }
 
         override suspend fun uploadAvatar(imageDataOrBase64: String, mime: String): Result<GothwadAccount?> {
-            pendingAvatarGate?.await()
-            val cur = (state.value as AccountState.SignedIn).account.copy(avatarUrl = "https://accounts.bansify.com/api/avatars/u-1?v=new")
-            state.value = AccountState.SignedIn(cur, listOf(cur))
-            return Result.success(cur)
+            val captured = (state.value as AccountState.SignedIn).account
+            val gate = pendingAvatarGate
+            gate?.await()
+            val updated = captured.copy(avatarUrl = "https://accounts.bansify.com/api/avatars/${captured.userId}?v=new")
+            val active = (state.value as? AccountState.SignedIn)?.account
+            if (active?.userId == captured.userId) {
+                state.value = AccountState.SignedIn(updated, listOf(updated))
+            }
+            return Result.success(updated)
         }
 
         override suspend fun removeAvatar(): Result<GothwadAccount?> {
@@ -564,14 +569,29 @@ class AccountDashboardViewModelTest {
         assertFalse(vm.uiState.value.canWriteProfileNatively)
         assertNull(vm.uiState.value.activeManagementDialog)
 
-        // Browser auth completion advances authSuccessCount and clears denial for the completed userId.
-        val countBeforeBrowser = vm.uiState.value.authSuccessCount
+        // Browser auth completion from an unrelated flow does NOT complete an embedded screen that
+        // was opened while already signed in and never started browser auth, whereas a screen-owned
+        // browser auth DOES clear denial, reload native management, and complete even across VM recreation.
+        val meeraId = vm.uiState.value.activeAccount!!.userId
+        val idleBaseline = AccountDashboardViewModel.SignInBaseline(
+            viewModelInstanceId = vm.viewModelInstanceId,
+            nativeSuccessCount = vm.uiState.value.authSuccessCount,
+            browserEventId = vm.uiState.value.latestBrowserAuthEventId,
+            userIds = setOf(meeraId),
+            activeUserId = meeraId,
+        )
         controller.rejectMobileScopesWith403 = false
-        val completedUserId = vm.uiState.value.activeAccount!!.userId
-        controller.browserAuthCompletion.value = BrowserAuthCompletion(generation = 1, userId = completedUserId)
+        controller.browserAuthCompletion.value = BrowserAuthCompletion(eventId = "ev-unrelated", userId = meeraId)
         advanceUntilIdle()
-        assertEquals(countBeforeBrowser + 1, vm.uiState.value.authSuccessCount)
         assertTrue(vm.uiState.value.canManageNatively)
+        assertFalse(vm.evaluateSignInCompletion(idleBaseline, startedBrowserFlow = false))
+
+        // Now simulate a screen-owned browser re-auth of the SAME user while process died & VM recreated:
+        val browserBaseline = idleBaseline.copy(browserEventId = "ev-unrelated")
+        controller.browserAuthCompletion.value = BrowserAuthCompletion(eventId = "ev-browser-reauth", userId = meeraId)
+        val postDeathVm = AccountDashboardViewModel(controller)
+        advanceUntilIdle()
+        assertTrue(postDeathVm.evaluateSignInCompletion(browserBaseline, startedBrowserFlow = true))
 
         // Late 403 from an obsolete refresh generation does not poison newer refresh state.
         val firstRefreshGate = CompletableDeferred<Boolean>()
@@ -586,26 +606,43 @@ class AccountDashboardViewModelTest {
         advanceUntilIdle()
         assertTrue(vm.uiState.value.canManageNatively)
 
-        // Switching active user clears busy state and prevents stale upload completions from sticking.
+        // Switching active user clears cached lists + mfaStatus + busy flags, and a late upload for A
+        // leaves B's newly opened dialog intact without overwriting B's snackbar.
+        assertTrue(vm.uiState.value.webSessions.isNotEmpty())
+        vm.loadMfaStatus()
+        advanceUntilIdle()
+        assertFalse(vm.uiState.value.mfaStatus?.enabled ?: true)
+
         val uploadGate = CompletableDeferred<Unit>()
         controller.pendingAvatarGate = uploadGate
         vm.uploadAvatar("data:image/jpeg;base64,abc")
         runCurrent()
         assertTrue(vm.uiState.value.isManagementBusy)
         controller.pendingAvatarGate = null
+        val userBRefreshGate = CompletableDeferred<Boolean>()
+        controller.pendingRefreshGate = userBRefreshGate
         val userB = GothwadAccount("u-b", "bella", "Bella", email = "bella@bansify.com")
         controller.state.value = AccountState.SignedIn(userB, listOf(userB))
-        advanceUntilIdle()
+        runCurrent()
+        assertTrue(vm.uiState.value.webSessions.isEmpty())
+        assertTrue(vm.uiState.value.activityFeed.isEmpty())
+        assertTrue(vm.uiState.value.authorizations.isEmpty())
+        assertNull(vm.uiState.value.mfaStatus)
         assertFalse(vm.uiState.value.isManagementBusy)
+
+        vm.openManagementDialog(ActiveManagementDialog.Phone)
         uploadGate.complete(Unit)
+        controller.pendingRefreshGate = null
+        userBRefreshGate.complete(false)
         advanceUntilIdle()
+        assertEquals(ActiveManagementDialog.Phone, vm.uiState.value.activeManagementDialog)
         assertFalse(vm.uiState.value.isManagementBusy)
+        assertFalse(vm.uiState.value.snackbarMessage == "Profile photo updated")
         assertEquals("u-b", vm.uiState.value.activeAccount?.userId)
 
-        // ViewModel-bound sign-in session tracker preserves rotation state while resetting on process recreation.
+        // ViewModel-bound sign-in entry preserves rotation state while resetting on process recreation.
         val sessionKey = "sess-1"
         vm.ensureSignInSessionInitialized(sessionKey, NativeAuthStep.SIGN_UP, "meera")
-        assertFalse(vm.evaluateSignInCompletion(sessionKey, allowWhenAlreadySignedIn = true, startedBrowserFlow = false))
         vm.setNativeAuthStep(NativeAuthStep.MFA)
         vm.ensureSignInSessionInitialized(sessionKey, NativeAuthStep.SIGN_UP, "meera")
         assertEquals(NativeAuthStep.MFA, vm.uiState.value.nativeAuth.step)
