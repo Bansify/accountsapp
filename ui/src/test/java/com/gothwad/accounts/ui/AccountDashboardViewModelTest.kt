@@ -72,6 +72,7 @@ class AccountDashboardViewModelTest {
 
         var failPeerSilentSso = false
         var requireMfaOnSignIn = false
+        var lastDeletedExpectedUserId: String? = null
         var requireMfaOnPhoneUpdate = false
         var rejectMobileScopesWith403 = false
         var failProfileSaveValidation = false
@@ -240,7 +241,11 @@ class AccountDashboardViewModelTest {
             Result.success("Password saved.")
 
         override suspend fun getMfaStatus() =
-            Result.success(MfaStatusInfo(enabled = false, enrollmentAvailable = true, recoveryCodesRemaining = 0))
+            if (rejectMobileScopesWith403) {
+                Result.failure(MobileApiException(403, "insufficient_scope", "insufficient_scope"))
+            } else {
+                Result.success(MfaStatusInfo(enabled = false, enrollmentAvailable = true, recoveryCodesRemaining = 0))
+            }
 
         override suspend fun beginMfaEnrollment(currentPassword: String) =
             Result.success(MfaEnrollmentSetup("enr-1", "SECRET123", "otpauth://totp/Gothwad:arjun?secret=SECRET123"))
@@ -257,6 +262,15 @@ class AccountDashboardViewModelTest {
         override suspend fun deleteAccount(password: String, mfaCode: String?): Result<Unit> {
             state.value = AccountState.SignedOut
             return Result.success(Unit)
+        }
+
+        override suspend fun deleteAccount(
+            password: String,
+            mfaCode: String?,
+            expectedUserId: String?,
+        ): Result<Unit> {
+            lastDeletedExpectedUserId = expectedUserId
+            return deleteAccount(password, mfaCode)
         }
     }
 
@@ -672,6 +686,11 @@ class AccountDashboardViewModelTest {
         advanceUntilIdle()
         assertTrue(vm.uiState.value.canManageNatively)
         assertTrue(vm.uiState.value.webSessions.isNotEmpty())
+
+        // deleteAccount binds expectedUserId to the active user that initiated deletion.
+        vm.deleteAccount("Pass123!", null)
+        advanceUntilIdle()
+        assertEquals(meeraAcc.userId, controller.lastDeletedExpectedUserId)
 
         // ViewModel-bound sign-in entry preserves rotation state while resetting on process recreation.
         val sessionKey = "sess-1"
