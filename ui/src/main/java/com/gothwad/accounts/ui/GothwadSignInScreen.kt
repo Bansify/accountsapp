@@ -53,11 +53,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import java.util.UUID
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -169,52 +169,20 @@ fun GothwadSignInScreen(
     val initialTheme = remember { AccountAppearancePrefs.loadTheme(context) }
     var prefsInitialized by remember { mutableStateOf(false) }
 
-    var entryConfigured by rememberSaveable { mutableStateOf(false) }
-    var baselineInitialized by rememberSaveable { mutableStateOf(false) }
-    var baselineSuccessCount by rememberSaveable { mutableIntStateOf(0) }
-    var baselineUserIdsList by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
-    var baselineActiveUserId by rememberSaveable { mutableStateOf<String?>(null) }
+    val sessionKey = rememberSaveable { UUID.randomUUID().toString() }
+    var entryPrepared by remember { mutableStateOf(false) }
     var startedBrowserFlow by rememberSaveable { mutableStateOf(false) }
-    var completionDispatched by rememberSaveable { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(sessionKey) {
         accountViewModel.setThemePreference(initialTheme)
-        if (!entryConfigured) {
-            accountViewModel.configureNativeAuthEntry(startStep, initialIdentifier)
-            accountViewModel.syncPeers()
-            entryConfigured = true
-        }
+        accountViewModel.ensureSignInSessionInitialized(sessionKey, startStep, initialIdentifier)
+        entryPrepared = true
         prefsInitialized = true
     }
 
-    LaunchedEffect(uiState.accountState, uiState.authSuccessCount, entryConfigured) {
-        if (!entryConfigured || completionDispatched) return@LaunchedEffect
-        val accountState = uiState.accountState
-        if (accountState == AccountState.Initializing) return@LaunchedEffect
-
-        if (!baselineInitialized) {
-            baselineInitialized = true
-            baselineSuccessCount = uiState.authSuccessCount
-            val existing = (accountState as? AccountState.SignedIn)
-            baselineUserIdsList = existing?.all?.map { it.userId }.orEmpty()
-            baselineActiveUserId = existing?.account?.userId
-            if (!allowWhenAlreadySignedIn && existing != null) {
-                completionDispatched = true
-                onSignedInComplete()
-            }
-            return@LaunchedEffect
-        }
-
-        val baselineUserIds = baselineUserIdsList.toSet()
-        val signedIn = accountState as? AccountState.SignedIn
-        val currentIds = signedIn?.all?.map { it.userId }?.toSet().orEmpty()
-        val hasNewAuthSuccess = uiState.authSuccessCount > baselineSuccessCount
-        val becameSignedInFromSignedOut = baselineUserIds.isEmpty() && signedIn != null
-        val addedNewLocalAccount = (currentIds - baselineUserIds).isNotEmpty()
-        val switchedAfterBrowser = startedBrowserFlow && signedIn != null && signedIn.account.userId != baselineActiveUserId
-
-        if (hasNewAuthSuccess || becameSignedInFromSignedOut || addedNewLocalAccount || switchedAfterBrowser) {
-            completionDispatched = true
+    LaunchedEffect(uiState.accountState, uiState.authSuccessCount, entryPrepared, startedBrowserFlow) {
+        if (!entryPrepared) return@LaunchedEffect
+        if (accountViewModel.evaluateSignInCompletion(sessionKey, allowWhenAlreadySignedIn, startedBrowserFlow)) {
             onSignedInComplete()
         }
     }

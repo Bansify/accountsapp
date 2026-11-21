@@ -4,6 +4,7 @@ import android.app.Activity
 import com.gothwad.accounts.core.AccountActivityEntry
 import com.gothwad.accounts.core.AccountState
 import com.gothwad.accounts.core.AuthFailure
+import com.gothwad.accounts.core.BrowserAuthCompletion
 import com.gothwad.accounts.core.ConnectedAppGrant
 import com.gothwad.accounts.core.DisconnectOutcome
 import com.gothwad.accounts.core.DiscoveredAccount
@@ -25,12 +26,14 @@ import com.gothwad.accounts.ui.model.NavigationLayoutMode
 import com.gothwad.accounts.ui.model.ThemePreference
 import com.gothwad.accounts.ui.state.AccountDashboardViewModel
 import com.gothwad.accounts.ui.state.AccountSessionController
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -55,7 +58,7 @@ class AccountDashboardViewModelTest {
         override val isRefreshing = MutableStateFlow(false)
         override val error = MutableStateFlow<AuthFailure?>(null)
         override val lastDisconnectOutcome = MutableStateFlow<DisconnectOutcome?>(null)
-        override val browserAuthCompletionCount = MutableStateFlow(0)
+        override val browserAuthCompletion = MutableStateFlow<BrowserAuthCompletion?>(null)
 
         var lastSwitchedUserId: String? = null
         var lastSignedOutUserId: String? = null
@@ -72,6 +75,8 @@ class AccountDashboardViewModelTest {
         var requireMfaOnPhoneUpdate = false
         var rejectMobileScopesWith403 = false
         var failProfileSaveValidation = false
+        var pendingAvatarGate: CompletableDeferred<Unit>? = null
+        var pendingRefreshGate: CompletableDeferred<Boolean>? = null
         var lastRevokedSessionId: String? = null
 
         override fun signIn(activity: Activity, chooseAccount: Boolean, loginHint: String?) = Unit
@@ -152,8 +157,10 @@ class AccountDashboardViewModelTest {
             return Result.success(acc)
         }
 
-        override suspend fun listWebSessions(): Result<List<WebSessionInfo>> =
-            if (rejectMobileScopesWith403) {
+        override suspend fun listWebSessions(): Result<List<WebSessionInfo>> {
+            val gate = pendingRefreshGate
+            val gateRejects = gate?.await() ?: false
+            return if (rejectMobileScopesWith403 || gateRejects) {
                 Result.failure(MobileApiException(403, "insufficient_scope", "insufficient_scope"))
             } else {
                 Result.success(
@@ -163,6 +170,7 @@ class AccountDashboardViewModelTest {
                     ),
                 )
             }
+        }
 
         override suspend fun revokeWebSession(sessionId: String): Result<Int> {
             lastRevokedSessionId = sessionId
@@ -193,6 +201,7 @@ class AccountDashboardViewModelTest {
         }
 
         override suspend fun uploadAvatar(imageDataOrBase64: String, mime: String): Result<GothwadAccount?> {
+            pendingAvatarGate?.await()
             val cur = (state.value as AccountState.SignedIn).account.copy(avatarUrl = "https://accounts.bansify.com/api/avatars/u-1?v=new")
             state.value = AccountState.SignedIn(cur, listOf(cur))
             return Result.success(cur)
@@ -555,12 +564,55 @@ class AccountDashboardViewModelTest {
         assertFalse(vm.uiState.value.canWriteProfileNatively)
         assertNull(vm.uiState.value.activeManagementDialog)
 
-        // Browser auth completion advances authSuccessCount even when the same account re-authenticates.
+        // Browser auth completion advances authSuccessCount and clears denial for the completed userId.
         val countBeforeBrowser = vm.uiState.value.authSuccessCount
         controller.rejectMobileScopesWith403 = false
-        controller.browserAuthCompletionCount.value = 1
+        val completedUserId = vm.uiState.value.activeAccount!!.userId
+        controller.browserAuthCompletion.value = BrowserAuthCompletion(generation = 1, userId = completedUserId)
         advanceUntilIdle()
         assertEquals(countBeforeBrowser + 1, vm.uiState.value.authSuccessCount)
         assertTrue(vm.uiState.value.canManageNatively)
+
+        // Late 403 from an obsolete refresh generation does not poison newer refresh state.
+        val firstRefreshGate = CompletableDeferred<Boolean>()
+        controller.pendingRefreshGate = firstRefreshGate
+        vm.refreshProfile()
+        runCurrent()
+        controller.pendingRefreshGate = null
+        vm.refreshProfile()
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.canManageNatively)
+        firstRefreshGate.complete(true)
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.canManageNatively)
+
+        // Switching active user clears busy state and prevents stale upload completions from sticking.
+        val uploadGate = CompletableDeferred<Unit>()
+        controller.pendingAvatarGate = uploadGate
+        vm.uploadAvatar("data:image/jpeg;base64,abc")
+        runCurrent()
+        assertTrue(vm.uiState.value.isManagementBusy)
+        controller.pendingAvatarGate = null
+        val userB = GothwadAccount("u-b", "bella", "Bella", email = "bella@bansify.com")
+        controller.state.value = AccountState.SignedIn(userB, listOf(userB))
+        advanceUntilIdle()
+        assertFalse(vm.uiState.value.isManagementBusy)
+        uploadGate.complete(Unit)
+        advanceUntilIdle()
+        assertFalse(vm.uiState.value.isManagementBusy)
+        assertEquals("u-b", vm.uiState.value.activeAccount?.userId)
+
+        // ViewModel-bound sign-in session tracker preserves rotation state while resetting on process recreation.
+        val sessionKey = "sess-1"
+        vm.ensureSignInSessionInitialized(sessionKey, NativeAuthStep.SIGN_UP, "meera")
+        assertFalse(vm.evaluateSignInCompletion(sessionKey, allowWhenAlreadySignedIn = true, startedBrowserFlow = false))
+        vm.setNativeAuthStep(NativeAuthStep.MFA)
+        vm.ensureSignInSessionInitialized(sessionKey, NativeAuthStep.SIGN_UP, "meera")
+        assertEquals(NativeAuthStep.MFA, vm.uiState.value.nativeAuth.step)
+
+        val recreatedVm = AccountDashboardViewModel(controller)
+        recreatedVm.ensureSignInSessionInitialized(sessionKey, NativeAuthStep.SIGN_UP, "meera")
+        assertEquals(NativeAuthStep.SIGN_UP, recreatedVm.uiState.value.nativeAuth.step)
+        assertEquals("meera", recreatedVm.uiState.value.nativeAuth.identifier)
     }
 }

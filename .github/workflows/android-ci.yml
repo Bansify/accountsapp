@@ -56,9 +56,16 @@ jobs:
           errors = [l for l in lines if re.search(r"(^e: |\berror:|Unresolved reference|Type mismatch|Compilation error|FAILURE:)", l)]
           markers = [i for i, l in enumerate(lines) if "* What went wrong:" in l]
           tail = lines[max(0, markers[-1] - 10):min(len(lines), markers[-1] + 45)] if markers else lines[-50:]
-          head_errors = "\n".join(errors[:25])[:1800]
-          tail_block = "\n".join(errors[-10:] + ([""] if errors else []) + tail)[-1600:]
-          excerpt = (head_errors + "\n...\n" + tail_block)[-3500:] if len("\n".join(errors)) > 1800 else ("\n".join(errors + ([""] if errors else []) + tail))[-3500:]
+          all_errors = "\n".join(errors)
+          if len(all_errors) <= 1800:
+              tail_part = "\n".join(tail)[-1600:]
+              excerpt = (all_errors + ("\n\n" + tail_part if tail_part else ""))[-3500:]
+          else:
+              head_errors = "\n".join(errors[:25])[:1600]
+              last_errors = "\n".join(errors[-10:])[-800:]
+              tail_part = "\n".join(tail)[-950:]
+              parts = [p for p in (head_errors, "...", last_errors, tail_part) if p]
+              excerpt = "\n".join(parts)[:3500]
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as f:
               f.write("### Gradle CI failure\n\n```text\n" + excerpt + "\n```\n")
           escaped = excerpt.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")

@@ -99,7 +99,7 @@ Work only in this `Bansify/mailapp` repository on the active session branch. Fir
      - Sign-out / Disconnect / Remove on device:
        - Sign out local account: `GothwadAccounts.signOut(userId, revokeOnServer = false)`
        - Disconnect Mail grant on server: `GothwadAccounts.signOut(userId, revokeOnServer = true)`
-       - Remove account + broadcast purge to peers: `GothwadAccounts.removeFromDevice(userId)` + `repository.deleteAccountData(email)`
+       - Remove account + broadcast purge to peers: call `GothwadAccounts.removeFromDevice(userId)` (async), then delete Mail's local Room data (`repository.deleteAccountData(email)`) **only once** `GothwadAccounts.state` confirms `userId` is absent from `(state as? AccountState.SignedIn)?.all` (or `state is AccountState.SignedOut`); if removal fails (`GothwadAccounts.error` emits `StorageUnavailable` or `userId` remains in `state`), keep the local Mail cache intact and surface the error to the user.
      - Remove local native auth form state machine (`nativeAuthState`, `openNativeSignIn`, `submitNativeIdentifier`, `submitNativePassword`, `verifyNativeMfa`, `submitNativeSignUp`, etc.) — `GothwadAccounts.openSignIn(...)` handles all of it inside `:ui`!
 
 ### 4. Replace Duplicated UI with Shared `:ui` Screens & Widgets
