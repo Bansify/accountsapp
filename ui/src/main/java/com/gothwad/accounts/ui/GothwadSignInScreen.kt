@@ -56,6 +56,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -168,20 +169,22 @@ fun GothwadSignInScreen(
     val initialTheme = remember { AccountAppearancePrefs.loadTheme(context) }
     var prefsInitialized by remember { mutableStateOf(false) }
 
-    var entryConfigured by remember { mutableStateOf(false) }
-    var baselineInitialized by remember { mutableStateOf(false) }
-    var baselineSuccessCount by remember { mutableIntStateOf(0) }
-    var baselineUserIds by remember { mutableStateOf<Set<String>>(emptySet()) }
-    var baselineActiveUserId by remember { mutableStateOf<String?>(null) }
-    var startedBrowserFlow by remember { mutableStateOf(false) }
-    var completionDispatched by remember { mutableStateOf(false) }
+    var entryConfigured by rememberSaveable { mutableStateOf(false) }
+    var baselineInitialized by rememberSaveable { mutableStateOf(false) }
+    var baselineSuccessCount by rememberSaveable { mutableIntStateOf(0) }
+    var baselineUserIdsList by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
+    var baselineActiveUserId by rememberSaveable { mutableStateOf<String?>(null) }
+    var startedBrowserFlow by rememberSaveable { mutableStateOf(false) }
+    var completionDispatched by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         accountViewModel.setThemePreference(initialTheme)
-        accountViewModel.configureNativeAuthEntry(startStep, initialIdentifier)
-        accountViewModel.syncPeers()
+        if (!entryConfigured) {
+            accountViewModel.configureNativeAuthEntry(startStep, initialIdentifier)
+            accountViewModel.syncPeers()
+            entryConfigured = true
+        }
         prefsInitialized = true
-        entryConfigured = true
     }
 
     LaunchedEffect(uiState.accountState, uiState.authSuccessCount, entryConfigured) {
@@ -193,7 +196,7 @@ fun GothwadSignInScreen(
             baselineInitialized = true
             baselineSuccessCount = uiState.authSuccessCount
             val existing = (accountState as? AccountState.SignedIn)
-            baselineUserIds = existing?.all?.map { it.userId }?.toSet().orEmpty()
+            baselineUserIdsList = existing?.all?.map { it.userId }.orEmpty()
             baselineActiveUserId = existing?.account?.userId
             if (!allowWhenAlreadySignedIn && existing != null) {
                 completionDispatched = true
@@ -202,6 +205,7 @@ fun GothwadSignInScreen(
             return@LaunchedEffect
         }
 
+        val baselineUserIds = baselineUserIdsList.toSet()
         val signedIn = accountState as? AccountState.SignedIn
         val currentIds = signedIn?.all?.map { it.userId }?.toSet().orEmpty()
         val hasNewAuthSuccess = uiState.authSuccessCount > baselineSuccessCount
@@ -223,7 +227,8 @@ fun GothwadSignInScreen(
     }
 
     val currentStep = uiState.nativeAuth.step
-    BackHandler(enabled = !uiState.nativeAuth.isBusy && currentStep != startStep) {
+    BackHandler(enabled = uiState.nativeAuth.isBusy || currentStep != startStep) {
+        if (uiState.nativeAuth.isBusy) return@BackHandler
         when (currentStep) {
             NativeAuthStep.MFA -> accountViewModel.setNativeAuthStep(NativeAuthStep.PASSWORD)
             NativeAuthStep.RESET_PASSWORD -> accountViewModel.setNativeAuthStep(NativeAuthStep.FORGOT_PASSWORD)

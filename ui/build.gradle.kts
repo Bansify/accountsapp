@@ -1,12 +1,11 @@
-group = "com.github.Bansify.accountsapp"
-version = providers.gradleProperty("version").getOrElse("0.1.0-SNAPSHOT")
-
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     `maven-publish`
 }
+group = "com.github.Bansify.accountsapp"
+version = providers.gradleProperty("version").getOrElse("0.1.0-SNAPSHOT")
 android {
     namespace = "com.gothwad.accounts.ui"
     compileSdk = 36

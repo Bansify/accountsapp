@@ -92,14 +92,14 @@ Work only in this `Bansify/mailapp` repository on the active session branch. Fir
      - `allowDebugBuild = BuildConfig.DEBUG`
    - Wire `MailApiClient(tokenProvider = MailAccessTokenProvider { GothwadAccounts.currentAccessToken() })`.
 2. **`MailViewModel.kt`**:
-   - Replace `GothwadMailAuth`, `MailAuthAccount`, `MailAuthFailure`, `DisconnectOutcome`, `DiscoveredAccount` (local copy), and `AuthScreenState` with `com.gothwad.accounts.core.GothwadAccounts`, `AccountState`, `GothwadAccount`, `AuthFailure`, `com.gothwad.accounts.core.broker.DiscoveredAccount`.
+   - Replace `GothwadMailAuth`, `MailAuthAccount`, `MailAuthFailure`, `DisconnectOutcome`, `DiscoveredAccount` (local copy), and `AuthScreenState` with `com.gothwad.accounts.core.GothwadAccounts`, `AccountState`, `GothwadAccount`, `AuthFailure`, `com.gothwad.accounts.core.DiscoveredAccount`.
    - Observe `GothwadAccounts.state` and `GothwadAccounts.discoveredAccounts` directly:
      - When `GothwadAccounts.state` emits `AccountState.SignedIn`, sync `MailRepository` accounts (`activeAccount` + `all` accounts + remove stale Room accounts no longer in `all`).
-     - When `switchAccount(email)`: find matching `userId` in `(GothwadAccounts.state.value as? AccountState.SignedIn)?.all` and call `GothwadAccounts.switchAccount(userId)`.
+     - When `switchAccount(email)`: find matching `userId` in `(GothwadAccounts.state.value as? AccountState.SignedIn)?.all` and call `GothwadAccounts.switchTo(userId)`.
      - Sign-out / Disconnect / Remove on device:
        - Sign out local account: `GothwadAccounts.signOut(userId, revokeOnServer = false)`
        - Disconnect Mail grant on server: `GothwadAccounts.signOut(userId, revokeOnServer = true)`
-       - Remove account + broadcast purge to peers: `GothwadAccounts.removeAccountFromDevice(userId)` + `repository.deleteAccountData(email)`
+       - Remove account + broadcast purge to peers: `GothwadAccounts.removeFromDevice(userId)` + `repository.deleteAccountData(email)`
      - Remove local native auth form state machine (`nativeAuthState`, `openNativeSignIn`, `submitNativeIdentifier`, `submitNativePassword`, `verifyNativeMfa`, `submitNativeSignUp`, etc.) — `GothwadAccounts.openSignIn(...)` handles all of it inside `:ui`!
 
 ### 4. Replace Duplicated UI with Shared `:ui` Screens & Widgets
@@ -113,7 +113,7 @@ Work only in this `Bansify/mailapp` repository on the active session branch. Fir
    - Replace the top-bar account avatar chip with `GothwadAccountAvatarButton(...)` (or wire Mail's existing avatar click to open `GothwadAccountSwitcherSheet(...)`).
    - Replace Mail's custom `AccountSwitcherDialog` with `:ui`'s `GothwadAccountSwitcherSheet`:
      - `onSwitchAccount` -> `viewModel.switchAccountByUserId(userId)`
-     - `onContinueWithPeerAccount` -> try `GothwadAccounts.continueWithPeerAccount(peer)` silently, or fallback to `GothwadAccounts.openSignIn(activity, startStep = NativeAuthStep.PASSWORD, initialIdentifier = peer.email ?: peer.username.orEmpty(), appName = "Bansify Mail")` on failure
+     - `onContinueWithPeerAccount` -> launch a coroutine calling `GothwadAccounts.signInSilentlyWithPeer(peer)`, inspecting its `Result` and falling back to `GothwadAccounts.openSignIn(activity, startStep = NativeAuthStep.PASSWORD, initialIdentifier = peer.email ?: peer.username.orEmpty(), appName = "Bansify Mail")` on failure
      - `onAddAnotherAccount` -> `GothwadAccounts.openSignIn(activity, appName = "Bansify Mail")`
      - `onManageGothwadAccount` -> `GothwadAccounts.openAccountManagement(activity)`
      - `onSignOutThisApp` -> `viewModel.signOutUser(account.userId)`
@@ -133,7 +133,7 @@ Work only in this `Bansify/mailapp` repository on the active session branch. Fir
    - `app/src/main/java/com/gothwad/mail/ui/components/AccountSwitcherDialog.kt`
 2. Delete obsolete tests for the deleted local auth layer (`PkceTest.kt`, `CallbackValidatorTest.kt`, `MailAuthSessionManagerTest.kt`, `NativeAuthTest.kt`, `PeerBrokerDiscoveryTest.kt` — all covered by `:core` and `:ui` tests in `accountsapp`), and keep/add Mail integration tests in `MailApiClientTest.kt`, `MailRepositorySyncTest.kt`, and `MailViewModelAuthWiringTest.kt` verifying:
    - `MailApiClient` fetches tokens cleanly from `MailAccessTokenProvider`.
-   - `MailViewModel` syncs Room accounts with `AccountState.SignedIn` and purges local mail caches on `removeAccountFromDevice`.
+   - `MailViewModel` syncs Room accounts with `AccountState.SignedIn` and purges local mail caches on `GothwadAccounts.removeFromDevice(userId)`.
 3. Update `tools/check_android_scaffold.py` so it verifies `:core` manifest components (`com.gothwad.accounts.core.AccountCallbackActivity`), `com.github.Bansify.accountsapp` dependency, `https://mail.bansify.com/oauth/callback`, and release workflow requirements without failing on deleted `.auth.*` files.
 
 ---

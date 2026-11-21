@@ -52,6 +52,9 @@ object GothwadAccounts {
     private val mutableLastDisconnectOutcome = MutableStateFlow<DisconnectOutcome?>(null)
     val lastDisconnectOutcome: StateFlow<DisconnectOutcome?> = mutableLastDisconnectOutcome.asStateFlow()
 
+    private val mutableBrowserAuthCompletionCount = MutableStateFlow(0)
+    val browserAuthCompletionCount: StateFlow<Int> = mutableBrowserAuthCompletionCount.asStateFlow()
+
     val state: StateFlow<AccountState> get() = session.state
 
     @Synchronized
@@ -82,6 +85,7 @@ object GothwadAccounts {
         mutableDiscoveredAccounts.value = emptyList()
         mutableIsRefreshing.value = false
         mutableLastDisconnectOutcome.value = null
+        mutableBrowserAuthCompletionCount.value = 0
     }
 
     private fun initInternal(
@@ -645,6 +649,7 @@ object GothwadAccounts {
                 readyOrThrow()
                 session.completeLogin(uri, config.redirectUri)
                 locallySignedOutInProcess = false
+                mutableBrowserAuthCompletionCount.value += 1
                 syncDiscoveredAccountsInternal()
             }
         } finally {

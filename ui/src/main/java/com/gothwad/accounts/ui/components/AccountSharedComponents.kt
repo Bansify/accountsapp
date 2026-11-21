@@ -236,7 +236,8 @@ fun AccountsTopAppBar(
                                 contentDescription = stringResource(R.string.gothwad_cd_back),
                             )
                         }
-                    } else if (showMenuButton) {
+                    }
+                    if (showMenuButton) {
                         IconButton(
                             onClick = onMenuClick,
                             modifier = Modifier.testTag("top_menu_button"),

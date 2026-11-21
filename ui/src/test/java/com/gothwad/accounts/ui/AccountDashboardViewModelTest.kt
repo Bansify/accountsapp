@@ -55,6 +55,7 @@ class AccountDashboardViewModelTest {
         override val isRefreshing = MutableStateFlow(false)
         override val error = MutableStateFlow<AuthFailure?>(null)
         override val lastDisconnectOutcome = MutableStateFlow<DisconnectOutcome?>(null)
+        override val browserAuthCompletionCount = MutableStateFlow(0)
 
         var lastSwitchedUserId: String? = null
         var lastSignedOutUserId: String? = null
@@ -70,6 +71,7 @@ class AccountDashboardViewModelTest {
         var requireMfaOnSignIn = false
         var requireMfaOnPhoneUpdate = false
         var rejectMobileScopesWith403 = false
+        var failProfileSaveValidation = false
         var lastRevokedSessionId: String? = null
 
         override fun signIn(activity: Activity, chooseAccount: Boolean, loginHint: String?) = Unit
@@ -179,6 +181,12 @@ class AccountDashboardViewModelTest {
             dateOfBirth: String,
             gender: String,
         ): Result<GothwadAccount?> {
+            if (rejectMobileScopesWith403) {
+                return Result.failure(MobileApiException(403, "insufficient_scope", "insufficient_scope"))
+            }
+            if (failProfileSaveValidation) {
+                return Result.failure(MobileApiException(400, "invalid_request", "invalid_request"))
+            }
             val updated = GothwadAccount("u-1", "arjun", "$firstName $lastName".trim(), firstName, lastName, "arjun@bansify.com", dateOfBirth = dateOfBirth, gender = gender)
             state.value = AccountState.SignedIn(updated, listOf(updated))
             return Result.success(updated)
@@ -529,5 +537,30 @@ class AccountDashboardViewModelTest {
         assertTrue(vm.uiState.value.canManageNatively)
         assertTrue(vm.uiState.value.canWriteProfileNatively)
         assertTrue(vm.uiState.value.webSessions.isNotEmpty())
+
+        // Validation failure during profile save keeps dialog open without downgrading scopes.
+        controller.failProfileSaveValidation = true
+        vm.openManagementDialog(ActiveManagementDialog.EditBasicProfile)
+        vm.saveBasicProfile("Meera", "Rao", "1995-01-01", "female")
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.canManageNatively)
+        assertEquals(ActiveManagementDialog.EditBasicProfile, vm.uiState.value.activeManagementDialog)
+
+        // 403 insufficient_scope during profile save downgrades cleanly and closes native dialog.
+        controller.failProfileSaveValidation = false
+        controller.rejectMobileScopesWith403 = true
+        vm.saveBasicProfile("Meera", "Rao", "1995-01-01", "female")
+        advanceUntilIdle()
+        assertFalse(vm.uiState.value.canManageNatively)
+        assertFalse(vm.uiState.value.canWriteProfileNatively)
+        assertNull(vm.uiState.value.activeManagementDialog)
+
+        // Browser auth completion advances authSuccessCount even when the same account re-authenticates.
+        val countBeforeBrowser = vm.uiState.value.authSuccessCount
+        controller.rejectMobileScopesWith403 = false
+        controller.browserAuthCompletionCount.value = 1
+        advanceUntilIdle()
+        assertEquals(countBeforeBrowser + 1, vm.uiState.value.authSuccessCount)
+        assertTrue(vm.uiState.value.canManageNatively)
     }
 }
