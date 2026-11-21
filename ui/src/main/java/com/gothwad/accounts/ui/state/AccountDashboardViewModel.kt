@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.gothwad.accounts.core.AccountActivityEntry
 import com.gothwad.accounts.core.AccountState
 import com.gothwad.accounts.core.AuthFailure
+import com.gothwad.accounts.core.BrowserAuthCompletion
 import com.gothwad.accounts.core.ConnectedAppGrant
 import com.gothwad.accounts.core.DisconnectOutcome
 import com.gothwad.accounts.core.DiscoveredAccount
@@ -29,6 +30,7 @@ import com.gothwad.accounts.ui.model.NavigationLayoutMode
 import com.gothwad.accounts.ui.model.SearchableSetting
 import com.gothwad.accounts.ui.model.SignOutDialogTarget
 import com.gothwad.accounts.ui.model.ThemePreference
+import java.util.UUID
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -44,6 +46,8 @@ interface AccountSessionController {
     val isRefreshing: StateFlow<Boolean>
     val error: StateFlow<AuthFailure?>
     val lastDisconnectOutcome: StateFlow<DisconnectOutcome?>
+        get() = MutableStateFlow(null)
+    val browserAuthCompletion: StateFlow<BrowserAuthCompletion?>
         get() = MutableStateFlow(null)
 
     fun signIn(activity: Activity, chooseAccount: Boolean = false, loginHint: String? = null)
@@ -153,6 +157,12 @@ interface AccountSessionController {
 
     suspend fun deleteAccount(password: String, mfaCode: String? = null): Result<Unit> =
         Result.failure(UnsupportedOperationException())
+
+    suspend fun deleteAccount(
+        password: String,
+        mfaCode: String?,
+        expectedUserId: String?,
+    ): Result<Unit> = deleteAccount(password, mfaCode)
 }
 
 object LiveGothwadAccountController : AccountSessionController {
@@ -161,6 +171,7 @@ object LiveGothwadAccountController : AccountSessionController {
     override val isRefreshing: StateFlow<Boolean> get() = GothwadAccounts.isRefreshing
     override val error: StateFlow<AuthFailure?> get() = GothwadAccounts.error
     override val lastDisconnectOutcome: StateFlow<DisconnectOutcome?> get() = GothwadAccounts.lastDisconnectOutcome
+    override val browserAuthCompletion: StateFlow<BrowserAuthCompletion?> get() = GothwadAccounts.browserAuthCompletion
 
     override fun signIn(activity: Activity, chooseAccount: Boolean, loginHint: String?) {
         GothwadAccounts.signIn(activity, chooseAccount, loginHint)
@@ -247,13 +258,42 @@ object LiveGothwadAccountController : AccountSessionController {
     override suspend fun exportAccountDataJson() = GothwadAccounts.exportAccountDataJson()
     override suspend fun deleteAccount(password: String, mfaCode: String?) =
         GothwadAccounts.deleteAccount(password, mfaCode)
+
+    override suspend fun deleteAccount(password: String, mfaCode: String?, expectedUserId: String?) =
+        GothwadAccounts.deleteAccount(password, mfaCode, expectedUserId)
 }
 
 class AccountDashboardViewModel(
     private val controller: AccountSessionController = LiveGothwadAccountController,
 ) : ViewModel() {
 
+    private data class ControllerSnapshot(
+        val accountState: AccountState,
+        val discoveredAccounts: List<DiscoveredAccount>,
+        val isRefreshing: Boolean,
+        val error: AuthFailure?,
+        val disconnectOutcome: DisconnectOutcome?,
+    )
+
+    data class SignInBaseline(
+        val viewModelInstanceId: String = "",
+        val nativeSuccessCount: Int = 0,
+        val browserEventId: String? = null,
+        val userIds: Set<String> = emptySet(),
+        val activeUserId: String? = null,
+    )
+
+    val viewModelInstanceId: String = UUID.randomUUID().toString()
+
     private var lastLoadedNativeUserId: String? = null
+    private var lastActiveUserId: String? = (controller.state.value as? AccountState.SignedIn)?.account?.userId
+    private var lastObservedBrowserEventId: String? = controller.browserAuthCompletion.value?.eventId
+    private var nativeRefreshGeneration: Long = 0L
+    private var activeManagementOpId: Long = 0L
+    private var activeProfileSaveOpId: Long = 0L
+    private var activeExportOpId: Long = 0L
+    private var initializedSignInSessionKey: String? = null
+    private val nativeScopeDeniedUserIds = mutableSetOf<String>()
 
     private val mutableUiState = MutableStateFlow(
         AccountDashboardUiState(
@@ -261,6 +301,7 @@ class AccountDashboardViewModel(
             discoveredAccounts = controller.discoveredAccounts.value,
             isRefreshing = controller.isRefreshing.value,
             authError = controller.error.value,
+            latestBrowserAuthEventId = controller.browserAuthCompletion.value?.eventId,
             installedVerifiedPeers = runCatching { controller.installedVerifiedPeers() }.getOrDefault(emptyList()),
             canManageNatively = runCatching { controller.canManageAccountNatively() }.getOrDefault(false),
             canWriteProfileNatively = runCatching { controller.canWriteProfileNatively() }.getOrDefault(false),
@@ -271,25 +312,44 @@ class AccountDashboardViewModel(
     init {
         viewModelScope.launch {
             combine(
-                controller.state,
-                controller.discoveredAccounts,
-                controller.isRefreshing,
-                controller.error,
-                controller.lastDisconnectOutcome,
-            ) { accountState, discovered, refreshing, err, disconnectOutcome ->
-                listOf(accountState, discovered, refreshing, err, disconnectOutcome)
-            }.collect { values ->
-                @Suppress("UNCHECKED_CAST")
-                val accountState = values[0] as AccountState
-                @Suppress("UNCHECKED_CAST")
-                val discovered = values[1] as List<DiscoveredAccount>
-                val refreshing = values[2] as Boolean
-                val err = values[3] as AuthFailure?
-                val disconnectOutcome = values[4] as DisconnectOutcome?
+                combine(
+                    controller.state,
+                    controller.discoveredAccounts,
+                    controller.isRefreshing,
+                    controller.error,
+                    controller.lastDisconnectOutcome,
+                ) { accountState, discovered, refreshing, err, disconnectOutcome ->
+                    ControllerSnapshot(accountState, discovered, refreshing, err, disconnectOutcome)
+                },
+                controller.browserAuthCompletion,
+            ) { snap, browserCompletion ->
+                snap to browserCompletion
+            }.collect { (snap, browserCompletion) ->
+                val accountState = snap.accountState
+                val discovered = snap.discoveredAccounts
+                val refreshing = snap.isRefreshing
+                val err = snap.error
+                val disconnectOutcome = snap.disconnectOutcome
                 val peers = runCatching { controller.installedVerifiedPeers() }.getOrDefault(emptyList())
-                val canManage = runCatching { controller.canManageAccountNatively() }.getOrDefault(false)
-                val canWrite = runCatching { controller.canWriteProfileNatively() }.getOrDefault(false)
                 val activeId = (accountState as? AccountState.SignedIn)?.account?.userId
+                val browserCompleted =
+                    browserCompletion != null && browserCompletion.eventId != lastObservedBrowserEventId
+                if (browserCompleted) {
+                    lastObservedBrowserEventId = browserCompletion.eventId
+                    nativeScopeDeniedUserIds.remove(browserCompletion.userId)
+                }
+                val activeUserChanged = activeId != lastActiveUserId
+                if (activeUserChanged) {
+                    lastActiveUserId = activeId
+                    lastLoadedNativeUserId = null
+                    nativeRefreshGeneration++
+                    activeManagementOpId++
+                    activeProfileSaveOpId++
+                    activeExportOpId++
+                }
+                val denied = activeId != null && activeId in nativeScopeDeniedUserIds
+                val canManage = !denied && runCatching { controller.canManageAccountNatively() }.getOrDefault(false)
+                val canWrite = !denied && runCatching { controller.canWriteProfileNatively() }.getOrDefault(false)
 
                 val outcomeMsg = when (disconnectOutcome) {
                     DisconnectOutcome.RevokedOnServer ->
@@ -310,21 +370,34 @@ class AccountDashboardViewModel(
                         discoveredAccounts = discovered,
                         isRefreshing = refreshing,
                         authError = err,
+                        latestBrowserAuthEventId = browserCompletion?.eventId ?: current.latestBrowserAuthEventId,
                         installedVerifiedPeers = peers,
                         canManageNatively = canManage,
                         canWriteProfileNatively = canWrite,
                         snackbarMessage = outcomeMsg ?: current.snackbarMessage,
-                        webSessions = if (activeId == null) emptyList() else current.webSessions,
-                        activityFeed = if (activeId == null) emptyList() else current.activityFeed,
-                        authorizations = if (activeId == null) emptyList() else current.authorizations,
+                        isSavingProfile = if (activeUserChanged) false else current.isSavingProfile,
+                        isExportingData = if (activeUserChanged) false else current.isExportingData,
+                        isManagementBusy = if (activeUserChanged) false else current.isManagementBusy,
+                        activeManagementDialog = if (activeUserChanged) null else current.activeManagementDialog,
+                        managementError = if (activeUserChanged) null else current.managementError,
+                        managementRequiresMfaPrompt = if (activeUserChanged) false else current.managementRequiresMfaPrompt,
+                        recoveryEmailPendingVerification = if (activeUserChanged) false else current.recoveryEmailPendingVerification,
+                        mfaStatus = if (activeUserChanged || activeId == null) null else current.mfaStatus,
+                        mfaSetup = if (activeUserChanged) null else current.mfaSetup,
+                        mfaRecoveryCodes = if (activeUserChanged) emptyList() else current.mfaRecoveryCodes,
+                        webSessions = if (activeId == null || activeUserChanged) emptyList() else current.webSessions,
+                        activityFeed = if (activeId == null || activeUserChanged) emptyList() else current.activityFeed,
+                        authorizations = if (activeId == null || activeUserChanged) emptyList() else current.authorizations,
                     )
                 }
 
-                if (canManage && activeId != null && activeId != lastLoadedNativeUserId) {
+                val completedForActive = browserCompleted && browserCompletion.userId == activeId
+                if (canManage && activeId != null && (activeId != lastLoadedNativeUserId || completedForActive)) {
                     lastLoadedNativeUserId = activeId
                     refreshNativeManagementData()
                 } else if (activeId == null) {
                     lastLoadedNativeUserId = null
+                    nativeRefreshGeneration++
                 }
             }
         }
@@ -424,6 +497,67 @@ class AccountDashboardViewModel(
                 ),
             )
         }
+    }
+
+    /** Configures inline native auth flow state (e.g. for [AccountSignInActivity] / [GothwadSignInScreen]). */
+    fun configureNativeAuthEntry(
+        startStep: NativeAuthStep = NativeAuthStep.IDENTIFIER,
+        initialIdentifier: String = "",
+    ) {
+        mutableUiState.update {
+            it.copy(
+                showAccountSwitcher = false,
+                nativeAuth = NativeAuthDialogState(
+                    visible = false,
+                    step = startStep,
+                    identifier = initialIdentifier.trim(),
+                ),
+            )
+        }
+    }
+
+    /**
+     * Binds an embedded or standalone [GothwadSignInScreen] session to this ViewModel so configuration
+     * changes preserve in-flight MFA/form state while process death recreates entry arguments cleanly.
+     */
+    fun ensureSignInSessionInitialized(
+        sessionKey: String,
+        startStep: NativeAuthStep = NativeAuthStep.IDENTIFIER,
+        initialIdentifier: String = "",
+    ) {
+        if (initializedSignInSessionKey == sessionKey) return
+        initializedSignInSessionKey = sessionKey
+        configureNativeAuthEntry(startStep, initialIdentifier)
+        syncPeers()
+    }
+
+    fun evaluateSignInCompletion(
+        baseline: SignInBaseline,
+        startedBrowserFlow: Boolean,
+    ): Boolean {
+        val currentState = mutableUiState.value
+        val accountState = currentState.accountState
+        if (accountState == AccountState.Initializing) return false
+
+        val signedIn = accountState as? AccountState.SignedIn
+        val currentIds = signedIn?.all?.map { it.userId }?.toSet().orEmpty()
+        val baselineVmMatches = baseline.viewModelInstanceId == viewModelInstanceId
+        val hasNewNativeSuccess = if (baselineVmMatches) {
+            currentState.authSuccessCount > baseline.nativeSuccessCount
+        } else {
+            currentState.authSuccessCount > 0
+        }
+        val hasScreenBrowserSuccess = startedBrowserFlow &&
+            signedIn != null &&
+            currentState.latestBrowserAuthEventId != null &&
+            currentState.latestBrowserAuthEventId != baseline.browserEventId
+        val becameSignedInFromSignedOut = baseline.userIds.isEmpty() && signedIn != null
+        val addedNewLocalAccount = (currentIds - baseline.userIds).isNotEmpty()
+
+        return hasNewNativeSuccess ||
+            hasScreenBrowserSuccess ||
+            becameSignedInFromSignedOut ||
+            addedNewLocalAccount
     }
 
     fun dismissNativeAuthDialog() {
@@ -540,9 +674,12 @@ class AccountDashboardViewModel(
             result.onSuccess { outcome ->
                 when (outcome) {
                     is MobileAuthSignInOutcome.Authenticated -> {
+                        val signedUserId = outcome.user?.id ?: uiState.value.activeAccount?.userId
+                        if (signedUserId != null) nativeScopeDeniedUserIds.remove(signedUserId)
                         mutableUiState.update {
                             it.copy(
                                 nativeAuth = NativeAuthDialogState(),
+                                authSuccessCount = it.authSuccessCount + 1,
                                 snackbarMessage = "Signed in as ${outcome.user?.email ?: cleanId}",
                             )
                         }
@@ -583,9 +720,11 @@ class AccountDashboardViewModel(
             mutableUiState.update { it.copy(nativeAuth = it.nativeAuth.copy(isBusy = true, errorMessage = null)) }
             val result = controller.verifyNativeMfa(challenge, cleanCode)
             result.onSuccess { acc ->
+                nativeScopeDeniedUserIds.remove(acc.userId)
                 mutableUiState.update {
                     it.copy(
                         nativeAuth = NativeAuthDialogState(),
+                        authSuccessCount = it.authSuccessCount + 1,
                         snackbarMessage = "Signed in as ${acc.email ?: acc.username ?: acc.userId}",
                     )
                 }
@@ -603,9 +742,11 @@ class AccountDashboardViewModel(
             mutableUiState.update { it.copy(nativeAuth = it.nativeAuth.copy(isBusy = true, errorMessage = null)) }
             val result = controller.signUpNative(input)
             result.onSuccess { acc ->
+                nativeScopeDeniedUserIds.remove(acc.userId)
                 mutableUiState.update {
                     it.copy(
                         nativeAuth = NativeAuthDialogState(),
+                        authSuccessCount = it.authSuccessCount + 1,
                         snackbarMessage = "Welcome to Bansify, ${acc.firstName ?: acc.username ?: acc.userId}",
                     )
                 }
@@ -681,9 +822,11 @@ class AccountDashboardViewModel(
             mutableUiState.update { it.copy(showAccountSwitcher = false, isPeerSilentSigningIn = true) }
             val result = controller.signInSilentlyWithPeer(peer)
             result.onSuccess { acc ->
+                nativeScopeDeniedUserIds.remove(acc.userId)
                 mutableUiState.update {
                     it.copy(
                         isPeerSilentSigningIn = false,
+                        authSuccessCount = it.authSuccessCount + 1,
                         snackbarMessage = "Signed in silently as ${acc.email ?: acc.username ?: acc.userId}",
                     )
                 }
@@ -792,9 +935,23 @@ class AccountDashboardViewModel(
         dateOfBirth: String,
         gender: String,
     ) {
+        val initiatingUserId = mutableUiState.value.activeAccount?.userId
+        val opId = ++activeProfileSaveOpId
         viewModelScope.launch {
             mutableUiState.update { it.copy(isSavingProfile = true) }
             val result = controller.updateBasicProfile(firstName, lastName, dateOfBirth, gender)
+            val err = result.exceptionOrNull()
+            if (opId != activeProfileSaveOpId || initiatingUserId != mutableUiState.value.activeAccount?.userId) {
+                return@launch
+            }
+            if (isInsufficientScopeError(err)) {
+                mutableUiState.update { it.copy(isSavingProfile = false) }
+                downgradeNativeManagementForUser(
+                    initiatingUserId,
+                    "Native management requires account scopes; use Manage on web.",
+                )
+                return@launch
+            }
             mutableUiState.update { current ->
                 current.copy(
                     isSavingProfile = false,
@@ -802,7 +959,7 @@ class AccountDashboardViewModel(
                     snackbarMessage = if (result.isSuccess) {
                         "Personal info updated"
                     } else {
-                        "Could not update personal info: ${result.exceptionOrNull()?.message ?: "try again"}"
+                        "Could not update personal info: ${err?.message ?: "try again"}"
                     },
                 )
             }
@@ -810,10 +967,15 @@ class AccountDashboardViewModel(
     }
 
     fun uploadAvatar(imageDataOrBase64: String, mime: String = "image/jpeg") {
+        val initiatingUserId = mutableUiState.value.activeAccount?.userId
+        val opId = ++activeManagementOpId
         viewModelScope.launch {
             mutableUiState.update { it.copy(isManagementBusy = true, managementError = null) }
             val result = controller.uploadAvatar(imageDataOrBase64, mime)
             result.onSuccess {
+                if (opId != activeManagementOpId || initiatingUserId != mutableUiState.value.activeAccount?.userId) {
+                    return@onSuccess
+                }
                 mutableUiState.update {
                     it.copy(
                         isManagementBusy = false,
@@ -822,18 +984,21 @@ class AccountDashboardViewModel(
                     )
                 }
             }.onFailure { err ->
-                mutableUiState.update {
-                    it.copy(isManagementBusy = false, managementError = err.message ?: "Failed to upload photo")
-                }
+                handleSimpleManagementFailure(err, "Failed to upload photo", initiatingUserId, opId)
             }
         }
     }
 
     fun removeAvatar() {
+        val initiatingUserId = mutableUiState.value.activeAccount?.userId
+        val opId = ++activeManagementOpId
         viewModelScope.launch {
             mutableUiState.update { it.copy(isManagementBusy = true, managementError = null) }
             val result = controller.removeAvatar()
             result.onSuccess {
+                if (opId != activeManagementOpId || initiatingUserId != mutableUiState.value.activeAccount?.userId) {
+                    return@onSuccess
+                }
                 mutableUiState.update {
                     it.copy(
                         isManagementBusy = false,
@@ -842,18 +1007,21 @@ class AccountDashboardViewModel(
                     )
                 }
             }.onFailure { err ->
-                mutableUiState.update {
-                    it.copy(isManagementBusy = false, managementError = err.message ?: "Failed to remove photo")
-                }
+                handleSimpleManagementFailure(err, "Failed to remove photo", initiatingUserId, opId)
             }
         }
     }
 
     fun updatePhoneNumber(phoneNumber: String, currentPassword: String, mfaCode: String?) {
+        val initiatingUserId = mutableUiState.value.activeAccount?.userId
+        val opId = ++activeManagementOpId
         viewModelScope.launch {
             mutableUiState.update { it.copy(isManagementBusy = true, managementError = null) }
             val result = controller.updatePhoneNumber(phoneNumber, currentPassword, mfaCode)
             result.onSuccess {
+                if (opId != activeManagementOpId || initiatingUserId != mutableUiState.value.activeAccount?.userId) {
+                    return@onSuccess
+                }
                 mutableUiState.update {
                     it.copy(
                         isManagementBusy = false,
@@ -863,16 +1031,21 @@ class AccountDashboardViewModel(
                     )
                 }
             }.onFailure { err ->
-                handleManagementFailure(err, "Could not update phone number")
+                handleManagementFailure(err, "Could not update phone number", initiatingUserId, opId)
             }
         }
     }
 
     fun requestRecoveryEmailChange(recoveryEmail: String, currentPassword: String, mfaCode: String?) {
+        val initiatingUserId = mutableUiState.value.activeAccount?.userId
+        val opId = ++activeManagementOpId
         viewModelScope.launch {
             mutableUiState.update { it.copy(isManagementBusy = true, managementError = null) }
             val result = controller.requestRecoveryEmailChange(recoveryEmail, currentPassword, mfaCode)
             result.onSuccess { msg ->
+                if (opId != activeManagementOpId || initiatingUserId != mutableUiState.value.activeAccount?.userId) {
+                    return@onSuccess
+                }
                 mutableUiState.update {
                     it.copy(
                         isManagementBusy = false,
@@ -882,16 +1055,21 @@ class AccountDashboardViewModel(
                     )
                 }
             }.onFailure { err ->
-                handleManagementFailure(err, "Could not request recovery email change")
+                handleManagementFailure(err, "Could not request recovery email change", initiatingUserId, opId)
             }
         }
     }
 
     fun verifyRecoveryEmailChange(token: String) {
+        val initiatingUserId = mutableUiState.value.activeAccount?.userId
+        val opId = ++activeManagementOpId
         viewModelScope.launch {
             mutableUiState.update { it.copy(isManagementBusy = true, managementError = null) }
             val result = controller.verifyRecoveryEmailChange(token)
             result.onSuccess {
+                if (opId != activeManagementOpId || initiatingUserId != mutableUiState.value.activeAccount?.userId) {
+                    return@onSuccess
+                }
                 mutableUiState.update {
                     it.copy(
                         isManagementBusy = false,
@@ -901,18 +1079,21 @@ class AccountDashboardViewModel(
                     )
                 }
             }.onFailure { err ->
-                mutableUiState.update {
-                    it.copy(isManagementBusy = false, managementError = err.message ?: "Verification token invalid or expired")
-                }
+                handleSimpleManagementFailure(err, "Verification token invalid or expired", initiatingUserId, opId)
             }
         }
     }
 
     fun changePassword(currentPassword: String, newPassword: String, mfaCode: String?) {
+        val initiatingUserId = mutableUiState.value.activeAccount?.userId
+        val opId = ++activeManagementOpId
         viewModelScope.launch {
             mutableUiState.update { it.copy(isManagementBusy = true, managementError = null) }
             val result = controller.changePassword(currentPassword, newPassword, mfaCode)
             result.onSuccess { message ->
+                if (opId != activeManagementOpId || initiatingUserId != mutableUiState.value.activeAccount?.userId) {
+                    return@onSuccess
+                }
                 mutableUiState.update {
                     it.copy(
                         isManagementBusy = false,
@@ -923,41 +1104,55 @@ class AccountDashboardViewModel(
                 }
                 refreshNativeManagementData()
             }.onFailure { err ->
-                handleManagementFailure(err, "Could not update password")
+                handleManagementFailure(err, "Could not update password", initiatingUserId, opId)
             }
         }
     }
 
     fun loadMfaStatus() {
+        val initiatingUserId = mutableUiState.value.activeAccount?.userId
         viewModelScope.launch {
             val result = controller.getMfaStatus()
             result.onSuccess { status ->
+                if (initiatingUserId != mutableUiState.value.activeAccount?.userId) return@onSuccess
                 mutableUiState.update { it.copy(mfaStatus = status) }
+            }.onFailure { err ->
+                if (isInsufficientScopeError(err)) {
+                    downgradeNativeManagementForUser(initiatingUserId)
+                }
             }
         }
     }
 
     fun beginMfaEnrollment(currentPassword: String) {
+        val initiatingUserId = mutableUiState.value.activeAccount?.userId
+        val opId = ++activeManagementOpId
         viewModelScope.launch {
             mutableUiState.update { it.copy(isManagementBusy = true, managementError = null) }
             val result = controller.beginMfaEnrollment(currentPassword)
             result.onSuccess { setup ->
+                if (opId != activeManagementOpId || initiatingUserId != mutableUiState.value.activeAccount?.userId) {
+                    return@onSuccess
+                }
                 mutableUiState.update {
                     it.copy(isManagementBusy = false, mfaSetup = setup, managementError = null)
                 }
             }.onFailure { err ->
-                mutableUiState.update {
-                    it.copy(isManagementBusy = false, managementError = err.message ?: "Could not start 2FA enrollment")
-                }
+                handleSimpleManagementFailure(err, "Could not start 2FA enrollment", initiatingUserId, opId)
             }
         }
     }
 
     fun confirmMfaEnrollment(currentPassword: String, enrollmentId: String, code: String) {
+        val initiatingUserId = mutableUiState.value.activeAccount?.userId
+        val opId = ++activeManagementOpId
         viewModelScope.launch {
             mutableUiState.update { it.copy(isManagementBusy = true, managementError = null) }
             val result = controller.confirmMfaEnrollment(currentPassword, enrollmentId, code)
             result.onSuccess { codes ->
+                if (opId != activeManagementOpId || initiatingUserId != mutableUiState.value.activeAccount?.userId) {
+                    return@onSuccess
+                }
                 mutableUiState.update {
                     it.copy(
                         isManagementBusy = false,
@@ -968,18 +1163,21 @@ class AccountDashboardViewModel(
                     )
                 }
             }.onFailure { err ->
-                mutableUiState.update {
-                    it.copy(isManagementBusy = false, managementError = err.message ?: "Invalid verification code")
-                }
+                handleSimpleManagementFailure(err, "Invalid verification code", initiatingUserId, opId)
             }
         }
     }
 
     fun regenerateMfaRecoveryCodes(currentPassword: String, code: String) {
+        val initiatingUserId = mutableUiState.value.activeAccount?.userId
+        val opId = ++activeManagementOpId
         viewModelScope.launch {
             mutableUiState.update { it.copy(isManagementBusy = true, managementError = null) }
             val result = controller.regenerateMfaRecoveryCodes(currentPassword, code)
             result.onSuccess { codes ->
+                if (opId != activeManagementOpId || initiatingUserId != mutableUiState.value.activeAccount?.userId) {
+                    return@onSuccess
+                }
                 mutableUiState.update {
                     it.copy(
                         isManagementBusy = false,
@@ -989,18 +1187,21 @@ class AccountDashboardViewModel(
                     )
                 }
             }.onFailure { err ->
-                mutableUiState.update {
-                    it.copy(isManagementBusy = false, managementError = err.message ?: "Could not regenerate recovery codes")
-                }
+                handleSimpleManagementFailure(err, "Could not regenerate recovery codes", initiatingUserId, opId)
             }
         }
     }
 
     fun disableMfa(currentPassword: String, code: String) {
+        val initiatingUserId = mutableUiState.value.activeAccount?.userId
+        val opId = ++activeManagementOpId
         viewModelScope.launch {
             mutableUiState.update { it.copy(isManagementBusy = true, managementError = null) }
             val result = controller.disableMfa(currentPassword, code)
             result.onSuccess {
+                if (opId != activeManagementOpId || initiatingUserId != mutableUiState.value.activeAccount?.userId) {
+                    return@onSuccess
+                }
                 mutableUiState.update {
                     it.copy(
                         isManagementBusy = false,
@@ -1012,18 +1213,21 @@ class AccountDashboardViewModel(
                     )
                 }
             }.onFailure { err ->
-                mutableUiState.update {
-                    it.copy(isManagementBusy = false, managementError = err.message ?: "Could not disable 2-Step Verification")
-                }
+                handleSimpleManagementFailure(err, "Could not disable 2-Step Verification", initiatingUserId, opId)
             }
         }
     }
 
     fun exportAccountData() {
+        val initiatingUserId = mutableUiState.value.activeAccount?.userId
+        val opId = ++activeExportOpId
         viewModelScope.launch {
             mutableUiState.update { it.copy(isExportingData = true) }
             val result = controller.exportAccountDataJson()
             result.onSuccess { jsonText ->
+                if (opId != activeExportOpId || initiatingUserId != mutableUiState.value.activeAccount?.userId) {
+                    return@onSuccess
+                }
                 mutableUiState.update {
                     it.copy(
                         isExportingData = false,
@@ -1031,21 +1235,35 @@ class AccountDashboardViewModel(
                     )
                 }
             }.onFailure { err ->
-                mutableUiState.update {
-                    it.copy(
-                        isExportingData = false,
-                        snackbarMessage = "Export failed: ${err.message ?: "try again"}",
+                if (opId != activeExportOpId || initiatingUserId != mutableUiState.value.activeAccount?.userId) {
+                    return@onFailure
+                }
+                mutableUiState.update { it.copy(isExportingData = false) }
+                if (isInsufficientScopeError(err)) {
+                    downgradeNativeManagementForUser(
+                        initiatingUserId,
+                        "Native management requires account scopes; use Manage on web.",
                     )
+                } else {
+                    mutableUiState.update {
+                        it.copy(snackbarMessage = "Export failed: ${err.message ?: "try again"}")
+                    }
                 }
             }
         }
     }
 
     fun deleteAccount(password: String, mfaCode: String?) {
+        val initiatingUserId = mutableUiState.value.activeAccount?.userId
+        val opId = ++activeManagementOpId
         viewModelScope.launch {
             mutableUiState.update { it.copy(isManagementBusy = true, managementError = null) }
-            val result = controller.deleteAccount(password, mfaCode)
+            val result = controller.deleteAccount(password, mfaCode, initiatingUserId)
             result.onSuccess {
+                val currentActiveId = mutableUiState.value.activeAccount?.userId
+                if (currentActiveId != null && (opId != activeManagementOpId || initiatingUserId != currentActiveId)) {
+                    return@onSuccess
+                }
                 mutableUiState.update {
                     it.copy(
                         isManagementBusy = false,
@@ -1055,48 +1273,75 @@ class AccountDashboardViewModel(
                     )
                 }
             }.onFailure { err ->
-                handleManagementFailure(err, "Could not delete account")
+                handleManagementFailure(err, "Could not delete account", initiatingUserId, opId)
             }
         }
     }
 
     fun revokeWebSession(sessionId: String) {
+        val initiatingUserId = mutableUiState.value.activeAccount?.userId
         viewModelScope.launch {
             val result = controller.revokeWebSession(sessionId)
             result.onSuccess {
+                if (initiatingUserId != mutableUiState.value.activeAccount?.userId) return@onSuccess
                 mutableUiState.update { it.copy(snackbarMessage = "Session signed out") }
                 refreshNativeManagementData()
             }.onFailure { err ->
-                mutableUiState.update {
-                    it.copy(snackbarMessage = "Could not sign out session: ${err.message ?: "error"}")
+                if (isInsufficientScopeError(err)) {
+                    downgradeNativeManagementForUser(
+                        initiatingUserId,
+                        "Native management requires account scopes; use Manage on web.",
+                    )
+                } else if (initiatingUserId == mutableUiState.value.activeAccount?.userId) {
+                    mutableUiState.update {
+                        it.copy(snackbarMessage = "Could not sign out session: ${err.message ?: "error"}")
+                    }
                 }
             }
         }
     }
 
     fun revokeOtherWebSessions() {
+        val initiatingUserId = mutableUiState.value.activeAccount?.userId
         viewModelScope.launch {
             val result = controller.revokeOtherWebSessions()
             result.onSuccess { count ->
+                if (initiatingUserId != mutableUiState.value.activeAccount?.userId) return@onSuccess
                 mutableUiState.update { it.copy(snackbarMessage = "Signed out $count other web session(s)") }
                 refreshNativeManagementData()
             }.onFailure { err ->
-                mutableUiState.update {
-                    it.copy(snackbarMessage = "Could not sign out other web sessions: ${err.message ?: "error"}")
+                if (isInsufficientScopeError(err)) {
+                    downgradeNativeManagementForUser(
+                        initiatingUserId,
+                        "Native management requires account scopes; use Manage on web.",
+                    )
+                } else if (initiatingUserId == mutableUiState.value.activeAccount?.userId) {
+                    mutableUiState.update {
+                        it.copy(snackbarMessage = "Could not sign out other web sessions: ${err.message ?: "error"}")
+                    }
                 }
             }
         }
     }
 
     fun revokeAppAuthorization(appId: String) {
+        val initiatingUserId = mutableUiState.value.activeAccount?.userId
         viewModelScope.launch {
             val result = controller.revokeAuthorization(appId)
             result.onSuccess {
+                if (initiatingUserId != mutableUiState.value.activeAccount?.userId) return@onSuccess
                 mutableUiState.update { it.copy(snackbarMessage = "Disconnected $appId") }
                 refreshNativeManagementData()
             }.onFailure { err ->
-                mutableUiState.update {
-                    it.copy(snackbarMessage = "Failed to disconnect app: ${err.message ?: "error"}")
+                if (isInsufficientScopeError(err)) {
+                    downgradeNativeManagementForUser(
+                        initiatingUserId,
+                        "Native management requires account scopes; use Manage on web.",
+                    )
+                } else if (initiatingUserId == mutableUiState.value.activeAccount?.userId) {
+                    mutableUiState.update {
+                        it.copy(snackbarMessage = "Failed to disconnect app: ${err.message ?: "error"}")
+                    }
                 }
             }
         }
@@ -1116,13 +1361,68 @@ class AccountDashboardViewModel(
     }
 
     fun refreshProfile() {
+        mutableUiState.value.activeAccount?.userId?.let { nativeScopeDeniedUserIds.remove(it) }
         controller.refreshProfile()
         if (controller.canManageAccountNatively()) {
             refreshNativeManagementData()
         }
     }
 
-    private fun handleManagementFailure(err: Throwable, fallback: String) {
+    private fun isInsufficientScopeError(err: Throwable?): Boolean =
+        err is MobileApiException && (err.code == 403 || err.errorCode == "insufficient_scope")
+
+    private fun downgradeNativeManagementForUser(targetUserId: String?, message: String? = null) {
+        if (targetUserId != null) {
+            nativeScopeDeniedUserIds.add(targetUserId)
+        }
+        val stillOwnsActive = targetUserId == null || mutableUiState.value.activeAccount?.userId == targetUserId
+        if (!stillOwnsActive) return
+        nativeRefreshGeneration++
+        mutableUiState.update {
+            it.copy(
+                canManageNatively = false,
+                canWriteProfileNatively = false,
+                isManagementBusy = false,
+                activeManagementDialog = null,
+                managementError = null,
+                snackbarMessage = message ?: it.snackbarMessage,
+            )
+        }
+    }
+
+    private fun handleSimpleManagementFailure(
+        err: Throwable,
+        fallback: String,
+        initiatingUserId: String?,
+        opId: Long = activeManagementOpId,
+    ) {
+        if (opId != activeManagementOpId || initiatingUserId != mutableUiState.value.activeAccount?.userId) return
+        if (isInsufficientScopeError(err)) {
+            downgradeNativeManagementForUser(
+                initiatingUserId,
+                "Native management requires account scopes; use Manage on web.",
+            )
+            return
+        }
+        mutableUiState.update {
+            it.copy(isManagementBusy = false, managementError = err.message ?: fallback)
+        }
+    }
+
+    private fun handleManagementFailure(
+        err: Throwable,
+        fallback: String,
+        initiatingUserId: String?,
+        opId: Long = activeManagementOpId,
+    ) {
+        if (opId != activeManagementOpId || initiatingUserId != mutableUiState.value.activeAccount?.userId) return
+        if (isInsufficientScopeError(err)) {
+            downgradeNativeManagementForUser(
+                initiatingUserId,
+                "Native management requires account scopes; use Manage on web.",
+            )
+            return
+        }
         val needsMfa = (err as? MobileApiException)?.errorCode == "mfa_required" ||
             err.message?.contains("authenticator", ignoreCase = true) == true
         mutableUiState.update {
@@ -1135,15 +1435,35 @@ class AccountDashboardViewModel(
     }
 
     private fun refreshNativeManagementData() {
+        val activeId = mutableUiState.value.activeAccount?.userId
+        val requestGen = ++nativeRefreshGeneration
         viewModelScope.launch {
-            val sessionsDeferred = async { controller.listWebSessions().getOrNull() }
-            val activityDeferred = async { controller.listActivity().getOrNull() }
-            val authsDeferred = async { controller.listAuthorizations().getOrNull() }
-            val sessions = sessionsDeferred.await()
-            val activity = activityDeferred.await()
-            val auths = authsDeferred.await()
+            val sessionsDeferred = async { controller.listWebSessions() }
+            val activityDeferred = async { controller.listActivity() }
+            val authsDeferred = async { controller.listAuthorizations() }
+            val sessionsRes = sessionsDeferred.await()
+            val activityRes = activityDeferred.await()
+            val authsRes = authsDeferred.await()
+            if (requestGen != nativeRefreshGeneration || activeId != mutableUiState.value.activeAccount?.userId) {
+                return@launch
+            }
+            val scopeRejected = listOf(sessionsRes, activityRes, authsRes)
+                .mapNotNull { it.exceptionOrNull() }
+                .any { isInsufficientScopeError(it) }
+            if (scopeRejected) {
+                downgradeNativeManagementForUser(activeId)
+                return@launch
+            }
+            val sessions = sessionsRes.getOrNull()
+            val activity = activityRes.getOrNull()
+            val auths = authsRes.getOrNull()
+            val denied = activeId != null && activeId in nativeScopeDeniedUserIds
+            val canManage = !denied && runCatching { controller.canManageAccountNatively() }.getOrDefault(false)
+            val canWrite = !denied && runCatching { controller.canWriteProfileNatively() }.getOrDefault(false)
             mutableUiState.update { current ->
                 current.copy(
+                    canManageNatively = canManage,
+                    canWriteProfileNatively = canWrite,
                     webSessions = sessions ?: current.webSessions,
                     activityFeed = activity ?: current.activityFeed,
                     authorizations = auths ?: current.authorizations,

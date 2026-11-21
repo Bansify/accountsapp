@@ -71,3 +71,8 @@ enum class DisconnectOutcome {
     /** Server rejected token (already invalid/revoked); local credential cleared. */
     AlreadyInvalidOnServer,
 }
+
+data class BrowserAuthCompletion(
+    val eventId: String,
+    val userId: String,
+)

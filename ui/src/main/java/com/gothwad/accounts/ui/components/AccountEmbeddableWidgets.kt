@@ -96,6 +96,9 @@ fun GothwadAccountSwitcherSheet(
     onSignOutThisApp: (GothwadAccount) -> Unit,
     onOpenPrivacy: () -> Unit,
     onOpenTerms: () -> Unit,
+    isRefreshing: Boolean = false,
+    onRefreshClick: (() -> Unit)? = null,
+    onOpenSettings: (() -> Unit)? = null,
 ) {
     val active = (accountState as? AccountState.SignedIn)?.account
     val all = (accountState as? AccountState.SignedIn)?.all.orEmpty()
@@ -104,6 +107,11 @@ fun GothwadAccountSwitcherSheet(
             activeAccount = active,
             otherLocalAccounts = all.filter { it.userId != active.userId },
             peerAccountsToAuthorize = discoveredAccounts.filter { !it.isAuthorizedLocally },
+            isRefreshing = isRefreshing,
+            onRefreshClick = onRefreshClick,
+            onOpenSettings = onOpenSettings,
+            manageButtonLabel = stringResource(R.string.gothwad_manage_account),
+            showManageExternalIcon = false,
             onDismiss = onDismiss,
             onSwitchAccount = onSwitchAccount,
             onContinueWithPeerAccount = onContinueWithPeerAccount,

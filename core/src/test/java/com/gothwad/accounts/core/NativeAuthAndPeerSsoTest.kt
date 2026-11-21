@@ -14,6 +14,7 @@ import com.gothwad.accounts.core.broker.DirectoryAccountRecord
 import com.gothwad.accounts.core.broker.DirectorySnapshot
 import com.gothwad.accounts.core.broker.KnownGothwadApps
 import com.gothwad.accounts.core.broker.PeerDirectoryTransport
+import java.io.IOException
 import java.net.InetAddress
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
@@ -397,6 +398,179 @@ class NativeAuthAndPeerSsoTest {
         assertEquals("arjun@bansify.com", signedIn.account.email)
         assertEquals("/api/oauth/token", server.takeRequest().path)
         assertEquals("/api/oauth/userinfo", server.takeRequest().path)
+    }
+
+    @Test
+    fun siblingFirstPartyClientWithAccountScopesCanManageNativelyAndSupplyCurrentAccessToken() = runTest {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val okHttp = testOkHttp()
+        val fullMailConfig = GothwadConfig(
+            clientId = "gothwad-mail",
+            redirectUri = "com.gothwad.mail:/oauth/callback",
+            authBaseUrl = server.url("/api").toString().trimEnd('/'),
+            scopes = setOf(
+                Scope.Profile,
+                Scope.Email,
+                Scope.OfflineAccess,
+                Scope.Mail,
+                Scope.AccountRead,
+                Scope.AccountProfileWrite,
+            ),
+        )
+        val store = object : TokenStore {
+            private var s = StoredSession(
+                credentials = listOf(
+                    Credential(
+                        account = GothwadAccount("u-mail", "arjun", "Arjun", email = "arjun@bansify.com"),
+                        accessToken = "mail-at-live",
+                        refreshToken = "mail-rt-live",
+                        expiresAt = System.currentTimeMillis() + 3_600_000L,
+                    ),
+                ),
+                activeUserId = "u-mail",
+            )
+            override fun read() = s
+            override fun write(value: StoredSession) { s = value }
+        }
+        GothwadAccounts.initWithStoreForTesting(
+            app,
+            fullMailConfig,
+            store,
+            oauth = OAuthClient(fullMailConfig, okHttp),
+            mobile = MobileAccountClient(fullMailConfig, okHttp),
+        )
+
+        assertTrue(GothwadAccounts.canManageAccountNatively())
+        assertTrue(GothwadAccounts.canWriteProfileNatively())
+        assertEquals("gothwad-mail", GothwadAccounts.currentClientId())
+        assertEquals("mail-at-live", GothwadAccounts.currentAccessToken())
+        assertFalse(GothwadAccounts.isAccountsAppInstalled())
+
+        installFakePackage(app, KnownGothwadApps.ACCOUNTS, 1020, byteArrayOf(0x05, 0x06))
+        assertTrue(GothwadAccounts.isAccountsAppInstalled())
+
+        // Without Scope.AccountRead, native management remains cleanly disabled.
+        GothwadAccounts.resetForTesting()
+        val mailOnlyConfig = fullMailConfig.copy(
+            scopes = setOf(Scope.Profile, Scope.Email, Scope.OfflineAccess, Scope.Mail),
+        )
+        GothwadAccounts.initWithStoreForTesting(
+            app,
+            mailOnlyConfig,
+            store,
+            oauth = OAuthClient(mailOnlyConfig, okHttp),
+            mobile = MobileAccountClient(mailOnlyConfig, okHttp),
+        )
+        assertFalse(GothwadAccounts.canManageAccountNatively())
+        assertFalse(GothwadAccounts.canWriteProfileNatively())
+    }
+
+    @Test
+    fun deleteAccountBindsExpectedUserReportsCleanupFailureAndPersistsBrowserCompletion() = runTest {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val okHttp = testOkHttp()
+        val config = testConfig()
+
+        // 1. Persisted browser completion marker survives reload & non-refreshable expired token invalidates cleanly.
+        val reloadStore = object : TokenStore {
+            private var s = StoredSession(
+                credentials = listOf(
+                    Credential(
+                        account = GothwadAccount("u-1", "arjun", "Arjun", email = "arjun@bansify.com"),
+                        accessToken = "at-no-refresh",
+                        refreshToken = null,
+                        expiresAt = System.currentTimeMillis() + 30_000L,
+                    ),
+                ),
+                activeUserId = "u-1",
+                lastBrowserCompletionEventId = "ev-persisted-1",
+                lastBrowserCompletionUserId = "u-1",
+            )
+            override fun read() = s
+            override fun write(value: StoredSession) { s = value }
+        }
+        GothwadAccounts.initWithStoreForTesting(
+            app,
+            config,
+            reloadStore,
+            oauth = OAuthClient(config, okHttp),
+            mobile = MobileAccountClient(config, okHttp),
+        )
+        // Unexpired credential without refresh token still works inside the 60s refresh window.
+        assertEquals("at-no-refresh", GothwadAccounts.currentAccessToken())
+        assertEquals(
+            BrowserAuthCompletion("ev-persisted-1", "u-1"),
+            GothwadAccounts.browserAuthCompletion.value,
+        )
+
+        // Expired credential without refresh token is removed cleanly and transitions to SignedOut.
+        GothwadAccounts.resetForTesting()
+        val expiredNoRefreshStore = object : TokenStore {
+            private var s = StoredSession(
+                credentials = listOf(
+                    Credential(
+                        account = GothwadAccount("u-exp", "expired", "Expired"),
+                        accessToken = "at-expired",
+                        refreshToken = null,
+                        expiresAt = 0L,
+                    ),
+                ),
+                activeUserId = "u-exp",
+            )
+            override fun read() = s
+            override fun write(value: StoredSession) { s = value }
+        }
+        GothwadAccounts.initWithStoreForTesting(
+            app,
+            config,
+            expiredNoRefreshStore,
+            oauth = OAuthClient(config, okHttp),
+            mobile = MobileAccountClient(config, okHttp),
+        )
+        assertNull(GothwadAccounts.currentAccessToken())
+        assertEquals(AccountState.SignedOut, GothwadAccounts.state.value)
+
+        // 2. deleteAccount refuses mismatched expectedUserId without touching server or setting SessionExpired,
+        // and surfaces local TokenStore write failure after server delete succeeds.
+        GothwadAccounts.resetForTesting()
+        var failWrites = false
+        val guardedStore = object : TokenStore {
+            private var s = StoredSession(
+                credentials = listOf(
+                    Credential(
+                        account = GothwadAccount("u-2", "bella", "Bella"),
+                        accessToken = "at-bella",
+                        refreshToken = "rt-bella",
+                        expiresAt = System.currentTimeMillis() + 3_600_000L,
+                    ),
+                ),
+                activeUserId = "u-2",
+            )
+            override fun read() = s
+            override fun write(value: StoredSession) {
+                if (failWrites) throw IOException("keystore write failed")
+                s = value
+            }
+        }
+        GothwadAccounts.initWithStoreForTesting(
+            app,
+            config,
+            guardedStore,
+            oauth = OAuthClient(config, okHttp),
+            mobile = MobileAccountClient(config, okHttp),
+        )
+        val mismatchRes = GothwadAccounts.deleteAccount("Pass123!", expectedUserId = "u-1")
+        assertTrue(mismatchRes.isFailure)
+        assertEquals(0, server.requestCount)
+        assertNull(GothwadAccounts.error.value)
+
+        failWrites = true
+        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"ok":true,"message":"deleted"}"""))
+        val cleanupFailRes = GothwadAccounts.deleteAccount("Pass123!", expectedUserId = "u-2")
+        assertTrue(cleanupFailRes.isFailure)
+        assertTrue(cleanupFailRes.exceptionOrNull()?.message?.contains("local device cleanup failed") == true)
+        assertEquals(1, server.requestCount)
+        assertTrue(GothwadAccounts.state.value is AccountState.SignedIn)
     }
 
     private fun installFakePackage(

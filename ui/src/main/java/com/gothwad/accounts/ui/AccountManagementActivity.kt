@@ -22,7 +22,7 @@ class AccountManagementActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.auto(Color.WHITE, DARK_CANVAS_COLOR),
         )
         setContent {
-            GothwadAccountsScreen(onClose = { finish() })
+            GothwadAccountsScreen(showCloseButton = true, onClose = { finish() })
         }
     }
 

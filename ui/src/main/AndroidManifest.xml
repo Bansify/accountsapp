@@ -1,3 +1,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application><activity android:name=".AccountManagementActivity" android:exported="false" /></application>
+    <application>
+        <activity
+            android:name=".AccountManagementActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+        <activity
+            android:name=".AccountSignInActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+    </application>
 </manifest>

@@ -4,6 +4,7 @@ import com.gothwad.accounts.core.broker.DirectoryAccountRecord
 import com.gothwad.accounts.core.broker.DirectorySnapshot
 import java.io.IOException
 import java.security.GeneralSecurityException
+import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,6 +26,9 @@ internal class SessionManager(
 
     private val mutableState = MutableStateFlow<AccountState>(AccountState.Initializing)
     val state = mutableState.asStateFlow()
+
+    private val mutableBrowserAuthCompletion = MutableStateFlow<BrowserAuthCompletion?>(null)
+    val browserAuthCompletion = mutableBrowserAuthCompletion.asStateFlow()
 
     suspend fun load() = mutex.withLock {
         try {
@@ -93,11 +97,14 @@ internal class SessionManager(
                     remove(account.userId)
                 }
             }
+            val nextEventId = UUID.randomUUID().toString()
             save(
                 data.copy(
                     credentials = data.credentials.filterNot { it.account.userId == account.userId } + credential,
                     activeUserId = account.userId,
                     deviceRemovalTombstones = nextTombstones,
+                    lastBrowserCompletionEventId = nextEventId,
+                    lastBrowserCompletionUserId = account.userId,
                 ),
             )
         }
@@ -325,6 +332,33 @@ internal class SessionManager(
         return accessTokenForResolvedUserId(userId, requireActive = true)
     }
 
+    internal sealed interface DeletionAuthResolution {
+        data class Ready(val userId: String, val bearerToken: String) : DeletionAuthResolution
+        data object AccountChanged : DeletionAuthResolution
+        data object NoActiveSession : DeletionAuthResolution
+    }
+
+    suspend fun activeAccessTokenForDeletion(expectedUserId: String?): DeletionAuthResolution {
+        val currentActiveId = mutex.withLock {
+            if (corrupted) null else data.activeUserId
+        } ?: return if (expectedUserId != null) DeletionAuthResolution.AccountChanged else DeletionAuthResolution.NoActiveSession
+
+        if (expectedUserId != null && currentActiveId != expectedUserId) {
+            return DeletionAuthResolution.AccountChanged
+        }
+
+        val token = accessTokenForResolvedUserId(currentActiveId, requireActive = true)
+        if (token == null) {
+            val nowActiveId = mutex.withLock { if (corrupted) null else data.activeUserId }
+            return if (nowActiveId != currentActiveId) {
+                DeletionAuthResolution.AccountChanged
+            } else {
+                DeletionAuthResolution.NoActiveSession
+            }
+        }
+        return DeletionAuthResolution.Ready(currentActiveId, token)
+    }
+
     /**
      * Resolves a local credential matching [userId], [username], or [email] (or active user if all blank)
      * and returns `(resolvedUserId, validAccessToken)`, silently refreshing via [oauth.refresh] when needed.
@@ -354,10 +388,16 @@ internal class SessionManager(
 
     private suspend fun accessTokenForResolvedUserId(userId: String, requireActive: Boolean): String? {
         return refreshLocks.getOrPut(userId) { Mutex() }.withLock {
-            val original = mutex.withLock { data.credentials.find { it.account.userId == userId } } ?: return@withLock null
-            if (original.expiresAt - clock() > 60_000) return@withLock original.accessToken
+            val original = mutex.withLock {
+                data.credentials.find { it.account.userId == userId }
+                    ?.takeIf { !requireActive || data.activeUserId == userId }
+            } ?: return@withLock null
+            val remainingMs = original.expiresAt - clock()
+            if (remainingMs > 60_000) return@withLock original.accessToken
+            val refreshToken = original.refreshToken
+            if (refreshToken == null && remainingMs > 0) return@withLock original.accessToken
             val tokens = try {
-                oauth.refresh(original.refreshToken ?: throw OAuthException(true))
+                oauth.refresh(refreshToken ?: throw OAuthException(true))
             } catch (error: OAuthException) {
                 if (error.rejected) mutex.withLock {
                     if (data.credentials.find { it.account.userId == userId } == original) {
@@ -419,6 +459,10 @@ internal class SessionManager(
         val all = data.credentials.map { it.account }
         val active = all.find { it.userId == data.activeUserId } ?: all.firstOrNull()
         mutableState.value = active?.let { AccountState.SignedIn(it, all) } ?: AccountState.SignedOut
+        val evId = data.lastBrowserCompletionEventId
+        val evUserId = data.lastBrowserCompletionUserId
+        mutableBrowserAuthCompletion.value =
+            if (evId != null && evUserId != null) BrowserAuthCompletion(evId, evUserId) else null
     }
 }
 

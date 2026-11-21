@@ -4,6 +4,7 @@ import android.app.Activity
 import com.gothwad.accounts.core.AccountActivityEntry
 import com.gothwad.accounts.core.AccountState
 import com.gothwad.accounts.core.AuthFailure
+import com.gothwad.accounts.core.BrowserAuthCompletion
 import com.gothwad.accounts.core.ConnectedAppGrant
 import com.gothwad.accounts.core.DisconnectOutcome
 import com.gothwad.accounts.core.DiscoveredAccount
@@ -25,12 +26,14 @@ import com.gothwad.accounts.ui.model.NavigationLayoutMode
 import com.gothwad.accounts.ui.model.ThemePreference
 import com.gothwad.accounts.ui.state.AccountDashboardViewModel
 import com.gothwad.accounts.ui.state.AccountSessionController
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -55,6 +58,7 @@ class AccountDashboardViewModelTest {
         override val isRefreshing = MutableStateFlow(false)
         override val error = MutableStateFlow<AuthFailure?>(null)
         override val lastDisconnectOutcome = MutableStateFlow<DisconnectOutcome?>(null)
+        override val browserAuthCompletion = MutableStateFlow<BrowserAuthCompletion?>(null)
 
         var lastSwitchedUserId: String? = null
         var lastSignedOutUserId: String? = null
@@ -68,7 +72,12 @@ class AccountDashboardViewModelTest {
 
         var failPeerSilentSso = false
         var requireMfaOnSignIn = false
+        var lastDeletedExpectedUserId: String? = null
         var requireMfaOnPhoneUpdate = false
+        var rejectMobileScopesWith403 = false
+        var failProfileSaveValidation = false
+        var pendingAvatarGate: CompletableDeferred<Unit>? = null
+        var pendingRefreshGate: CompletableDeferred<Boolean>? = null
         var lastRevokedSessionId: String? = null
 
         override fun signIn(activity: Activity, chooseAccount: Boolean, loginHint: String?) = Unit
@@ -149,13 +158,20 @@ class AccountDashboardViewModelTest {
             return Result.success(acc)
         }
 
-        override suspend fun listWebSessions(): Result<List<WebSessionInfo>> =
-            Result.success(
-                listOf(
-                    WebSessionInfo(id = "ws-1", browser = "Chrome", os = "Android", current = true),
-                    WebSessionInfo(id = "ws-2", browser = "Firefox", os = "Linux", current = false),
-                ),
-            )
+        override suspend fun listWebSessions(): Result<List<WebSessionInfo>> {
+            val gate = pendingRefreshGate
+            val gateRejects = gate?.await() ?: false
+            return if (rejectMobileScopesWith403 || gateRejects) {
+                Result.failure(MobileApiException(403, "insufficient_scope", "insufficient_scope"))
+            } else {
+                Result.success(
+                    listOf(
+                        WebSessionInfo(id = "ws-1", browser = "Chrome", os = "Android", current = true),
+                        WebSessionInfo(id = "ws-2", browser = "Firefox", os = "Linux", current = false),
+                    ),
+                )
+            }
+        }
 
         override suspend fun revokeWebSession(sessionId: String): Result<Int> {
             lastRevokedSessionId = sessionId
@@ -174,15 +190,27 @@ class AccountDashboardViewModelTest {
             dateOfBirth: String,
             gender: String,
         ): Result<GothwadAccount?> {
+            if (rejectMobileScopesWith403) {
+                return Result.failure(MobileApiException(403, "insufficient_scope", "insufficient_scope"))
+            }
+            if (failProfileSaveValidation) {
+                return Result.failure(MobileApiException(400, "invalid_request", "invalid_request"))
+            }
             val updated = GothwadAccount("u-1", "arjun", "$firstName $lastName".trim(), firstName, lastName, "arjun@bansify.com", dateOfBirth = dateOfBirth, gender = gender)
             state.value = AccountState.SignedIn(updated, listOf(updated))
             return Result.success(updated)
         }
 
         override suspend fun uploadAvatar(imageDataOrBase64: String, mime: String): Result<GothwadAccount?> {
-            val cur = (state.value as AccountState.SignedIn).account.copy(avatarUrl = "https://accounts.bansify.com/api/avatars/u-1?v=new")
-            state.value = AccountState.SignedIn(cur, listOf(cur))
-            return Result.success(cur)
+            val captured = (state.value as AccountState.SignedIn).account
+            val gate = pendingAvatarGate
+            gate?.await()
+            val updated = captured.copy(avatarUrl = "https://accounts.bansify.com/api/avatars/${captured.userId}?v=new")
+            val active = (state.value as? AccountState.SignedIn)?.account
+            if (active?.userId == captured.userId) {
+                state.value = AccountState.SignedIn(updated, listOf(updated))
+            }
+            return Result.success(updated)
         }
 
         override suspend fun removeAvatar(): Result<GothwadAccount?> {
@@ -213,7 +241,11 @@ class AccountDashboardViewModelTest {
             Result.success("Password saved.")
 
         override suspend fun getMfaStatus() =
-            Result.success(MfaStatusInfo(enabled = false, enrollmentAvailable = true, recoveryCodesRemaining = 0))
+            if (rejectMobileScopesWith403) {
+                Result.failure(MobileApiException(403, "insufficient_scope", "insufficient_scope"))
+            } else {
+                Result.success(MfaStatusInfo(enabled = false, enrollmentAvailable = true, recoveryCodesRemaining = 0))
+            }
 
         override suspend fun beginMfaEnrollment(currentPassword: String) =
             Result.success(MfaEnrollmentSetup("enr-1", "SECRET123", "otpauth://totp/Gothwad:arjun?secret=SECRET123"))
@@ -230,6 +262,15 @@ class AccountDashboardViewModelTest {
         override suspend fun deleteAccount(password: String, mfaCode: String?): Result<Unit> {
             state.value = AccountState.SignedOut
             return Result.success(Unit)
+        }
+
+        override suspend fun deleteAccount(
+            password: String,
+            mfaCode: String?,
+            expectedUserId: String?,
+        ): Result<Unit> {
+            lastDeletedExpectedUserId = expectedUserId
+            return deleteAccount(password, mfaCode)
         }
     }
 
@@ -485,5 +526,182 @@ class AccountDashboardViewModelTest {
         assertEquals(listOf(AccountSubScreen.AppSettings), vm.uiState.value.subScreenStack)
         assertTrue(vm.navigateBack())
         assertNull(vm.uiState.value.currentSubScreen)
+    }
+
+    @Test
+    fun authSuccessCountAndInsufficientScopeDegradationBehaveDeterministically() = runTest {
+        val controller = FakeController(nativeManage = true, nativeWrite = true).apply {
+            rejectMobileScopesWith403 = true
+        }
+        val vm = AccountDashboardViewModel(controller)
+
+        vm.configureNativeAuthEntry(NativeAuthStep.SIGN_UP, "meera")
+        assertFalse(vm.uiState.value.nativeAuth.visible)
+        assertEquals(NativeAuthStep.SIGN_UP, vm.uiState.value.nativeAuth.step)
+        assertEquals("meera", vm.uiState.value.nativeAuth.identifier)
+        assertEquals(0, vm.uiState.value.authSuccessCount)
+
+        // Native sign-up increments authSuccessCount cleanly.
+        vm.submitNativeSignUp(
+            NativeSignUpInput(
+                firstName = "Meera",
+                lastName = "Rao",
+                username = "meera",
+                password = "Password123!",
+                recoveryEmail = "meera@example.com",
+            ),
+        )
+        advanceUntilIdle()
+        assertEquals(1, vm.uiState.value.authSuccessCount)
+
+        // 403 insufficient_scope automatically degrades native management to web /me links without crash.
+        assertFalse(vm.uiState.value.canManageNatively)
+        assertFalse(vm.uiState.value.canWriteProfileNatively)
+
+        // Once server grants account scopes and user refreshes, native management activates cleanly.
+        controller.rejectMobileScopesWith403 = false
+        vm.refreshProfile()
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.canManageNatively)
+        assertTrue(vm.uiState.value.canWriteProfileNatively)
+        assertTrue(vm.uiState.value.webSessions.isNotEmpty())
+
+        // Validation failure during profile save keeps dialog open without downgrading scopes.
+        controller.failProfileSaveValidation = true
+        vm.openManagementDialog(ActiveManagementDialog.EditBasicProfile)
+        vm.saveBasicProfile("Meera", "Rao", "1995-01-01", "female")
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.canManageNatively)
+        assertEquals(ActiveManagementDialog.EditBasicProfile, vm.uiState.value.activeManagementDialog)
+
+        // 403 insufficient_scope during profile save downgrades cleanly and closes native dialog.
+        controller.failProfileSaveValidation = false
+        controller.rejectMobileScopesWith403 = true
+        vm.saveBasicProfile("Meera", "Rao", "1995-01-01", "female")
+        advanceUntilIdle()
+        assertFalse(vm.uiState.value.canManageNatively)
+        assertFalse(vm.uiState.value.canWriteProfileNatively)
+        assertNull(vm.uiState.value.activeManagementDialog)
+
+        // Browser auth completion from an unrelated flow does NOT complete an embedded screen that
+        // was opened while already signed in and never started browser auth, whereas a screen-owned
+        // browser auth DOES clear denial, reload native management, and complete even across VM recreation.
+        val meeraId = vm.uiState.value.activeAccount!!.userId
+        val idleBaseline = AccountDashboardViewModel.SignInBaseline(
+            viewModelInstanceId = vm.viewModelInstanceId,
+            nativeSuccessCount = vm.uiState.value.authSuccessCount,
+            browserEventId = vm.uiState.value.latestBrowserAuthEventId,
+            userIds = setOf(meeraId),
+            activeUserId = meeraId,
+        )
+        controller.rejectMobileScopesWith403 = false
+        controller.browserAuthCompletion.value = BrowserAuthCompletion(eventId = "ev-unrelated", userId = meeraId)
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.canManageNatively)
+        assertFalse(vm.evaluateSignInCompletion(idleBaseline, startedBrowserFlow = false))
+
+        // Now simulate a screen-owned browser re-auth of the SAME user while process died & VM recreated:
+        val browserBaseline = idleBaseline.copy(browserEventId = "ev-unrelated")
+        controller.browserAuthCompletion.value = BrowserAuthCompletion(eventId = "ev-browser-reauth", userId = meeraId)
+        val postDeathVm = AccountDashboardViewModel(controller)
+        advanceUntilIdle()
+        assertTrue(postDeathVm.evaluateSignInCompletion(browserBaseline, startedBrowserFlow = true))
+
+        // Canceling browser auth and switching to an already-stored account must NOT count as browser completion,
+        // nor should a stale browser event while SignedOut trigger completion.
+        val storedB = GothwadAccount("u-b-stored", "bella", "Bella", email = "bella@bansify.com")
+        val twoAccountBaseline = idleBaseline.copy(
+            browserEventId = postDeathVm.uiState.value.latestBrowserAuthEventId,
+            userIds = setOf(meeraId, storedB.userId),
+        )
+        controller.state.value = AccountState.SignedIn(storedB, listOf(controller.state.value.let { (it as AccountState.SignedIn).account }, storedB))
+        advanceUntilIdle()
+        assertFalse(postDeathVm.evaluateSignInCompletion(twoAccountBaseline, startedBrowserFlow = true))
+
+        val signedOutCheckVm = AccountDashboardViewModel(controller)
+        controller.state.value = AccountState.SignedOut
+        advanceUntilIdle()
+        assertFalse(signedOutCheckVm.evaluateSignInCompletion(browserBaseline, startedBrowserFlow = true))
+
+        // Restore active state back to Meera for subsequent management tests.
+        val meeraAcc = GothwadAccount(meeraId, "meera", "Meera", email = "meera@bansify.com")
+        controller.state.value = AccountState.SignedIn(meeraAcc, listOf(meeraAcc))
+        advanceUntilIdle()
+
+        // Late 403 from an obsolete refresh generation does not poison newer refresh state.
+        val firstRefreshGate = CompletableDeferred<Boolean>()
+        controller.pendingRefreshGate = firstRefreshGate
+        vm.refreshProfile()
+        runCurrent()
+        controller.pendingRefreshGate = null
+        vm.refreshProfile()
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.canManageNatively)
+        firstRefreshGate.complete(true)
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.canManageNatively)
+
+        // Switching active user clears cached lists + mfaStatus + busy flags, and a late upload for A
+        // leaves B's newly opened dialog intact without overwriting B's snackbar.
+        assertTrue(vm.uiState.value.webSessions.isNotEmpty())
+        vm.loadMfaStatus()
+        advanceUntilIdle()
+        assertFalse(vm.uiState.value.mfaStatus?.enabled ?: true)
+
+        val uploadGate = CompletableDeferred<Unit>()
+        controller.pendingAvatarGate = uploadGate
+        vm.uploadAvatar("data:image/jpeg;base64,abc")
+        runCurrent()
+        assertTrue(vm.uiState.value.isManagementBusy)
+        controller.pendingAvatarGate = null
+        val userBRefreshGate = CompletableDeferred<Boolean>()
+        controller.pendingRefreshGate = userBRefreshGate
+        val userB = GothwadAccount("u-b", "bella", "Bella", email = "bella@bansify.com")
+        controller.state.value = AccountState.SignedIn(userB, listOf(userB))
+        runCurrent()
+        assertTrue(vm.uiState.value.webSessions.isEmpty())
+        assertTrue(vm.uiState.value.activityFeed.isEmpty())
+        assertTrue(vm.uiState.value.authorizations.isEmpty())
+        assertNull(vm.uiState.value.mfaStatus)
+        assertFalse(vm.uiState.value.isManagementBusy)
+
+        vm.openManagementDialog(ActiveManagementDialog.Phone)
+        uploadGate.complete(Unit)
+        controller.pendingRefreshGate = null
+        userBRefreshGate.complete(false)
+        advanceUntilIdle()
+        assertEquals(ActiveManagementDialog.Phone, vm.uiState.value.activeManagementDialog)
+        assertFalse(vm.uiState.value.isManagementBusy)
+        assertFalse(vm.uiState.value.snackbarMessage == "Profile photo updated")
+        assertEquals("u-b", vm.uiState.value.activeAccount?.userId)
+
+        // Switching back from a scope-denied account to an eligible account reloads its management lists.
+        controller.rejectMobileScopesWith403 = true
+        vm.loadMfaStatus() // trigger 403 scope denial on userB
+        advanceUntilIdle()
+        assertFalse(vm.uiState.value.canManageNatively)
+
+        controller.rejectMobileScopesWith403 = false
+        controller.state.value = AccountState.SignedIn(meeraAcc, listOf(meeraAcc, userB))
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.canManageNatively)
+        assertTrue(vm.uiState.value.webSessions.isNotEmpty())
+
+        // deleteAccount binds expectedUserId to the active user that initiated deletion.
+        vm.deleteAccount("Pass123!", null)
+        advanceUntilIdle()
+        assertEquals(meeraAcc.userId, controller.lastDeletedExpectedUserId)
+
+        // ViewModel-bound sign-in entry preserves rotation state while resetting on process recreation.
+        val sessionKey = "sess-1"
+        vm.ensureSignInSessionInitialized(sessionKey, NativeAuthStep.SIGN_UP, "meera")
+        vm.setNativeAuthStep(NativeAuthStep.MFA)
+        vm.ensureSignInSessionInitialized(sessionKey, NativeAuthStep.SIGN_UP, "meera")
+        assertEquals(NativeAuthStep.MFA, vm.uiState.value.nativeAuth.step)
+
+        val recreatedVm = AccountDashboardViewModel(controller)
+        recreatedVm.ensureSignInSessionInitialized(sessionKey, NativeAuthStep.SIGN_UP, "meera")
+        assertEquals(NativeAuthStep.SIGN_UP, recreatedVm.uiState.value.nativeAuth.step)
+        assertEquals("meera", recreatedVm.uiState.value.nativeAuth.identifier)
     }
 }

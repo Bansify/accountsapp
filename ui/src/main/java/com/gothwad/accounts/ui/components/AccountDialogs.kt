@@ -89,6 +89,8 @@ fun AccountSwitcherDialog(
     isRefreshing: Boolean = false,
     onRefreshClick: (() -> Unit)? = null,
     onOpenSettings: (() -> Unit)? = null,
+    manageButtonLabel: String? = null,
+    showManageExternalIcon: Boolean = true,
     onDismiss: () -> Unit,
     onSwitchAccount: (String) -> Unit,
     onContinueWithPeerAccount: (DiscoveredAccount) -> Unit,
@@ -303,15 +305,17 @@ fun AccountSwitcherDialog(
                                 .testTag("switcher_manage_web_button"),
                         ) {
                             Text(
-                                text = stringResource(R.string.gothwad_manage_web),
+                                text = manageButtonLabel ?: stringResource(R.string.gothwad_manage_web),
                                 fontWeight = FontWeight.SemiBold,
                             )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Icon(
-                                Icons.AutoMirrored.Rounded.OpenInNew,
-                                contentDescription = null,
-                                modifier = Modifier.size(15.dp),
-                            )
+                            if (showManageExternalIcon) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Icon(
+                                    Icons.AutoMirrored.Rounded.OpenInNew,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(15.dp),
+                                )
+                            }
                         }
                     }
                 }

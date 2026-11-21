@@ -3,11 +3,14 @@ package com.gothwad.accounts.core
 import android.app.Activity
 import android.app.Application
 import android.content.ActivityNotFoundException
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Looper
 import androidx.browser.customtabs.CustomTabsIntent
 import com.gothwad.accounts.core.broker.AndroidPeerDirectoryTransport
 import com.gothwad.accounts.core.broker.DirectorySnapshot
+import com.gothwad.accounts.core.broker.KnownGothwadApps
 import com.gothwad.accounts.core.broker.PeerBrokerClient
 import com.gothwad.accounts.core.broker.PeerDirectoryTransport
 import java.io.IOException
@@ -27,12 +30,11 @@ import kotlinx.coroutines.withTimeout
 import okhttp3.Interceptor
 
 object GothwadAccounts {
-    private const val FIRST_PARTY_ACCOUNTS_CLIENT_ID = "gothwad-accounts-android"
-
     private lateinit var config: GothwadConfig
     private lateinit var session: SessionManager
     private lateinit var mobileClient: MobileAccountClient
     private lateinit var peerBroker: PeerBrokerClient
+    private var appContext: Application? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var ready: kotlinx.coroutines.Deferred<Unit>? = null
     @Volatile
@@ -49,6 +51,9 @@ object GothwadAccounts {
 
     private val mutableLastDisconnectOutcome = MutableStateFlow<DisconnectOutcome?>(null)
     val lastDisconnectOutcome: StateFlow<DisconnectOutcome?> = mutableLastDisconnectOutcome.asStateFlow()
+
+    private val mutableBrowserAuthCompletion = MutableStateFlow<BrowserAuthCompletion?>(null)
+    val browserAuthCompletion: StateFlow<BrowserAuthCompletion?> = mutableBrowserAuthCompletion.asStateFlow()
 
     val state: StateFlow<AccountState> get() = session.state
 
@@ -74,11 +79,13 @@ object GothwadAccounts {
     @Synchronized
     internal fun resetForTesting() {
         ready = null
+        appContext = null
         locallySignedOutInProcess = false
         mutableError.value = null
         mutableDiscoveredAccounts.value = emptyList()
         mutableIsRefreshing.value = false
         mutableLastDisconnectOutcome.value = null
+        mutableBrowserAuthCompletion.value = null
     }
 
     private fun initInternal(
@@ -93,6 +100,7 @@ object GothwadAccounts {
             require(this.config == config) { "GothwadAccounts.init called twice with different GothwadConfig" }
             return
         }
+        this.appContext = application
         this.config = config
         this.mobileClient = mobile
         this.session = SessionManager(
@@ -107,6 +115,7 @@ object GothwadAccounts {
         ready = scope.async {
             try {
                 session.load()
+                mutableBrowserAuthCompletion.value = session.browserAuthCompletion.value
                 syncDiscoveredAccountsInternal()
                 if (
                     session.currentLocalAccounts().isEmpty() &&
@@ -125,13 +134,45 @@ object GothwadAccounts {
         }
     }
 
+    /**
+     * Returns true when this host app requests [Scope.AccountRead] so shared `:ui` screens can
+     * manage `/api/mobile/...` Account Centre data directly. When a server or legacy cached token
+     * rejects `/api/mobile/...` with `insufficient_scope`, `:ui` degrades automatically to web `/me`.
+     */
     fun canManageAccountNatively(): Boolean =
-        ::config.isInitialized &&
-            config.clientId == FIRST_PARTY_ACCOUNTS_CLIENT_ID &&
-            Scope.AccountRead in config.scopes
+        ::config.isInitialized && Scope.AccountRead in config.scopes
 
     fun canWriteProfileNatively(): Boolean =
         canManageAccountNatively() && Scope.AccountProfileWrite in config.scopes
+
+    fun currentClientId(): String? = if (::config.isInitialized) config.clientId else null
+
+    /**
+     * Returns a valid OAuth bearer token for the currently active account (refreshing silently
+     * when near expiration), or `null` when signed out or storage is unavailable.
+     */
+    suspend fun currentAccessToken(): String? = withContext(Dispatchers.IO) {
+        runCatching {
+            readyOrThrow()
+            session.accessToken()
+        }.getOrNull()
+    }
+
+    fun isAccountsAppInstalled(): Boolean {
+        val ctx = appContext ?: return false
+        return runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ctx.packageManager.getPackageInfo(
+                    KnownGothwadApps.ACCOUNTS,
+                    PackageManager.PackageInfoFlags.of(0L),
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                ctx.packageManager.getPackageInfo(KnownGothwadApps.ACCOUNTS, 0)
+            }
+            true
+        }.getOrDefault(false)
+    }
 
     fun manageOnWeb(activity: Activity, section: String? = null) = scope.launch {
         action {
@@ -388,6 +429,7 @@ object GothwadAccounts {
         action {
             readyOrThrow()
             session.recoverCorruptedStorage()
+            mutableBrowserAuthCompletion.value = null
             syncDiscoveredAccountsInternal()
         }
     }
@@ -529,17 +571,50 @@ object GothwadAccounts {
         mobileClient.exportAccountDataJson(bearer)
     }
 
-    suspend fun deleteAccount(password: String, mfaCode: String? = null): Result<Unit> = mobileCall { bearer ->
-        requireAccountProfileWriteScope()
-        val activeUserId = session.activeUserId()
-        mobileClient.deleteAccount(bearer, password, mfaCode)
-        if (activeUserId != null) {
-            locallySignedOutInProcess = true
-            val removedAt = session.removeFromDevice(activeUserId, revokeOnServer = false)
-            peerBroker.broadcastDeviceRemoval(activeUserId, removedAt, config.brokerPolicy)
-            syncDiscoveredAccountsInternal()
+    suspend fun deleteAccount(
+        password: String,
+        mfaCode: String? = null,
+        expectedUserId: String? = null,
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            readyOrThrow()
+            requireAccountProfileWriteScope()
+            val resolution = session.activeAccessTokenForDeletion(expectedUserId)
+            val (capturedUserId, bearer) = when (resolution) {
+                is SessionManager.DeletionAuthResolution.Ready -> resolution.userId to resolution.bearerToken
+                SessionManager.DeletionAuthResolution.AccountChanged ->
+                    throw IllegalStateException("Active account changed before deletion; please try again.")
+                SessionManager.DeletionAuthResolution.NoActiveSession ->
+                    throw OAuthException(rejected = true)
+            }
+            mobileClient.deleteAccount(bearer, password, mfaCode)
+            val removedAt = try {
+                session.removeFromDevice(capturedUserId, revokeOnServer = false)
+            } catch (_: Exception) {
+                try {
+                    session.removeFromDevice(capturedUserId, revokeOnServer = false)
+                } catch (secondErr: Exception) {
+                    throw IllegalStateException(
+                        "Account deleted on server, but local device cleanup failed; remove the account locally or restart.",
+                        secondErr,
+                    )
+                }
+            }
+            runCatching {
+                peerBroker.broadcastDeviceRemoval(capturedUserId, removedAt, config.brokerPolicy)
+                syncDiscoveredAccountsInternal()
+            }
+            val anyRemainingLocal = runCatching { session.currentLocalAccounts().isNotEmpty() }.getOrDefault(false)
+            if (!anyRemainingLocal) {
+                locallySignedOutInProcess = true
+            }
+            Unit
+        }.also { result ->
+            val err = result.exceptionOrNull()
+            if (err is OAuthException && err.rejected) {
+                mutableError.value = AuthFailure.SessionExpired
+            }
         }
-        Unit
     }
 
     suspend fun fetchTrustedApps(
@@ -609,6 +684,7 @@ object GothwadAccounts {
                 readyOrThrow()
                 session.completeLogin(uri, config.redirectUri)
                 locallySignedOutInProcess = false
+                mutableBrowserAuthCompletion.value = session.browserAuthCompletion.value
                 syncDiscoveredAccountsInternal()
             }
         } finally {

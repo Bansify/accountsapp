@@ -2,6 +2,9 @@
     <string name="gothwad_accounts">Bansify Accounts</string>
     <string name="gothwad_account_brand">Bansify Account</string>
     <string name="gothwad_sign_in">Sign in to Bansify</string>
+    <string name="gothwad_create_account">Create account</string>
+    <string name="gothwad_sign_in_continue_to">Continue to %1$s</string>
+    <string name="gothwad_native_auth_subtitle">One secure identity for Mail, Drive, Meet, Notes &amp; Kiwi Store.</string>
     <string name="gothwad_sign_in_browser">Sign in with Browser</string>
     <string name="gothwad_continue_as">Continue as %1$s</string>
     <string name="gothwad_auth_description">Sign in or create your Bansify Account directly in this app — no browser required.</string>
